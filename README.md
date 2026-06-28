@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ScoutforU ATS
 
-## Getting Started
+A standalone, multi-tenant **Applicant Tracking System** for ScoutforU Consultants —
+a 9-stage candidate pipeline with drag-and-drop, role-based access (Master Admin /
+Recruiter / Client), and live multi-user updates. Built natively from the design
+reference in [`design-reference/`](./design-reference).
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** (App Router) + **TypeScript** + **Tailwind CSS v4**
+- **shadcn/ui** (Base UI primitives) for components
+- **Supabase** — Postgres + Auth + Row-Level Security + Realtime
+- **@dnd-kit** for accessible drag-and-drop
+- Deploy target: **Vercel + Supabase**
+
+## Architecture
+
+```
+src/
+  app/
+    login/                 # auth screen (email/password + demo accounts)
+    (app)/                 # authenticated shell + every view
+      layout.tsx           # sidebar + topbar + global drawer/modals + realtime
+      pipeline/ jobs/ candidates/ interviews/ offers/
+      overview/ analytics/ team/ talent/ admin/
+  components/              # sidebar, topbar, drawer, modals, shared bits
+  lib/
+    domain.ts              # 9 stages, colors, helpers (single source of truth)
+    data.ts                # scope-aware workspace loader + analytics
+    auth.ts  preview.ts    # profile/session + admin "Preview as"
+    actions/               # server actions (mutations, auth, preview)
+    supabase/              # browser / server / proxy clients
+    database.types.ts      # typed schema
+supabase/
+  migrations/              # schema -> functions/triggers -> RLS -> settings
+scripts/seed.mjs           # auth users + full prototype dataset
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Key design points**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Every stage change is logged by a **Postgres trigger** (`stage_events`), and
+  `entered_stage_at` is reset automatically — so the candidate timeline, activity
+  feed, and time-in-stage analytics are all driven by real history, never local state.
+- **RLS enforces scoping server-side**: Master Admin & Recruiter see everything;
+  Client logins can only ever read their own client's jobs/candidates (SELECT-only).
+- The Master Admin topbar has a **Preview as** switch that narrows the UI to a
+  recruiter or a specific client for testing — real security always rides on the RLS
+  of whoever is authenticated.
+- A single Realtime subscription refreshes the UI when anyone changes shared data.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup
 
-## Learn More
+### 1. Create a Supabase project
 
-To learn more about Next.js, take a look at the following resources:
+At [app.supabase.com](https://app.supabase.com) create a project, then copy
+**Project URL**, **anon key**, and **service_role key** from Project Settings → API.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. Environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cp .env.local.example .env.local
+# fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+```
 
-## Deploy on Vercel
+### 3. Apply migrations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Option A — Supabase CLI (recommended):**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+```
+
+**Option B — SQL editor:** paste the files in `supabase/migrations/` in numeric
+order (0001 → 0004) into the Supabase SQL editor and run them.
+
+### 4. Seed data
+
+```bash
+node scripts/seed.mjs
+```
+
+Creates the demo accounts and loads the full dataset (3 clients, 8 roles,
+26 candidates, interviews, offers, and stage history).
+
+### 5. Run
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+```
+
+## Demo accounts
+
+Password for all: **`scoutforu123`** (override with `SEED_PASSWORD`).
+
+| Role          | Email                       | Sees                                  |
+| ------------- | --------------------------- | ------------------------------------- |
+| Master Admin  | `riya.sharma@scoutforu.in`  | Everything; can Preview-as any role   |
+| Recruiter     | `aisha.khan@scoutforu.in`   | All jobs/candidates, read + write     |
+| Client        | `hr@acme.com`               | Acme Corp pipelines only, read-only   |
+
+## Scripts
+
+| Command                 | Description          |
+| ----------------------- | -------------------- |
+| `npm run dev`           | Dev server           |
+| `npm run build`         | Production build     |
+| `npm run lint`          | ESLint               |
+| `node scripts/seed.mjs` | Reset + reseed data  |
+
+## Deploy
+
+Push to GitHub, import into Vercel, set the three Supabase env vars in the Vercel
+project, and point Supabase Auth → URL Configuration at your deployed domain.
