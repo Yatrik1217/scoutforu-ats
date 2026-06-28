@@ -81,7 +81,7 @@ const ADMIN = {
   color: "#2a6fdb",
 };
 const RECRUITERS = [
-  { email: "yashashvi.shsh@scoutforu.com", name: "Yashashvi Shah", color: "#2a6fdb" },
+  { email: "yashashvi.shah@scoutforu.com", name: "Yashashvi Shah", color: "#2a6fdb" },
   { email: "shivani.meena@scoutforu.com", name: "Shivani Meena", color: "#8b5cf6" },
 ];
 const CLIENT_USER = {
@@ -165,11 +165,21 @@ async function wipe() {
     const { error } = await db.from(t).delete().not("id", "is", null);
     if (error) throw new Error(`wipe ${t}: ${error.message}`);
   }
-  // delete seed auth users (cascades their profiles)
+  // delete seed auth users (cascades their profiles), including any superseded
+  // emails from earlier seed runs so they don't linger.
+  const LEGACY_EMAILS = [
+    "yashashvi.shsh@scoutforu.com",
+    "riya.sharma@scoutforu.in",
+    "aisha.khan@scoutforu.in",
+    "rahul.verma@scoutforu.in",
+    "meera.nair@scoutforu.in",
+    "tom.brooks@scoutforu.in",
+  ];
   const emails = new Set([
     ADMIN.email,
     CLIENT_USER.email,
     ...RECRUITERS.map((r) => r.email),
+    ...LEGACY_EMAILS,
   ]);
   let page = 1;
   for (;;) {

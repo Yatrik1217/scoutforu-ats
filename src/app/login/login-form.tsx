@@ -5,7 +5,7 @@ import { signInAction } from "@/lib/actions/auth";
 
 const DEMO = [
   { label: "Master Admin", email: "yatrik@scoutforu.com", color: "#2a6fdb" },
-  { label: "Recruiter", email: "yashashvi.shsh@scoutforu.com", color: "#8b5cf6" },
+  { label: "Recruiter", email: "yashashvi.shah@scoutforu.com", color: "#8b5cf6" },
   { label: "Client", email: "hr@acme.com", color: "#f59e0b" },
 ];
 

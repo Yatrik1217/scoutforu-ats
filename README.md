@@ -97,7 +97,7 @@ Password for all: **`scoutforu123`** (override with `SEED_PASSWORD`).
 | Role          | Email                          | Sees                                  |
 | ------------- | ------------------------------ | ------------------------------------- |
 | Master Admin  | `yatrik@scoutforu.com`         | Everything; can Preview-as any role   |
-| Recruiter     | `yashashvi.shsh@scoutforu.com` | All jobs/candidates, read + write     |
+| Recruiter     | `yashashvi.shah@scoutforu.com` | All jobs/candidates, read + write     |
 | Recruiter     | `shivani.meena@scoutforu.com`  | All jobs/candidates, read + write     |
 | Client        | `hr@acme.com`                  | Acme Corp pipelines only, read-only   |
 
