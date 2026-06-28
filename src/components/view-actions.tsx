@@ -8,6 +8,7 @@ import { useShell } from "@/components/shell-provider";
 import {
   acceptOffer,
   advanceTalent,
+  setUserActive,
   updateSetting,
 } from "@/lib/actions/mutations";
 
@@ -137,6 +138,39 @@ export function TalentAdvance({ id }: { id: string }) {
       className="mt-3.5 w-full rounded-[9px] bg-[#eef4fe] py-2.5 text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd] disabled:opacity-60"
     >
       Move to Screening →
+    </button>
+  );
+}
+
+export function UserActiveToggle({
+  id,
+  active,
+}: {
+  id: string;
+  active: boolean;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await setUserActive(id, !active);
+          if (res.ok) {
+            toast.success(res.message ?? "Updated");
+            router.refresh();
+          } else toast.error(res.error ?? "Failed");
+        })
+      }
+      className="rounded-lg border px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-50"
+      style={
+        active
+          ? { borderColor: "#f3c4c4", background: "#fef2f2", color: "#dc2626" }
+          : { borderColor: "#bfe6cd", background: "#e9f9ef", color: "#16a34a" }
+      }
+    >
+      {active ? "Deactivate" : "Activate"}
     </button>
   );
 }

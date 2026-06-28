@@ -15,7 +15,11 @@ export default async function AppLayout({
   const sb = await createClient();
   const [{ data: clients }, { data: team }, counts] = await Promise.all([
     sb.from("clients").select("*").order("name"),
-    sb.from("profiles").select("*").neq("role", "client"),
+    sb
+      .from("profiles")
+      .select("*")
+      .neq("role", "client")
+      .eq("active", true),
     getNavCounts(),
   ]);
   const scope = await getEffectiveScope(profile, clients ?? []);

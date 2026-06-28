@@ -94,11 +94,16 @@ npm run dev      # http://localhost:3000
 
 Password for all: **`scoutforu123`** (override with `SEED_PASSWORD`).
 
-| Role          | Email                       | Sees                                  |
-| ------------- | --------------------------- | ------------------------------------- |
-| Master Admin  | `riya.sharma@scoutforu.in`  | Everything; can Preview-as any role   |
-| Recruiter     | `aisha.khan@scoutforu.in`   | All jobs/candidates, read + write     |
-| Client        | `hr@acme.com`               | Acme Corp pipelines only, read-only   |
+| Role          | Email                          | Sees                                  |
+| ------------- | ------------------------------ | ------------------------------------- |
+| Master Admin  | `yatrik@scoutforu.com`         | Everything; can Preview-as any role   |
+| Recruiter     | `yashashvi.shsh@scoutforu.com` | All jobs/candidates, read + write     |
+| Recruiter     | `shivani.meena@scoutforu.com`  | All jobs/candidates, read + write     |
+| Client        | `hr@acme.com`                  | Acme Corp pipelines only, read-only   |
+
+Admins can **activate / deactivate recruiters** from Admin → Users & Roles.
+Deactivated recruiters can't sign in (and are locked out mid-session), and they
+no longer appear in assignment dropdowns; their historical data is preserved.
 
 ## Scripts
 

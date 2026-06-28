@@ -12,8 +12,22 @@ export async function signInAction(
   if (!email || !password) return { error: "Enter your email and password." };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
   if (error) return { error: "Invalid email or password." };
+
+  // Block deactivated accounts.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("active")
+    .eq("id", data.user.id)
+    .single();
+  if (profile && profile.active === false) {
+    await supabase.auth.signOut();
+    return { error: "Your account has been deactivated. Contact your admin." };
+  }
 
   redirect("/pipeline");
 }

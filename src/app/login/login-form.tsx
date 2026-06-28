@@ -4,8 +4,8 @@ import { useActionState, useState } from "react";
 import { signInAction } from "@/lib/actions/auth";
 
 const DEMO = [
-  { label: "Master Admin", email: "riya.sharma@scoutforu.in", color: "#2a6fdb" },
-  { label: "Recruiter", email: "aisha.khan@scoutforu.in", color: "#8b5cf6" },
+  { label: "Master Admin", email: "yatrik@scoutforu.com", color: "#2a6fdb" },
+  { label: "Recruiter", email: "yashashvi.shsh@scoutforu.com", color: "#8b5cf6" },
   { label: "Client", email: "hr@acme.com", color: "#f59e0b" },
 ];
 

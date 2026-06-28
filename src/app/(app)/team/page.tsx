@@ -36,8 +36,15 @@ export default async function TeamPage() {
                     Recruiter
                   </div>
                 </div>
-                <span className="rounded-full bg-[#e9f9ef] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">
-                  Active
+                <span
+                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                  style={
+                    t.active
+                      ? { background: "#e9f9ef", color: "#16a34a" }
+                      : { background: "#fef2f2", color: "#dc2626" }
+                  }
+                >
+                  {t.active ? "Active" : "Inactive"}
                 </span>
               </div>
               <div className="mt-[18px] flex gap-2.5">

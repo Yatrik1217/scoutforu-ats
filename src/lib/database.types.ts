@@ -34,6 +34,7 @@ export type ProfileRow = {
   role: UserRole;
   color: string;
   client_id: string | null;
+  active: boolean;
   created_at: string;
 };
 

@@ -2,7 +2,7 @@ import { Building2 } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
 import { ROLE_LABEL } from "@/lib/domain";
 import { Avatar } from "@/components/bits";
-import { SettingsToggle } from "@/components/view-actions";
+import { SettingsToggle, UserActiveToggle } from "@/components/view-actions";
 import type { UserRole } from "@/lib/database.types";
 
 const ROLE_BADGE: Record<UserRole, { color: string; bg: string }> = {
@@ -41,9 +41,19 @@ export default async function AdminPage() {
           >
             <Avatar name={u.name} size={36} />
             <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-bold">{u.name}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-[13.5px] font-bold">{u.name}</span>
+                {!u.active && (
+                  <span className="rounded-full bg-[#fef2f2] px-2 py-0.5 text-[10px] font-bold text-[#dc2626]">
+                    Inactive
+                  </span>
+                )}
+              </div>
               <div className="text-[11.5px] text-[#9aa4b6]">{u.email}</div>
             </div>
+            {isAdmin && u.role === "recruiter" && (
+              <UserActiveToggle id={u.id} active={u.active} />
+            )}
             <span
               className="rounded-full px-2.5 py-1 text-[11px] font-bold"
               style={{

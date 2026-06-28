@@ -154,6 +154,17 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
   return { ok: true, message: "Interview scheduled" };
 }
 
+export async function setUserActive(
+  id: string,
+  active: boolean,
+): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("profiles").update({ active }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: active ? "Recruiter activated" : "Recruiter deactivated" };
+}
+
 export async function updateSetting(
   key: "email_notif" | "auto_reject" | "client_portal" | "two_factor",
   value: boolean,

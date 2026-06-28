@@ -75,16 +75,14 @@ const STAGE_DAYS = {
 
 // ---- people ----
 const ADMIN = {
-  email: "riya.sharma@scoutforu.in",
-  name: "Riya Sharma",
+  email: "yatrik@scoutforu.com",
+  name: "Yatrik",
   role: "master_admin",
   color: "#2a6fdb",
 };
 const RECRUITERS = [
-  { email: "aisha.khan@scoutforu.in", name: "Aisha Khan", color: "#2a6fdb" },
-  { email: "rahul.verma@scoutforu.in", name: "Rahul Verma", color: "#8b5cf6" },
-  { email: "meera.nair@scoutforu.in", name: "Meera Nair", color: "#06b6d4" },
-  { email: "tom.brooks@scoutforu.in", name: "Tom Brooks", color: "#f59e0b" },
+  { email: "yashashvi.shsh@scoutforu.com", name: "Yashashvi Shah", color: "#2a6fdb" },
+  { email: "shivani.meena@scoutforu.com", name: "Shivani Meena", color: "#8b5cf6" },
 ];
 const CLIENT_USER = {
   email: "hr@acme.com",
@@ -93,6 +91,16 @@ const CLIENT_USER = {
   color: "#f59e0b",
   clientName: "Acme Corp",
 };
+
+// The prototype dataset references four demo recruiters; remap their work onto
+// the two real recruiters so jobs/candidates/interviews stay populated.
+const REMAP = {
+  "Aisha Khan": "Yashashvi Shah",
+  "Meera Nair": "Yashashvi Shah",
+  "Rahul Verma": "Shivani Meena",
+  "Tom Brooks": "Shivani Meena",
+};
+const recName = (name) => REMAP[name] ?? name;
 
 const CLIENTS = [
   { name: "Acme Corp", status: "Active", contact_email: "hr@acme.com" },
@@ -213,7 +221,7 @@ async function main() {
     type: j[4],
     openings: j[5],
     client_id: clientId[j[6]] ?? null,
-    recruiter_id: userId[j[7]] ?? null,
+    recruiter_id: userId[recName(j[7])] ?? null,
     posted_at: ago(j[8]),
     applicants_count: j[9],
     status: j[10],
@@ -242,7 +250,7 @@ async function main() {
         exp_years: exp,
         location: loc,
         source,
-        recruiter_id: userId[recruiter] ?? null,
+        recruiter_id: userId[recName(recruiter)] ?? null,
         salary_lpa: salary,
         tags: tagsByCode[code] ?? [],
         entered_stage_at: enteredAt,
@@ -264,7 +272,7 @@ async function main() {
         candidate_id: row.id,
         from_stage: i === 0 ? null : STAGE_ORDER[i - 1],
         to_stage: prevSlug,
-        by_user_id: userId[recruiter] ?? null,
+        by_user_id: userId[recName(recruiter)] ?? null,
         created_at: ago(t),
       });
     }
@@ -279,7 +287,7 @@ async function main() {
     candidate_id: candIdByName[iv[0]],
     scheduled_at: fromNow(iv[1], iv[2], iv[3]),
     type: iv[4],
-    interviewer_id: userId[iv[5]] ?? null,
+    interviewer_id: userId[recName(iv[5])] ?? null,
     created_by: userId[ADMIN.name],
   })).filter((r) => r.candidate_id);
   const { error: iErr } = await db.from("interviews").insert(interviewRows);
@@ -306,7 +314,7 @@ async function main() {
   console.log(`  Demo password for all accounts: ${PASSWORD}`);
   console.log("  Logins:");
   console.log(`   • Master Admin → ${ADMIN.email}`);
-  console.log(`   • Recruiter    → ${RECRUITERS[0].email}`);
+  console.log(`   • Recruiters   → ${RECRUITERS.map((r) => r.email).join(", ")}`);
   console.log(`   • Client       → ${CLIENT_USER.email}`);
 }
 

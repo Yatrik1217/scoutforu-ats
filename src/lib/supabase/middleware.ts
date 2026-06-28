@@ -50,6 +50,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Lock out a user who was deactivated mid-session.
+  if (user && !isPublic) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("active")
+      .eq("id", user.id)
+      .single();
+    if (profile && profile.active === false) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("deactivated", "1");
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";

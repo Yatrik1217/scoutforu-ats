@@ -1,6 +1,11 @@
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deactivated?: string }>;
+}) {
+  const { deactivated } = await searchParams;
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#eef1f6] p-6">
       <div className="w-full max-w-[400px]">
@@ -38,6 +43,11 @@ export default function LoginPage() {
           <p className="mb-5 text-[13px] font-medium text-[#8a94a6]">
             Sign in to your recruitment workspace
           </p>
+          {deactivated && (
+            <div className="mb-4 rounded-[10px] bg-[#fef2f2] px-3.5 py-2.5 text-xs font-semibold text-[#dc2626]">
+              Your account has been deactivated. Contact your admin.
+            </div>
+          )}
           <LoginForm />
         </div>
 
