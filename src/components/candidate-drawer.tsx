@@ -107,8 +107,8 @@ export function CandidateDrawer({
       const res = await fn(candidateId);
       if (res.ok) {
         toast.success(res.message ?? "Done");
+        router.refresh();
         if (close) onClose();
-        else router.refresh();
       } else {
         toast.error(res.error ?? "Action failed");
       }

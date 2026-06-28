@@ -7,7 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useShell } from "@/components/shell-provider";
@@ -126,9 +125,9 @@ export function AppTopbar({
         <DropdownMenuContent align="end" className="w-[248px]">
           {isAdmin ? (
             <>
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#9aa4b6]">
+              <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[#9aa4b6]">
                 Switch Role / View
-              </DropdownMenuLabel>
+              </div>
               <PreviewItem
                 label="Master Admin"
                 scope="Full access · all clients"
@@ -155,9 +154,9 @@ export function AppTopbar({
               ))}
             </>
           ) : (
-            <DropdownMenuLabel className="text-[12px] font-semibold text-[#42506b]">
+            <div className="px-2 py-1.5 text-[12px] font-semibold text-[#42506b]">
               {scopeLabel}
-            </DropdownMenuLabel>
+            </div>
           )}
           <DropdownMenuItem
             onClick={() => start(() => signOutAction())}
