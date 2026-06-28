@@ -1,4 +1,4 @@
--- ScoutforU ATS — full database setup (migrations 0001–0005 combined)
+-- ScoutforU ATS — full database setup (migrations combined)
 -- Paste this whole file into the Supabase SQL editor and Run.
 
 -- ============================================================
@@ -365,4 +365,18 @@ create policy app_settings_admin_write on public.app_settings
 -- excluded from assignment lists, but their historical data is preserved.
 alter table public.profiles
   add column active boolean not null default true;
+
+-- ============================================================
+-- supabase/migrations/0006_more_fields.sql
+-- ============================================================
+-- Richer recruitment fields (Indian market): candidate CTC/ECTC + notice period,
+-- and a client-given budget band on the job/requisition.
+alter table public.candidates
+  add column current_ctc_lpa numeric not null default 0,
+  add column expected_ctc_lpa numeric not null default 0,
+  add column notice_period_days integer not null default 0;
+
+alter table public.jobs
+  add column min_ctc_lpa numeric not null default 0,
+  add column max_ctc_lpa numeric not null default 0;
 

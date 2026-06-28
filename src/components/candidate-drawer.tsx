@@ -7,7 +7,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X, ArrowRight, Mail, Calendar } from "lucide-react";
+import { X, ArrowRight, Mail, Calendar, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   PIPELINE_STAGES,
@@ -20,7 +20,11 @@ import {
   daysInStage,
   type StageKey,
 } from "@/lib/domain";
-import { advanceCandidate, rejectCandidate } from "@/lib/actions/mutations";
+import {
+  advanceCandidate,
+  rejectCandidate,
+  deleteCandidate,
+} from "@/lib/actions/mutations";
 import type { CandidateRow, StageEventRow } from "@/lib/database.types";
 
 type Detail = {
@@ -36,11 +40,13 @@ export function CandidateDrawer({
   canWrite,
   onClose,
   onSchedule,
+  onEdit,
 }: {
   candidateId: string | null;
   canWrite: boolean;
   onClose: () => void;
   onSchedule: (id: string) => void;
+  onEdit: (candidate: CandidateRow) => void;
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -177,6 +183,14 @@ export function CandidateDrawer({
                     <Calendar size={15} /> Schedule
                   </button>
                 )}
+                {canWrite && (
+                  <button
+                    onClick={() => onEdit(detail.cand)}
+                    className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
+                  >
+                    <Pencil size={15} /> Edit
+                  </button>
+                )}
               </div>
 
               <div className="mb-[22px] grid grid-cols-2 gap-[11px]">
@@ -185,7 +199,9 @@ export function CandidateDrawer({
                     ["Experience", `${detail.cand.exp_years} years`],
                     ["Location", detail.cand.location ?? "—"],
                     ["Source", detail.cand.source ?? "—"],
-                    ["Expected", fmtSalary(detail.cand.salary_lpa)],
+                    ["Current CTC", fmtSalary(detail.cand.current_ctc_lpa)],
+                    ["Expected CTC", fmtSalary(detail.cand.expected_ctc_lpa)],
+                    ["Notice Period", `${detail.cand.notice_period_days} days`],
                     ["Recruiter", detail.recruiterName],
                     ["Days in stage", `${daysInStage(detail.cand.entered_stage_at)} days`],
                   ] as const
@@ -279,6 +295,17 @@ export function CandidateDrawer({
 
             {canWrite && (
               <div className="flex shrink-0 gap-2.5 border-t border-[#eef1f6] p-[16px_22px]">
+                <button
+                  disabled={pending}
+                  title="Delete candidate"
+                  onClick={() => {
+                    if (confirm(`Delete ${detail.cand.name}? This cannot be undone.`))
+                      run(deleteCandidate, true);
+                  }}
+                  className="flex items-center justify-center rounded-[11px] border border-[#eadfe0] bg-[#fafafa] px-3 py-3 text-[#9aa4b6] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:opacity-60"
+                >
+                  <Trash2 size={16} />
+                </button>
                 <button
                   disabled={pending}
                   onClick={() => run(rejectCandidate, true)}

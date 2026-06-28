@@ -3,14 +3,22 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2, UserPlus } from "lucide-react";
 import { useShell } from "@/components/shell-provider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   acceptOffer,
   advanceTalent,
+  deleteJob,
   setUserActive,
   updateSetting,
 } from "@/lib/actions/mutations";
+import type { JobRow } from "@/lib/database.types";
 
 export function OpenOnClick({
   id,
@@ -61,6 +69,54 @@ export function ScheduleButton({
     <button onClick={() => openSchedule(candidateId)} className={className}>
       {children}
     </button>
+  );
+}
+
+export function NewCandidateButton() {
+  const { openCandidateForm, canWrite } = useShell();
+  if (!canWrite) return null;
+  return (
+    <button
+      onClick={() => openCandidateForm(null)}
+      className="flex items-center gap-[7px] rounded-[10px] bg-[#2a6fdb] px-4 py-2.5 text-[13.5px] font-bold text-white shadow-[0_3px_10px_rgba(42,111,219,.3)] hover:bg-[#1f5bc0]"
+    >
+      <UserPlus size={16} strokeWidth={2.2} />
+      New Candidate
+    </button>
+  );
+}
+
+export function JobMenu({ job }: { job: JobRow }) {
+  const router = useRouter();
+  const { openJobForm, canWrite } = useShell();
+  const [, start] = useTransition();
+  if (!canWrite) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e6eaf1] text-[#9aa4b6] hover:bg-[#f6f8fb]">
+        <MoreVertical size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[160px]">
+        <DropdownMenuItem onClick={() => openJobForm(job)} className="gap-2 text-[13px] font-semibold">
+          <Pencil size={15} /> Edit role
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            if (!confirm(`Delete "${job.title}"?`)) return;
+            start(async () => {
+              const res = await deleteJob(job.id);
+              if (res.ok) {
+                toast.success(res.message ?? "Deleted");
+                router.refresh();
+              } else toast.error(res.error ?? "Failed");
+            });
+          }}
+          className="gap-2 text-[13px] font-semibold text-[#dc2626]"
+        >
+          <Trash2 size={15} /> Delete role
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

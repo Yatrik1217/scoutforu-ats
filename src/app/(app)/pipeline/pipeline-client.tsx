@@ -26,6 +26,7 @@ import {
 } from "@/lib/domain";
 import { Avatar, RecBadge, RatingChip, StageBadge } from "@/components/bits";
 import { useShell } from "@/components/shell-provider";
+import { UserPlus } from "lucide-react";
 import { moveCandidateStage } from "@/lib/actions/mutations";
 import type { EnrichedCandidate } from "@/lib/data";
 
@@ -43,7 +44,7 @@ export function PipelineClient({
   query: string;
 }) {
   const router = useRouter();
-  const { openDrawer, canWrite } = useShell();
+  const { openDrawer, canWrite, openCandidateForm } = useShell();
   const [items, setItems] = useState(candidates);
   const [filterJob, setFilterJob] = useState("all");
   const [filterRec, setFilterRec] = useState("all");
@@ -142,6 +143,14 @@ export function PipelineClient({
         <span className="tf-num text-[12.5px] font-semibold text-[#8a94a6]">
           {filtered.length} candidates
         </span>
+        {canWrite && (
+          <button
+            onClick={() => openCandidateForm(null)}
+            className="flex items-center gap-1.5 rounded-[9px] bg-[#eef4fe] px-3 py-2 text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+          >
+            <UserPlus size={15} strokeWidth={2.2} /> New Candidate
+          </button>
+        )}
         <div className="flex-1" />
         <div className="flex gap-0.5 rounded-[10px] bg-[#eef1f6] p-[3px]">
           {(

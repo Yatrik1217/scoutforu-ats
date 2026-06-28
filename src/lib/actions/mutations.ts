@@ -104,12 +104,13 @@ export type ReqForm = {
   clientId: string | null;
   recruiterId: string | null;
   description: string;
+  minCtc: number;
+  maxCtc: number;
+  status?: "open" | "hot" | "closed";
 };
 
-export async function createRequisition(form: ReqForm): Promise<Result> {
-  if (!form.title.trim()) return { ok: false, error: "Job title is required" };
-  const sb = await createClient();
-  const { error } = await sb.from("jobs").insert({
+function jobPayload(form: ReqForm) {
+  return {
     title: form.title.trim(),
     dept: form.dept,
     location: form.location,
@@ -117,13 +118,142 @@ export async function createRequisition(form: ReqForm): Promise<Result> {
     openings: form.openings || 1,
     client_id: form.clientId,
     recruiter_id: form.recruiterId,
-    status: "open",
     description: form.description,
+    min_ctc_lpa: form.minCtc || 0,
+    max_ctc_lpa: form.maxCtc || 0,
+    status: form.status ?? "open",
+  };
+}
+
+export async function createRequisition(form: ReqForm): Promise<Result> {
+  if (!form.title.trim()) return { ok: false, error: "Job title is required" };
+  const sb = await createClient();
+  const { error } = await sb.from("jobs").insert({
+    ...jobPayload(form),
     posted_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true, message: `Requisition "${form.title.trim()}" created` };
+}
+
+export async function updateRequisition(
+  id: string,
+  form: ReqForm,
+): Promise<Result> {
+  if (!form.title.trim()) return { ok: false, error: "Job title is required" };
+  const sb = await createClient();
+  const { error } = await sb.from("jobs").update(jobPayload(form)).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: `"${form.title.trim()}" updated` };
+}
+
+export async function deleteJob(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("jobs").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Requisition deleted" };
+}
+
+export type CandidateForm = {
+  name: string;
+  email: string;
+  phone: string;
+  jobId: string | null;
+  recruiterId: string | null;
+  stage: CandidateStage;
+  source: string;
+  location: string;
+  expYears: number;
+  rating: number;
+  currentCtc: number;
+  expectedCtc: number;
+  noticePeriod: number;
+  tags: string[];
+};
+
+function candidatePayload(form: CandidateForm) {
+  return {
+    name: form.name.trim(),
+    email: form.email.trim() || null,
+    phone: form.phone.trim() || null,
+    job_id: form.jobId,
+    recruiter_id: form.recruiterId,
+    stage: form.stage,
+    source: form.source || null,
+    location: form.location || null,
+    exp_years: form.expYears || 0,
+    rating: form.rating || 0,
+    current_ctc_lpa: form.currentCtc || 0,
+    expected_ctc_lpa: form.expectedCtc || 0,
+    salary_lpa: form.expectedCtc || 0,
+    notice_period_days: form.noticePeriod || 0,
+    tags: form.tags,
+  };
+}
+
+export async function createCandidate(form: CandidateForm): Promise<Result> {
+  if (!form.name.trim()) return { ok: false, error: "Candidate name is required" };
+  const sb = await createClient();
+  const { error } = await sb.from("candidates").insert(candidatePayload(form));
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: `${form.name.trim()} added` };
+}
+
+export async function updateCandidate(
+  id: string,
+  form: CandidateForm,
+): Promise<Result> {
+  if (!form.name.trim()) return { ok: false, error: "Candidate name is required" };
+  const sb = await createClient();
+  const { error } = await sb
+    .from("candidates")
+    .update(candidatePayload(form))
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: `${form.name.trim()} updated` };
+}
+
+export async function deleteCandidate(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("candidates").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Candidate deleted" };
+}
+
+// ---- clients (admin only, enforced by RLS) ----
+export async function saveClient(
+  id: string | null,
+  name: string,
+  status: string,
+  contactEmail: string,
+): Promise<Result> {
+  if (!name.trim()) return { ok: false, error: "Client name is required" };
+  const sb = await createClient();
+  const payload = {
+    name: name.trim(),
+    status: status || "Active",
+    contact_email: contactEmail.trim() || null,
+  };
+  const { error } = id
+    ? await sb.from("clients").update(payload).eq("id", id)
+    : await sb.from("clients").insert(payload);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: id ? "Client updated" : `${name.trim()} added` };
+}
+
+export async function deleteClientRecord(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("clients").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Client deleted" };
 }
 
 export type SchedForm = {

@@ -9,9 +9,16 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { ProfileRow, ClientRow, UserRole } from "@/lib/database.types";
+import type {
+  ProfileRow,
+  ClientRow,
+  UserRole,
+  CandidateRow,
+  JobRow,
+} from "@/lib/database.types";
 import { CandidateDrawer } from "@/components/candidate-drawer";
-import { CreateReqModal } from "@/components/create-req-modal";
+import { CandidateFormModal } from "@/components/candidate-form-modal";
+import { JobFormModal } from "@/components/create-req-modal";
 import { ScheduleModal } from "@/components/schedule-modal";
 
 type ShellCtx = {
@@ -21,6 +28,8 @@ type ShellCtx = {
   clients: ClientRow[];
   openDrawer: (id: string) => void;
   openCreateReq: () => void;
+  openJobForm: (job?: JobRow | null) => void;
+  openCandidateForm: (candidate?: CandidateRow | null) => void;
   openSchedule: (candidateId?: string) => void;
 };
 
@@ -44,7 +53,14 @@ export function ShellProvider({
 }) {
   const router = useRouter();
   const [drawerId, setDrawerId] = useState<string | null>(null);
-  const [createReq, setCreateReq] = useState(false);
+  const [candForm, setCandForm] = useState<{
+    open: boolean;
+    candidate: CandidateRow | null;
+  }>({ open: false, candidate: null });
+  const [jobForm, setJobForm] = useState<{ open: boolean; job: JobRow | null }>({
+    open: false,
+    job: null,
+  });
   const [sched, setSched] = useState<{ open: boolean; candidateId?: string }>({
     open: false,
   });
@@ -52,7 +68,16 @@ export function ShellProvider({
   const canWrite = role !== "client";
 
   const openDrawer = useCallback((id: string) => setDrawerId(id), []);
-  const openCreateReq = useCallback(() => setCreateReq(true), []);
+  const openCandidateForm = useCallback(
+    (candidate?: CandidateRow | null) =>
+      setCandForm({ open: true, candidate: candidate ?? null }),
+    [],
+  );
+  const openJobForm = useCallback(
+    (job?: JobRow | null) => setJobForm({ open: true, job: job ?? null }),
+    [],
+  );
+  const openCreateReq = useCallback(() => openJobForm(null), [openJobForm]);
   const openSchedule = useCallback(
     (candidateId?: string) => setSched({ open: true, candidateId }),
     [],
@@ -84,6 +109,8 @@ export function ShellProvider({
         clients,
         openDrawer,
         openCreateReq,
+        openJobForm,
+        openCandidateForm,
         openSchedule,
       }}
     >
@@ -92,16 +119,27 @@ export function ShellProvider({
         candidateId={drawerId}
         canWrite={canWrite}
         onClose={() => setDrawerId(null)}
+        onEdit={(c) => {
+          setDrawerId(null);
+          openCandidateForm(c);
+        }}
         onSchedule={(id) => {
           setDrawerId(null);
           openSchedule(id);
         }}
       />
-      <CreateReqModal
-        open={createReq}
+      <CandidateFormModal
+        open={candForm.open}
+        candidate={candForm.candidate}
+        team={team}
+        onClose={() => setCandForm({ open: false, candidate: null })}
+      />
+      <JobFormModal
+        open={jobForm.open}
+        job={jobForm.job}
         team={team}
         clients={clients}
-        onClose={() => setCreateReq(false)}
+        onClose={() => setJobForm({ open: false, job: null })}
       />
       <ScheduleModal
         open={sched.open}

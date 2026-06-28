@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Briefcase, MoreVertical } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
 import { DEPT_COLOR, hexA } from "@/lib/domain";
 import { RecBadge } from "@/components/bits";
-import { ScheduleButton } from "@/components/view-actions";
+import { ScheduleButton, JobMenu } from "@/components/view-actions";
 
 function ago(iso: string) {
   const d = Math.floor((Date.now() - +new Date(iso)) / 86_400_000);
@@ -56,10 +56,13 @@ export default async function JobsPage() {
                         ? "Contract"
                         : "Intern"}
                   </div>
+                  {(j.min_ctc_lpa > 0 || j.max_ctc_lpa > 0) && (
+                    <div className="tf-num mt-1 text-[11.5px] font-bold text-[#16a34a]">
+                      Budget: ₹{j.min_ctc_lpa}–{j.max_ctc_lpa} LPA
+                    </div>
+                  )}
                 </div>
-                <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e6eaf1] text-[#9aa4b6] hover:bg-[#f6f8fb]">
-                  <MoreVertical size={16} />
-                </button>
+                <JobMenu job={j} />
               </div>
 
               <div className="mt-[18px] flex gap-[22px] border-t border-[#f0f3f8] pt-4">

@@ -1,6 +1,6 @@
 import { loadWorkspace } from "@/lib/data";
 import { Avatar, StageBadge } from "@/components/bits";
-import { ClickableTr } from "@/components/view-actions";
+import { ClickableTr, NewCandidateButton } from "@/components/view-actions";
 
 export default async function CandidatesPage({
   searchParams,
@@ -20,6 +20,12 @@ export default async function CandidatesPage({
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="tf-num text-[13px] font-semibold text-[#8a94a6]">
+          {rows.length} candidates
+        </span>
+        <NewCandidateButton />
+      </div>
       <div className="overflow-hidden rounded-[14px] border border-[#e9edf3] bg-white">
         <table className="w-full border-collapse">
           <thead>

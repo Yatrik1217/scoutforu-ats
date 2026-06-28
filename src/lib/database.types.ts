@@ -51,6 +51,8 @@ export type JobRow = {
   posted_at: string;
   applicants_count: number;
   description: string;
+  min_ctc_lpa: number;
+  max_ctc_lpa: number;
   created_at: string;
 };
 
@@ -67,6 +69,9 @@ export type CandidateRow = {
   source: string | null;
   recruiter_id: string | null;
   salary_lpa: number;
+  current_ctc_lpa: number;
+  expected_ctc_lpa: number;
+  notice_period_days: number;
   tags: string[];
   entered_stage_at: string;
   created_at: string;
