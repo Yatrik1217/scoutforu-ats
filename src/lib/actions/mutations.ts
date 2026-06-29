@@ -206,6 +206,18 @@ export type CandidateForm = {
   expectedCtc: number;
   noticePeriod: number;
   tags: string[];
+  gender: string;
+  currentDesignation: string;
+  currentCompany: string;
+  graduation: string;
+  postGraduation: string;
+  birthDate: string;
+  maritalStatus: string;
+  altEmail: string;
+  altPhone: string;
+  function: string;
+  industry: string;
+  resumeUrl: string;
 };
 
 function candidatePayload(form: CandidateForm) {
@@ -225,6 +237,18 @@ function candidatePayload(form: CandidateForm) {
     salary_lpa: form.expectedCtc || 0,
     notice_period_days: form.noticePeriod || 0,
     tags: form.tags,
+    gender: form.gender,
+    current_designation: form.currentDesignation,
+    current_company: form.currentCompany,
+    graduation: form.graduation,
+    post_graduation: form.postGraduation,
+    birth_date: form.birthDate || null,
+    marital_status: form.maritalStatus,
+    alt_email: form.altEmail,
+    alt_phone: form.altPhone,
+    function: form.function,
+    industry: form.industry,
+    resume_url: form.resumeUrl,
   };
 }
 

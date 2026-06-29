@@ -1,9 +1,6 @@
 -- ScoutforU ATS — full database setup (migrations combined)
--- Paste this whole file into the Supabase SQL editor and Run.
 
--- ============================================================
 -- supabase/migrations/0001_schema.sql
--- ============================================================
 -- ScoutforU ATS — schema (README §8)
 -- Enums, core tables, indexes. RLS and triggers live in later migrations.
 
@@ -125,9 +122,7 @@ create index idx_interviews_scheduled on public.interviews (scheduled_at);
 create index idx_stage_events_candidate on public.stage_events (candidate_id);
 create index idx_stage_events_created on public.stage_events (created_at desc);
 
--- ============================================================
 -- supabase/migrations/0002_functions.sql
--- ============================================================
 -- ScoutforU ATS — functions & triggers.
 
 -- ===== auth helpers (SECURITY DEFINER avoids RLS recursion in policies) =====
@@ -263,9 +258,7 @@ create trigger trg_handle_offer_stage
 after update on public.candidates
 for each row execute function public.handle_offer_stage();
 
--- ============================================================
 -- supabase/migrations/0003_rls.sql
--- ============================================================
 -- ScoutforU ATS — Row-Level Security (README §3.4, §6)
 -- Roles: master_admin (all) · recruiter (all, read+write) · client (read-only,
 -- scoped to their own client's jobs/candidates). Enforced in the DB, not the UI.
@@ -337,9 +330,7 @@ alter publication supabase_realtime add table public.interviews;
 alter publication supabase_realtime add table public.jobs;
 alter publication supabase_realtime add table public.offers;
 
--- ============================================================
 -- supabase/migrations/0004_settings.sql
--- ============================================================
 -- App-wide settings (Admin → Settings toggles). Single row.
 create table public.app_settings (
   id boolean primary key default true check (id),
@@ -358,17 +349,13 @@ create policy app_settings_select on public.app_settings
 create policy app_settings_admin_write on public.app_settings
   for all using (public.is_admin()) with check (public.is_admin());
 
--- ============================================================
 -- supabase/migrations/0005_profile_active.sql
--- ============================================================
 -- Recruiter activation: deactivated users are blocked from signing in and
 -- excluded from assignment lists, but their historical data is preserved.
 alter table public.profiles
   add column active boolean not null default true;
 
--- ============================================================
 -- supabase/migrations/0006_more_fields.sql
--- ============================================================
 -- Richer recruitment fields (Indian market): candidate CTC/ECTC + notice period,
 -- and a client-given budget band on the job/requisition.
 alter table public.candidates
@@ -380,9 +367,7 @@ alter table public.jobs
   add column min_ctc_lpa numeric not null default 0,
   add column max_ctc_lpa numeric not null default 0;
 
--- ============================================================
 -- supabase/migrations/0007_rich_forms.sql
--- ============================================================
 -- Richer job & client records (matching a mature recruitment ATS).
 
 alter table public.jobs
@@ -418,4 +403,20 @@ alter table public.clients
   add column if not exists address text not null default '',
   add column if not exists profile text not null default '',
   add column if not exists remarks text not null default '';
+
+-- supabase/migrations/0008_candidate_resume_fields.sql
+-- Full "resume" detail on candidates (matching the Manage Resume form).
+alter table public.candidates
+  add column if not exists gender text not null default '',
+  add column if not exists current_designation text not null default '',
+  add column if not exists current_company text not null default '',
+  add column if not exists graduation text not null default '',
+  add column if not exists post_graduation text not null default '',
+  add column if not exists birth_date date,
+  add column if not exists marital_status text not null default '',
+  add column if not exists alt_email text not null default '',
+  add column if not exists alt_phone text not null default '',
+  add column if not exists function text not null default '',
+  add column if not exists industry text not null default '',
+  add column if not exists resume_url text not null default '';
 

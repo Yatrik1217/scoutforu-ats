@@ -11,7 +11,17 @@ import {
   updateCandidate,
   type CandidateForm,
 } from "@/lib/actions/mutations";
-import { STAGES, SOURCES, INDIAN_CITIES, stageToSlug } from "@/lib/domain";
+import {
+  STAGES,
+  SOURCES,
+  INDIAN_CITIES,
+  GENDERS,
+  MARITAL_STATUSES,
+  QUALIFICATIONS,
+  FUNCTIONAL_AREAS,
+  INDUSTRIES,
+  stageToSlug,
+} from "@/lib/domain";
 import type {
   CandidateRow,
   CandidateStage,
@@ -51,6 +61,18 @@ const empty: CForm = {
   expectedCtc: "",
   noticePeriod: "",
   tags: [],
+  gender: "",
+  currentDesignation: "",
+  currentCompany: "",
+  graduation: "",
+  postGraduation: "",
+  birthDate: "",
+  maritalStatus: "",
+  altEmail: "",
+  altPhone: "",
+  function: "",
+  industry: "",
+  resumeUrl: "",
 };
 
 export function CandidateFormModal({
@@ -90,6 +112,18 @@ export function CandidateFormModal({
         expectedCtc: numStr(candidate.expected_ctc_lpa),
         noticePeriod: numStr(candidate.notice_period_days),
         tags: candidate.tags,
+        gender: candidate.gender,
+        currentDesignation: candidate.current_designation,
+        currentCompany: candidate.current_company,
+        graduation: candidate.graduation,
+        postGraduation: candidate.post_graduation,
+        birthDate: candidate.birth_date ?? "",
+        maritalStatus: candidate.marital_status,
+        altEmail: candidate.alt_email,
+        altPhone: candidate.alt_phone,
+        function: candidate.function,
+        industry: candidate.industry,
+        resumeUrl: candidate.resume_url,
       });
       setTagsText(candidate.tags.join(", "));
     } else {
@@ -241,7 +275,64 @@ export function CandidateFormModal({
             </Field>
           </div>
 
-          <label className={`${labelCls} mt-4`}>Skills / Tags (comma-separated)</label>
+          <div className="mt-5 mb-3 border-b border-[#eef1f6] pb-1.5 text-[13px] font-extrabold text-[#16203a]">
+            Profile Details
+          </div>
+          <div className="grid grid-cols-3 gap-3.5">
+            <Field label="Gender">
+              <select value={f.gender} onChange={(e) => set("gender", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {GENDERS.map((g) => <option key={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Marital Status">
+              <select value={f.maritalStatus} onChange={(e) => set("maritalStatus", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {MARITAL_STATUSES.map((m) => <option key={m}>{m}</option>)}
+              </select>
+            </Field>
+            <Field label="Birth Date">
+              <input type="date" value={f.birthDate} onChange={(e) => set("birthDate", e.target.value)} className={fieldCls} />
+            </Field>
+            <Field label="Current Designation">
+              <input value={f.currentDesignation} onChange={(e) => set("currentDesignation", e.target.value)} className={fieldCls} placeholder="e.g. Senior Engineer" />
+            </Field>
+            <Field label="Current Company">
+              <input value={f.currentCompany} onChange={(e) => set("currentCompany", e.target.value)} className={fieldCls} placeholder="Current employer" />
+            </Field>
+            <Field label="Function">
+              <select value={f.function} onChange={(e) => set("function", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {FUNCTIONAL_AREAS.map((a) => <option key={a}>{a}</option>)}
+              </select>
+            </Field>
+            <Field label="Graduation">
+              <select value={f.graduation} onChange={(e) => set("graduation", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {QUALIFICATIONS.map((q) => <option key={q}>{q}</option>)}
+              </select>
+            </Field>
+            <Field label="Post Graduation">
+              <select value={f.postGraduation} onChange={(e) => set("postGraduation", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {QUALIFICATIONS.map((q) => <option key={q}>{q}</option>)}
+              </select>
+            </Field>
+            <Field label="Industry">
+              <select value={f.industry} onChange={(e) => set("industry", e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                <option value="">— Select —</option>
+                {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+              </select>
+            </Field>
+            <Field label="Alternate Email">
+              <input value={f.altEmail} onChange={(e) => set("altEmail", e.target.value)} className={fieldCls} placeholder="alt@email.com" />
+            </Field>
+            <Field label="Alternate Phone">
+              <input value={f.altPhone} onChange={(e) => set("altPhone", e.target.value)} className={fieldCls} placeholder="+91…" />
+            </Field>
+          </div>
+
+          <label className={`${labelCls} mt-4`}>Keywords / Skills (comma-separated)</label>
           <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} className={fieldCls} placeholder="React, TypeScript, Node" />
         </div>
 

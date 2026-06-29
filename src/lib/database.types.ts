@@ -103,6 +103,18 @@ export type CandidateRow = {
   expected_ctc_lpa: number;
   notice_period_days: number;
   tags: string[];
+  gender: string;
+  current_designation: string;
+  current_company: string;
+  graduation: string;
+  post_graduation: string;
+  birth_date: string | null;
+  marital_status: string;
+  alt_email: string;
+  alt_phone: string;
+  function: string;
+  industry: string;
+  resume_url: string;
   entered_stage_at: string;
   created_at: string;
 };

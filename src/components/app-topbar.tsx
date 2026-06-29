@@ -20,6 +20,7 @@ const TITLES: Record<string, [string, string]> = {
   "/pipeline": ["Candidate Pipeline", "Drag candidates across stages"],
   "/jobs": ["Open Jobs", "Active requisitions"],
   "/candidates": ["All Candidates", "Everyone in your ATS"],
+  "/search": ["Search Resumes", "Find profiles in your database"],
   "/interviews": ["Interviews", "Upcoming & scheduled rounds"],
   "/offers": ["Offers", "Offer journey & status"],
   "/analytics": ["Analytics", "Funnel & sourcing insights"],

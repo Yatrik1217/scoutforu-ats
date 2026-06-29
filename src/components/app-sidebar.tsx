@@ -10,6 +10,7 @@ import {
   Calendar,
   FileText,
   BarChart3,
+  Search,
   UserCheck,
   Database,
   SlidersHorizontal,
@@ -43,6 +44,7 @@ export function AppSidebar({
     { href: "/pipeline", label: "Pipeline", icon: Columns3 },
     { href: "/jobs", label: "Open Jobs", icon: Briefcase, badge: jobsCount },
     { href: "/candidates", label: "Candidates", icon: Users },
+    { href: "/search", label: "Search Resumes", icon: Search },
     {
       href: "/interviews",
       label: "Interviews",

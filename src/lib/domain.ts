@@ -361,6 +361,13 @@ export const QUALIFICATIONS = [
 ] as const;
 
 export const CLIENT_RATINGS = ["A+", "A", "B", "C", "D"] as const;
+export const GENDERS = ["Male", "Female", "Other"] as const;
+export const MARITAL_STATUSES = [
+  "Single",
+  "Married",
+  "Divorced",
+  "Widowed",
+] as const;
 
 export const SOURCES = [
   "LinkedIn",
