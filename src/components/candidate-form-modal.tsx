@@ -22,7 +22,21 @@ const fieldCls =
   "w-full rounded-[10px] border border-[#e3e8f0] px-3 py-2.5 text-[13.5px] font-semibold text-[#16203a] outline-none focus:border-[#2a6fdb]";
 const labelCls = "mb-1.5 block text-xs font-bold text-[#42506b]";
 
-const empty: CandidateForm = {
+// Numeric fields kept as strings so they're freely typeable; coerced on submit.
+type CForm = Omit<
+  CandidateForm,
+  "expYears" | "rating" | "currentCtc" | "expectedCtc" | "noticePeriod"
+> & {
+  expYears: string;
+  rating: string;
+  currentCtc: string;
+  expectedCtc: string;
+  noticePeriod: string;
+};
+
+const numStr = (n: number) => (n ? String(n) : "");
+
+const empty: CForm = {
   name: "",
   email: "",
   phone: "",
@@ -30,12 +44,12 @@ const empty: CandidateForm = {
   recruiterId: null,
   stage: "sourced",
   source: "LinkedIn",
-  location: "Bangalore",
-  expYears: 0,
-  rating: 0,
-  currentCtc: 0,
-  expectedCtc: 0,
-  noticePeriod: 0,
+  location: "",
+  expYears: "",
+  rating: "",
+  currentCtc: "",
+  expectedCtc: "",
+  noticePeriod: "",
   tags: [],
 };
 
@@ -54,7 +68,7 @@ export function CandidateFormModal({
   const [pending, start] = useTransition();
   const [err, setErr] = useState(false);
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([]);
-  const [f, setF] = useState<CandidateForm>(empty);
+  const [f, setF] = useState<CForm>(empty);
   const [tagsText, setTagsText] = useState("");
 
   useEffect(() => {
@@ -70,11 +84,11 @@ export function CandidateFormModal({
         stage: candidate.stage,
         source: candidate.source ?? "LinkedIn",
         location: candidate.location ?? "",
-        expYears: candidate.exp_years,
-        rating: candidate.rating,
-        currentCtc: candidate.current_ctc_lpa,
-        expectedCtc: candidate.expected_ctc_lpa,
-        noticePeriod: candidate.notice_period_days,
+        expYears: numStr(candidate.exp_years),
+        rating: numStr(candidate.rating),
+        currentCtc: numStr(candidate.current_ctc_lpa),
+        expectedCtc: numStr(candidate.expected_ctc_lpa),
+        noticePeriod: numStr(candidate.notice_period_days),
         tags: candidate.tags,
       });
       setTagsText(candidate.tags.join(", "));
@@ -90,7 +104,7 @@ export function CandidateFormModal({
   }, [open, candidate, team]);
 
   if (!open) return null;
-  const set = <K extends keyof CandidateForm>(k: K, v: CandidateForm[K]) =>
+  const set = <K extends keyof CForm>(k: K, v: CForm[K]) =>
     setF((s) => ({ ...s, [k]: v }));
 
   const submit = () => {
@@ -100,6 +114,11 @@ export function CandidateFormModal({
     }
     const payload: CandidateForm = {
       ...f,
+      expYears: parseFloat(f.expYears) || 0,
+      rating: parseFloat(f.rating) || 0,
+      currentCtc: parseFloat(f.currentCtc) || 0,
+      expectedCtc: parseFloat(f.expectedCtc) || 0,
+      noticePeriod: parseInt(f.noticePeriod) || 0,
       tags: tagsText
         .split(",")
         .map((t) => t.trim())
@@ -206,19 +225,19 @@ export function CandidateFormModal({
               <input list="india-cities-cand" value={f.location} onChange={(e) => set("location", e.target.value)} className={fieldCls} placeholder="Type any city…" />
             </Field>
             <Field label="Experience (years)">
-              <input type="number" min={0} value={f.expYears} onChange={(e) => set("expYears", Number(e.target.value))} className={fieldCls} />
+              <input inputMode="decimal" value={f.expYears} onChange={(e) => set("expYears", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 5" />
             </Field>
             <Field label="Rating (0–5)">
-              <input type="number" min={0} max={5} step={0.5} value={f.rating} onChange={(e) => set("rating", Number(e.target.value))} className={fieldCls} />
+              <input inputMode="decimal" value={f.rating} onChange={(e) => set("rating", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 4.5" />
             </Field>
             <Field label="Notice Period (days)">
-              <input type="number" min={0} value={f.noticePeriod} onChange={(e) => set("noticePeriod", Number(e.target.value))} className={fieldCls} />
+              <input inputMode="numeric" value={f.noticePeriod} onChange={(e) => set("noticePeriod", e.target.value.replace(/[^0-9]/g, ""))} className={fieldCls} placeholder="e.g. 30" />
             </Field>
             <Field label="Current CTC (₹ LPA)">
-              <input type="number" min={0} step={0.5} value={f.currentCtc} onChange={(e) => set("currentCtc", Number(e.target.value))} className={fieldCls} />
+              <input inputMode="decimal" value={f.currentCtc} onChange={(e) => set("currentCtc", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 5" />
             </Field>
             <Field label="Expected CTC (₹ LPA)">
-              <input type="number" min={0} step={0.5} value={f.expectedCtc} onChange={(e) => set("expectedCtc", Number(e.target.value))} className={fieldCls} />
+              <input inputMode="decimal" value={f.expectedCtc} onChange={(e) => set("expectedCtc", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 7" />
             </Field>
           </div>
 

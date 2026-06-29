@@ -34,13 +34,26 @@ const fieldCls =
   "w-full rounded-[10px] border border-[#e3e8f0] px-3 py-2.5 text-[13.5px] font-semibold text-[#16203a] outline-none focus:border-[#2a6fdb]";
 const labelCls = "mb-1.5 block text-xs font-bold text-[#42506b]";
 
-const blank = (clients: ClientRow[], team: ProfileRow[]): ReqForm => ({
+// Numeric fields are held as strings so they're freely typeable (clear, decimals
+// like 5.5, etc.) and only coerced to numbers on submit.
+type FormState = Omit<
+  ReqForm,
+  "openings" | "expMin" | "expMax" | "minCtc" | "maxCtc"
+> & {
+  openings: string;
+  expMin: string;
+  expMax: string;
+  minCtc: string;
+  maxCtc: string;
+};
+
+const blank = (clients: ClientRow[], team: ProfileRow[]): FormState => ({
   title: "",
   designation: "",
   dept: "Engineering",
   location: "Bangalore",
   type: "full_time",
-  openings: 1,
+  openings: "1",
   targetDate: "",
   referenceCode: "",
   clientId: clients[0]?.id ?? null,
@@ -48,14 +61,14 @@ const blank = (clients: ClientRow[], team: ProfileRow[]): ReqForm => ({
   interviewerHr: "",
   interviewVenue: "",
   remoteWork: false,
-  expMin: 0,
-  expMax: 0,
+  expMin: "",
+  expMax: "",
   functionalArea: "",
   industry: "",
   qualification: "",
   keywords: "",
-  minCtc: 0,
-  maxCtc: 0,
+  minCtc: "",
+  maxCtc: "",
   hideSalary: false,
   description: "",
   profileCriteria: "",
@@ -64,6 +77,8 @@ const blank = (clients: ClientRow[], team: ProfileRow[]): ReqForm => ({
   telephonic: false,
   status: "open",
 });
+
+const numStr = (n: number) => (n ? String(n) : "");
 
 export function JobFormModal({
   open,
@@ -81,7 +96,7 @@ export function JobFormModal({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState(false);
-  const [f, setF] = useState<ReqForm>(blank(clients, team));
+  const [f, setF] = useState<FormState>(blank(clients, team));
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +108,7 @@ export function JobFormModal({
         dept: job.dept,
         location: job.location,
         type: job.type,
-        openings: job.openings,
+        openings: String(job.openings || 1),
         targetDate: job.target_date ?? "",
         referenceCode: job.reference_code,
         clientId: job.client_id,
@@ -101,14 +116,14 @@ export function JobFormModal({
         interviewerHr: job.interviewer_hr,
         interviewVenue: job.interview_venue,
         remoteWork: job.remote_work,
-        expMin: job.exp_min,
-        expMax: job.exp_max,
+        expMin: numStr(job.exp_min),
+        expMax: numStr(job.exp_max),
         functionalArea: job.functional_area,
         industry: job.industry,
         qualification: job.qualification,
         keywords: job.keywords,
-        minCtc: job.min_ctc_lpa,
-        maxCtc: job.max_ctc_lpa,
+        minCtc: numStr(job.min_ctc_lpa),
+        maxCtc: numStr(job.max_ctc_lpa),
         hideSalary: job.hide_salary,
         description: job.description,
         profileCriteria: job.profile_criteria,
@@ -123,7 +138,7 @@ export function JobFormModal({
   }, [open, job, clients, team]);
 
   if (!open) return null;
-  const set = <K extends keyof ReqForm>(k: K, v: ReqForm[K]) =>
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setF((s) => ({ ...s, [k]: v }));
 
   const submit = () => {
@@ -131,10 +146,18 @@ export function JobFormModal({
       setErr(true);
       return;
     }
+    const payload: ReqForm = {
+      ...f,
+      openings: parseInt(f.openings) || 1,
+      expMin: parseFloat(f.expMin) || 0,
+      expMax: parseFloat(f.expMax) || 0,
+      minCtc: parseFloat(f.minCtc) || 0,
+      maxCtc: parseFloat(f.maxCtc) || 0,
+    };
     start(async () => {
       const res = job
-        ? await updateRequisition(job.id, f)
-        : await createRequisition(f);
+        ? await updateRequisition(job.id, payload)
+        : await createRequisition(payload);
       if (res.ok) {
         toast.success(res.message ?? "Saved");
         onClose();
@@ -184,7 +207,7 @@ export function JobFormModal({
           </div>
           <div className="grid grid-cols-4 gap-3.5">
             <Field label="Designation"><input value={f.designation} onChange={(e) => set("designation", e.target.value)} className={fieldCls} placeholder="e.g. SDE II" /></Field>
-            <Field label="Vacancies"><input type="number" min={1} value={f.openings} onChange={(e) => set("openings", Number(e.target.value))} className={fieldCls} /></Field>
+            <Field label="Vacancies"><input inputMode="numeric" value={f.openings} onChange={(e) => set("openings", e.target.value.replace(/[^0-9]/g, ""))} className={fieldCls} placeholder="1" /></Field>
             <Field label="Target Date"><input type="date" value={f.targetDate} onChange={(e) => set("targetDate", e.target.value)} className={fieldCls} /></Field>
             <Field label="Reference Code"><input value={f.referenceCode} onChange={(e) => set("referenceCode", e.target.value)} className={fieldCls} placeholder="REF-001" /></Field>
           </div>
@@ -235,12 +258,12 @@ export function JobFormModal({
           {/* Employment details */}
           <Section title="Employment Details" />
           <div className="grid grid-cols-2 gap-3.5">
-            <Field label="Experience — From (yrs)"><input type="number" min={0} step={0.5} value={f.expMin} onChange={(e) => set("expMin", Number(e.target.value))} className={fieldCls} /></Field>
-            <Field label="Experience — To (yrs)"><input type="number" min={0} step={0.5} value={f.expMax} onChange={(e) => set("expMax", Number(e.target.value))} className={fieldCls} /></Field>
+            <Field label="Experience — From (yrs)"><input inputMode="decimal" value={f.expMin} onChange={(e) => set("expMin", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 3" /></Field>
+            <Field label="Experience — To (yrs)"><input inputMode="decimal" value={f.expMax} onChange={(e) => set("expMax", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 6" /></Field>
           </div>
           <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3.5">
-            <Field label="CTC — Min (₹ LPA)"><input type="number" min={0} step={0.5} value={f.minCtc} onChange={(e) => set("minCtc", Number(e.target.value))} className={fieldCls} /></Field>
-            <Field label="CTC — Max (₹ LPA)"><input type="number" min={0} step={0.5} value={f.maxCtc} onChange={(e) => set("maxCtc", Number(e.target.value))} className={fieldCls} /></Field>
+            <Field label="CTC — Min (₹ LPA)"><input inputMode="decimal" value={f.minCtc} onChange={(e) => set("minCtc", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 5" /></Field>
+            <Field label="CTC — Max (₹ LPA)"><input inputMode="decimal" value={f.maxCtc} onChange={(e) => set("maxCtc", e.target.value.replace(/[^0-9.]/g, ""))} className={fieldCls} placeholder="e.g. 7" /></Field>
             <label className="flex items-center gap-2 pb-2.5 text-[13px] font-bold text-[#42506b]">
               <input type="checkbox" checked={f.hideSalary} onChange={(e) => set("hideSalary", e.target.checked)} className="h-4 w-4" />
               Hide CTC
