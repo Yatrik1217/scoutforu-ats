@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: dirname(fileURLToPath(import.meta.url)),
   },
+  // Resume uploads (PDF/DOCX) flow through a Server Action; raise the body cap.
+  experimental: {
+    serverActions: { bodySizeLimit: "10mb" },
+  },
 };
 
 export default nextConfig;

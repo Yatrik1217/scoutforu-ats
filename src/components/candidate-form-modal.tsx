@@ -4,13 +4,14 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { X, FileUp, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   createCandidate,
   updateCandidate,
   type CandidateForm,
 } from "@/lib/actions/mutations";
+import { parseResume } from "@/lib/actions/parse-resume";
 import {
   STAGES,
   SOURCES,
@@ -92,6 +93,47 @@ export function CandidateFormModal({
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([]);
   const [f, setF] = useState<CForm>(empty);
   const [tagsText, setTagsText] = useState("");
+  const [parsing, setParsing] = useState(false);
+
+  const onResume = (file: File) => {
+    setParsing(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    parseResume(fd).then((res) => {
+      setParsing(false);
+      if (!res.ok || !res.data) {
+        toast.error(res.error ?? "Could not parse the resume");
+        return;
+      }
+      const d = res.data;
+      const keep = (v: string, cur: string) => v || cur;
+      const num = (v: number, cur: string) => (v ? String(v) : cur);
+      setF((s) => ({
+        ...s,
+        name: keep(d.name, s.name),
+        email: keep(d.email, s.email),
+        phone: keep(d.phone, s.phone),
+        altEmail: keep(d.altEmail, s.altEmail),
+        altPhone: keep(d.altPhone, s.altPhone),
+        location: keep(d.location, s.location),
+        expYears: num(d.expYears, s.expYears),
+        currentCtc: num(d.currentCtc, s.currentCtc),
+        expectedCtc: num(d.expectedCtc, s.expectedCtc),
+        noticePeriod: num(d.noticePeriod, s.noticePeriod),
+        currentDesignation: keep(d.currentDesignation, s.currentDesignation),
+        currentCompany: keep(d.currentCompany, s.currentCompany),
+        gender: keep(d.gender, s.gender),
+        graduation: keep(d.graduation, s.graduation),
+        postGraduation: keep(d.postGraduation, s.postGraduation),
+        function: keep(d.function, s.function),
+        industry: keep(d.industry, s.industry),
+        maritalStatus: keep(d.maritalStatus, s.maritalStatus),
+        birthDate: keep(d.birthDate, s.birthDate),
+      }));
+      if (d.skills.length) setTagsText(d.skills.join(", "));
+      toast.success("Resume parsed — review the details and save");
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -202,6 +244,39 @@ export function CandidateFormModal({
         </div>
 
         <div className="p-[22px_24px]">
+          {!candidate && (
+            <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] border border-dashed border-[#c3d4f0] bg-[#f6f9ff] p-4">
+              <div className="min-w-0">
+                <div className="text-[13px] font-extrabold text-[#16203a]">
+                  Attach Resume → Auto-fill
+                </div>
+                <div className="text-[11.5px] font-medium text-[#8a94a6]">
+                  Upload a PDF or Word file — AI reads it and fills the form below.
+                </div>
+              </div>
+              <label
+                className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-[10px] px-4 py-2.5 text-[12.5px] font-bold text-white ${parsing ? "bg-[#9bbcef]" : "bg-[#2a6fdb] hover:bg-[#1f5bc0]"}`}
+              >
+                {parsing ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <FileUp size={15} />
+                )}
+                {parsing ? "Parsing…" : "Upload Resume"}
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  disabled={parsing}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onResume(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          )}
           <label className={labelCls}>
             Full Name <span className="text-[#ef4444]">*</span>
           </label>
