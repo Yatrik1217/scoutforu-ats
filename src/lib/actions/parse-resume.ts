@@ -123,7 +123,8 @@ export async function parseResume(formData: FormData): Promise<Result> {
 
   try {
     const msg = await client.messages.create({
-      model: "claude-opus-4-8",
+      // Haiku is cost-effective (~0.4¢/resume) and strong at structured extraction.
+      model: "claude-haiku-4-5",
       max_tokens: 1500,
       system: SYSTEM,
       messages: [{ role: "user", content }],
