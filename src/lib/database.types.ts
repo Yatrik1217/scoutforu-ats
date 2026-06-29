@@ -24,6 +24,19 @@ export type ClientRow = {
   name: string;
   status: string;
   contact_email: string | null;
+  city: string;
+  reference_code: string;
+  rating: string;
+  industry: string;
+  contact_number: string;
+  key_account_manager_id: string | null;
+  transportation: boolean;
+  canteen: boolean;
+  website: string;
+  linkedin_url: string;
+  address: string;
+  profile: string;
+  remarks: string;
   created_at: string;
 };
 
@@ -53,6 +66,23 @@ export type JobRow = {
   description: string;
   min_ctc_lpa: number;
   max_ctc_lpa: number;
+  designation: string;
+  target_date: string | null;
+  reference_code: string;
+  interviewer_hr: string;
+  interview_venue: string;
+  remote_work: boolean;
+  exp_min: number;
+  exp_max: number;
+  functional_area: string;
+  industry: string;
+  qualification: string;
+  keywords: string;
+  profile_criteria: string;
+  benefits: string;
+  hide_salary: boolean;
+  walk_in: boolean;
+  telephonic: boolean;
   created_at: string;
 };
 

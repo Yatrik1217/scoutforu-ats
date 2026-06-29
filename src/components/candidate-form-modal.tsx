@@ -11,7 +11,7 @@ import {
   updateCandidate,
   type CandidateForm,
 } from "@/lib/actions/mutations";
-import { STAGES, SOURCES, stageToSlug } from "@/lib/domain";
+import { STAGES, SOURCES, INDIAN_CITIES, stageToSlug } from "@/lib/domain";
 import type {
   CandidateRow,
   CandidateStage,
@@ -122,6 +122,11 @@ export function CandidateFormModal({
       onClick={onClose}
       className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(16,24,40,.5)] p-4 animate-sc-fadein"
     >
+      <datalist id="india-cities-cand">
+        {INDIAN_CITIES.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
       <div
         onClick={(e) => e.stopPropagation()}
         className="max-h-[90vh] w-[620px] overflow-y-auto rounded-[18px] bg-white shadow-[0_24px_60px_rgba(16,24,40,.3)] animate-sc-popin"
@@ -198,7 +203,7 @@ export function CandidateFormModal({
               </select>
             </Field>
             <Field label="Location">
-              <input value={f.location} onChange={(e) => set("location", e.target.value)} className={fieldCls} placeholder="Bangalore" />
+              <input list="india-cities-cand" value={f.location} onChange={(e) => set("location", e.target.value)} className={fieldCls} placeholder="Type any city…" />
             </Field>
             <Field label="Experience (years)">
               <input type="number" min={0} value={f.expYears} onChange={(e) => set("expYears", Number(e.target.value))} className={fieldCls} />

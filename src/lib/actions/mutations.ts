@@ -97,30 +97,64 @@ export async function advanceTalent(id: string): Promise<Result> {
 
 export type ReqForm = {
   title: string;
+  designation: string;
   dept: string;
   location: string;
   type: EmploymentType;
   openings: number;
+  targetDate: string;
+  referenceCode: string;
   clientId: string | null;
   recruiterId: string | null;
-  description: string;
+  interviewerHr: string;
+  interviewVenue: string;
+  remoteWork: boolean;
+  expMin: number;
+  expMax: number;
+  functionalArea: string;
+  industry: string;
+  qualification: string;
+  keywords: string;
   minCtc: number;
   maxCtc: number;
+  hideSalary: boolean;
+  description: string;
+  profileCriteria: string;
+  benefits: string;
+  walkIn: boolean;
+  telephonic: boolean;
   status?: "open" | "hot" | "closed";
 };
 
 function jobPayload(form: ReqForm) {
   return {
     title: form.title.trim(),
+    designation: form.designation,
     dept: form.dept,
     location: form.location,
     type: form.type,
     openings: form.openings || 1,
+    target_date: form.targetDate || null,
+    reference_code: form.referenceCode,
     client_id: form.clientId,
     recruiter_id: form.recruiterId,
-    description: form.description,
+    interviewer_hr: form.interviewerHr,
+    interview_venue: form.interviewVenue,
+    remote_work: form.remoteWork,
+    exp_min: form.expMin || 0,
+    exp_max: form.expMax || 0,
+    functional_area: form.functionalArea,
+    industry: form.industry,
+    qualification: form.qualification,
+    keywords: form.keywords,
     min_ctc_lpa: form.minCtc || 0,
     max_ctc_lpa: form.maxCtc || 0,
+    hide_salary: form.hideSalary,
+    description: form.description,
+    profile_criteria: form.profileCriteria,
+    benefits: form.benefits,
+    walk_in: form.walkIn,
+    telephonic: form.telephonic,
     status: form.status ?? "open",
   };
 }
@@ -227,25 +261,55 @@ export async function deleteCandidate(id: string): Promise<Result> {
 }
 
 // ---- clients (admin only, enforced by RLS) ----
+export type ClientForm = {
+  name: string;
+  status: string;
+  city: string;
+  referenceCode: string;
+  rating: string;
+  industry: string;
+  contactNumber: string;
+  contactEmail: string;
+  keyAccountManagerId: string | null;
+  transportation: boolean;
+  canteen: boolean;
+  website: string;
+  linkedinUrl: string;
+  address: string;
+  profile: string;
+  remarks: string;
+};
+
 export async function saveClient(
   id: string | null,
-  name: string,
-  status: string,
-  contactEmail: string,
+  form: ClientForm,
 ): Promise<Result> {
-  if (!name.trim()) return { ok: false, error: "Client name is required" };
+  if (!form.name.trim()) return { ok: false, error: "Client name is required" };
   const sb = await createClient();
   const payload = {
-    name: name.trim(),
-    status: status || "Active",
-    contact_email: contactEmail.trim() || null,
+    name: form.name.trim(),
+    status: form.status || "Active",
+    city: form.city,
+    reference_code: form.referenceCode,
+    rating: form.rating,
+    industry: form.industry,
+    contact_number: form.contactNumber,
+    contact_email: form.contactEmail.trim() || null,
+    key_account_manager_id: form.keyAccountManagerId,
+    transportation: form.transportation,
+    canteen: form.canteen,
+    website: form.website,
+    linkedin_url: form.linkedinUrl,
+    address: form.address,
+    profile: form.profile,
+    remarks: form.remarks,
   };
   const { error } = id
     ? await sb.from("clients").update(payload).eq("id", id)
     : await sb.from("clients").insert(payload);
   if (error) return { ok: false, error: error.message };
   refresh();
-  return { ok: true, message: id ? "Client updated" : `${name.trim()} added` };
+  return { ok: true, message: id ? "Client updated" : `${form.name.trim()} added` };
 }
 
 export async function deleteClientRecord(id: string): Promise<Result> {

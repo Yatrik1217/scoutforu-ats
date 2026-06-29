@@ -70,19 +70,13 @@ export default async function AdminPage() {
       <div className="flex flex-col gap-[18px]">
         <ClientManager
           isAdmin={isAdmin}
+          team={ws.team}
           clients={ws.clients.map((c) => {
             const jobs = ws.jobs.filter((j) => j.client_id === c.id);
             const cands = ws.candidates.filter((x) =>
               jobs.some((j) => j.id === x.job_id),
             ).length;
-            return {
-              id: c.id,
-              name: c.name,
-              status: c.status,
-              contact_email: c.contact_email,
-              jobs: jobs.length,
-              cands,
-            };
+            return { ...c, jobs: jobs.length, cands };
           })}
         />
 
