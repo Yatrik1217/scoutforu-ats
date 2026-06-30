@@ -9,9 +9,13 @@ import { createClient } from "@/lib/supabase/client";
 import {
   createCandidate,
   updateCandidate,
+  findDuplicateCandidate,
   type CandidateForm,
+  type DuplicateMatch,
 } from "@/lib/actions/mutations";
 import { parseResume } from "@/lib/actions/parse-resume";
+import { useShell } from "@/components/shell-provider";
+import { AlertTriangle } from "lucide-react";
 import {
   STAGES,
   SOURCES,
@@ -22,6 +26,7 @@ import {
   FUNCTIONAL_AREAS,
   INDUSTRIES,
   stageToSlug,
+  stageFromSlug,
 } from "@/lib/domain";
 import type {
   CandidateRow,
@@ -91,9 +96,15 @@ export function CandidateFormModal({
   const [pending, start] = useTransition();
   const [err, setErr] = useState(false);
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([]);
+  const { openDrawer } = useShell();
   const [f, setF] = useState<CForm>(empty);
   const [tagsText, setTagsText] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [dup, setDup] = useState<DuplicateMatch | null>(null);
+
+  const checkDup = (email: string, phone: string) => {
+    findDuplicateCandidate(email, phone, candidate?.id).then(setDup);
+  };
 
   const onResume = (file: File) => {
     setParsing(true);
@@ -131,6 +142,7 @@ export function CandidateFormModal({
         birthDate: keep(d.birthDate, s.birthDate),
       }));
       if (d.skills.length) setTagsText(d.skills.join(", "));
+      checkDup(d.email, d.phone);
       toast.success("Resume parsed — review the details and save");
     });
   };
@@ -138,6 +150,7 @@ export function CandidateFormModal({
   useEffect(() => {
     if (!open) return;
     setErr(false);
+    setDup(null);
     if (candidate) {
       setF({
         name: candidate.name,
@@ -277,6 +290,25 @@ export function CandidateFormModal({
               </label>
             </div>
           )}
+          {dup && (
+            <div className="mb-4 flex items-center gap-3 rounded-[11px] border border-[#f3d9a6] bg-[#fff8ec] p-[12px_14px]">
+              <AlertTriangle size={18} className="shrink-0 text-[#b27400]" />
+              <div className="flex-1 text-[12.5px] font-semibold text-[#7a5b14]">
+                Possible duplicate — <b>{dup.name}</b> is already in your database
+                {" "}(stage: {stageFromSlug(dup.stage)}), matched by {dup.via}.
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openDrawer(dup.id);
+                }}
+                className="shrink-0 rounded-lg bg-[#b27400] px-3 py-1.5 text-[11.5px] font-bold text-white hover:brightness-110"
+              >
+                View existing
+              </button>
+            </div>
+          )}
           <label className={labelCls}>
             Full Name <span className="text-[#ef4444]">*</span>
           </label>
@@ -295,10 +327,10 @@ export function CandidateFormModal({
 
           <div className="mt-4 grid grid-cols-2 gap-3.5">
             <Field label="Email">
-              <input value={f.email} onChange={(e) => set("email", e.target.value)} className={fieldCls} placeholder="name@email.com" />
+              <input value={f.email} onChange={(e) => set("email", e.target.value)} onBlur={(e) => checkDup(e.target.value, f.phone)} className={fieldCls} placeholder="name@email.com" />
             </Field>
             <Field label="Phone">
-              <input value={f.phone} onChange={(e) => set("phone", e.target.value)} className={fieldCls} placeholder="+91…" />
+              <input value={f.phone} onChange={(e) => set("phone", e.target.value)} onBlur={(e) => checkDup(f.email, e.target.value)} className={fieldCls} placeholder="+91…" />
             </Field>
             <Field label="Role / Job">
               <select value={f.jobId ?? ""} onChange={(e) => set("jobId", e.target.value || null)} className={`${fieldCls} cursor-pointer`}>

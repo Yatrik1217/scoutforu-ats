@@ -276,6 +276,49 @@ export async function updateCandidate(
   return { ok: true, message: `${form.name.trim()} updated` };
 }
 
+// Duplicate detection — matches an existing candidate by email or phone
+// (across primary + alternate), with phone normalized to its last 10 digits so
+// "+91 98765 43210" and "9876543210" match. Returns the existing record or null.
+export type DuplicateMatch = {
+  id: string;
+  name: string;
+  stage: CandidateStage;
+  via: "email" | "phone";
+};
+
+export async function findDuplicateCandidate(
+  email: string,
+  phone: string,
+  excludeId?: string,
+): Promise<DuplicateMatch | null> {
+  const e = email.trim().toLowerCase();
+  const p = phone.replace(/\D/g, "").slice(-10);
+  if (!e && p.length < 7) return null;
+
+  const sb = await createClient();
+  const { data } = await sb
+    .from("candidates")
+    .select("id,name,stage,email,phone,alt_email,alt_phone");
+  if (!data) return null;
+
+  for (const c of data) {
+    if (excludeId && c.id === excludeId) continue;
+    if (e) {
+      const emails = [c.email, c.alt_email]
+        .filter(Boolean)
+        .map((x) => x!.trim().toLowerCase());
+      if (emails.includes(e)) return { id: c.id, name: c.name, stage: c.stage, via: "email" };
+    }
+    if (p.length >= 7) {
+      const phones = [c.phone, c.alt_phone]
+        .filter(Boolean)
+        .map((x) => x!.replace(/\D/g, "").slice(-10));
+      if (phones.includes(p)) return { id: c.id, name: c.name, stage: c.stage, via: "phone" };
+    }
+  }
+  return null;
+}
+
 export async function deleteCandidate(id: string): Promise<Result> {
   const sb = await createClient();
   const { error } = await sb.from("candidates").delete().eq("id", id);
