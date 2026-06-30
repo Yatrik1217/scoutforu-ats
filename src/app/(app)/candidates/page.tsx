@@ -1,6 +1,7 @@
 import { loadWorkspace } from "@/lib/data";
 import { Avatar, StageBadge } from "@/components/bits";
 import { ClickableTr, NewCandidateButton } from "@/components/view-actions";
+import { ExportCsvButton } from "@/components/export-csv";
 
 export default async function CandidatesPage({
   searchParams,
@@ -24,7 +25,30 @@ export default async function CandidatesPage({
         <span className="tf-num text-[13px] font-semibold text-[#8a94a6]">
           {rows.length} candidates
         </span>
-        <NewCandidateButton />
+        <div className="flex items-center gap-2">
+          <ExportCsvButton
+            filename="candidates"
+            rows={rows.map((c) => ({
+              Name: c.name,
+              Email: c.email ?? "",
+              Phone: c.phone ?? "",
+              Role: c.jobTitle,
+              Stage: c.stageKey,
+              Location: c.location ?? "",
+              "Experience (yrs)": c.exp_years,
+              "Current CTC (LPA)": c.current_ctc_lpa,
+              "Expected CTC (LPA)": c.expected_ctc_lpa,
+              "Notice (days)": c.notice_period_days,
+              Designation: c.current_designation,
+              Company: c.current_company,
+              Source: c.source ?? "",
+              Recruiter: c.recruiterName,
+              Rating: c.rating,
+              Skills: c.tags.join("; "),
+            }))}
+          />
+          <NewCandidateButton />
+        </div>
       </div>
       <div className="overflow-hidden rounded-[14px] border border-[#e9edf3] bg-white">
         <table className="w-full border-collapse">

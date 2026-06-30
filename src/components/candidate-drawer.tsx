@@ -24,8 +24,12 @@ import {
   advanceCandidate,
   rejectCandidate,
   deleteCandidate,
+  addCandidateNote,
+  deleteCandidateNote,
 } from "@/lib/actions/mutations";
 import type { CandidateRow, StageEventRow } from "@/lib/database.types";
+
+type Note = { id: string; body: string; created_at: string; author: string };
 
 type Detail = {
   cand: CandidateRow;
@@ -51,12 +55,51 @@ export function CandidateDrawer({
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [pending, start] = useTransition();
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+
+  const loadNotes = async (id: string) => {
+    const sb = createClient();
+    const [{ data: rows }, { data: profs }] = await Promise.all([
+      sb
+        .from("candidate_notes")
+        .select("id,body,created_at,author_id")
+        .eq("candidate_id", id)
+        .order("created_at", { ascending: false }),
+      sb.from("profiles").select("id,name"),
+    ]);
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.name]));
+    setNotes(
+      (rows ?? []).map((n) => ({
+        id: n.id,
+        body: n.body,
+        created_at: n.created_at,
+        author: n.author_id ? (nameById.get(n.author_id) ?? "—") : "—",
+      })),
+    );
+  };
+
+  const submitNote = () => {
+    if (!candidateId || !noteText.trim()) return;
+    setSavingNote(true);
+    addCandidateNote(candidateId, noteText).then((res) => {
+      setSavingNote(false);
+      if (res.ok) {
+        setNoteText("");
+        loadNotes(candidateId);
+      } else toast.error(res.error ?? "Could not add note");
+    });
+  };
 
   useEffect(() => {
     if (!candidateId) {
       setDetail(null);
+      setNotes([]);
+      setNoteText("");
       return;
     }
+    loadNotes(candidateId);
     let active = true;
     (async () => {
       const sb = createClient();
@@ -291,6 +334,64 @@ export function CandidateDrawer({
                   );
                 })}
               </div>
+
+              {canWrite && (
+                <>
+                  <div className="mb-2.5 mt-7 text-[13px] font-extrabold">Notes</div>
+                  <div className="mb-3 flex gap-2">
+                    <input
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitNote();
+                      }}
+                      placeholder="Add a note…"
+                      className="flex-1 rounded-[10px] border border-[#e3e8f0] px-3 py-2.5 text-[13px] outline-none focus:border-[#2a6fdb]"
+                    />
+                    <button
+                      onClick={submitNote}
+                      disabled={savingNote || !noteText.trim()}
+                      className="rounded-[10px] bg-[#2a6fdb] px-4 text-[12.5px] font-bold text-white hover:bg-[#1f5bc0] disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {notes.length === 0 && (
+                    <div className="text-[12px] font-medium text-[#a3acbd]">
+                      No notes yet.
+                    </div>
+                  )}
+                  {notes.map((n) => (
+                    <div
+                      key={n.id}
+                      className="group mb-2 rounded-[10px] bg-[#f7f9fc] p-[10px_12px]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11.5px] font-bold text-[#42506b]">
+                          {n.author}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-[10.5px] font-medium text-[#a3acbd]">
+                            {new Date(n.created_at).toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() =>
+                              deleteCandidateNote(n.id).then(() => loadNotes(candidateId))
+                            }
+                            className="text-[#c3cad6] opacity-0 transition group-hover:opacity-100 hover:text-[#dc2626]"
+                            title="Delete note"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </span>
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap text-[12.5px] text-[#16203a]">
+                        {n.body}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             {canWrite && (

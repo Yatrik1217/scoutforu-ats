@@ -147,6 +147,14 @@ export type OfferRow = {
   status: OfferStatus;
 };
 
+export type CandidateNoteRow = {
+  id: string;
+  candidate_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type AppSettingsRow = {
   id: boolean;
   email_notif: boolean;
@@ -172,6 +180,7 @@ export type Database = {
       interviews: Table<InterviewRow>;
       stage_events: Table<StageEventRow>;
       offers: Table<OfferRow>;
+      candidate_notes: Table<CandidateNoteRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

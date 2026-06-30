@@ -426,6 +426,33 @@ export async function setUserActive(
   return { ok: true, message: active ? "Recruiter activated" : "Recruiter deactivated" };
 }
 
+export async function addCandidateNote(
+  candidateId: string,
+  body: string,
+): Promise<Result> {
+  if (!body.trim()) return { ok: false, error: "Note is empty" };
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const { error } = await sb.from("candidate_notes").insert({
+    candidate_id: candidateId,
+    author_id: user?.id ?? null,
+    body: body.trim(),
+  });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Note added" };
+}
+
+export async function deleteCandidateNote(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("candidate_notes").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
 export async function updateSetting(
   key: "email_notif" | "auto_reject" | "client_portal" | "two_factor",
   value: boolean,
