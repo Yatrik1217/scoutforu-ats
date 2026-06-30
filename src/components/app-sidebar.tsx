@@ -11,6 +11,7 @@ import {
   FileText,
   BarChart3,
   Search,
+  UploadCloud,
   UserCheck,
   Database,
   SlidersHorizontal,
@@ -45,6 +46,7 @@ export function AppSidebar({
     { href: "/jobs", label: "Open Jobs", icon: Briefcase, badge: jobsCount },
     { href: "/candidates", label: "Candidates", icon: Users },
     { href: "/search", label: "Search Resumes", icon: Search },
+    { href: "/bulk", label: "Bulk Upload", icon: UploadCloud },
     {
       href: "/interviews",
       label: "Interviews",

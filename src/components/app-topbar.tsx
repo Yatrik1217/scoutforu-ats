@@ -21,6 +21,7 @@ const TITLES: Record<string, [string, string]> = {
   "/jobs": ["Open Jobs", "Active requisitions"],
   "/candidates": ["All Candidates", "Everyone in your ATS"],
   "/search": ["Search Resumes", "Find profiles in your database"],
+  "/bulk": ["Bulk Upload", "Parse many resumes at once"],
   "/interviews": ["Interviews", "Upcoming & scheduled rounds"],
   "/offers": ["Offers", "Offer journey & status"],
   "/analytics": ["Analytics", "Funnel & sourcing insights"],
