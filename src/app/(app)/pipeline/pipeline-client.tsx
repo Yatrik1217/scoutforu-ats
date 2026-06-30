@@ -185,6 +185,7 @@ export function PipelineClient({
         <PipelineTable rows={filtered} onOpen={openDrawer} />
       ) : (
         <DndContext
+          id="pipeline-board"
           sensors={sensors}
           collisionDetection={pointerWithin}
           onDragStart={onDragStart}

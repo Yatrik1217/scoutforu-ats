@@ -134,7 +134,8 @@ export const ROLE_COLOR: Record<Role, string> = {
 
 // Broad list of Indian cities for the location autocomplete. Used as a
 // <datalist> so users get suggestions but can still type ANY city.
-export const INDIAN_CITIES = [
+// Deduped at export so accidental repeats can't cause duplicate React keys.
+const RAW_CITIES = [
   "Remote",
   "Mumbai",
   "Delhi",
@@ -290,7 +291,8 @@ export const INDIAN_CITIES = [
   "Goa",
   "Pondicherry",
   "Puducherry",
-] as const;
+];
+export const INDIAN_CITIES: string[] = Array.from(new Set(RAW_CITIES));
 
 export const FUNCTIONAL_AREAS = [
   "Engineering / Software",
