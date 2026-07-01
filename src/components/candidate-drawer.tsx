@@ -7,7 +7,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X, ArrowRight, Mail, Calendar, Pencil, Trash2 } from "lucide-react";
+import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   PIPELINE_STAGES,
@@ -218,6 +218,21 @@ export function CandidateDrawer({
                 >
                   <Mail size={15} /> Email
                 </a>
+                {canWrite && detail.cand.resume_url && (
+                  <button
+                    onClick={async () => {
+                      const sb = createClient();
+                      const { data } = await sb.storage
+                        .from("resumes")
+                        .createSignedUrl(detail.cand.resume_url, 120);
+                      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                      else toast.error("Could not open the resume file");
+                    }}
+                    className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
+                  >
+                    <FileText size={15} /> Résumé
+                  </button>
+                )}
                 {canWrite && (
                   <button
                     onClick={() => onSchedule(detail.cand.id)}

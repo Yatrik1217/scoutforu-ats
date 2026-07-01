@@ -2,6 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import mammoth from "mammoth";
+import { createClient as createSupabase } from "@/lib/supabase/server";
 import {
   GENDERS,
   MARITAL_STATUSES,
@@ -33,7 +34,12 @@ export type ParsedResume = {
   skills: string[];
 };
 
-type Result = { ok: boolean; data?: ParsedResume; error?: string };
+type Result = {
+  ok: boolean;
+  data?: ParsedResume;
+  resumeUrl?: string;
+  error?: string;
+};
 
 const SYSTEM = `You are a precise resume parser for an Indian recruitment ATS. Extract candidate details from the resume and return ONLY a single JSON object — no prose, no markdown fences. Use empty string "" for unknown text fields, 0 for unknown numbers, and [] for skills if none found. CTC values are in ₹ Lakhs Per Annum (LPA) as numbers (e.g. 12.5). Experience is total years as a number. Notice period is in days as a number. Birth date as YYYY-MM-DD or "".
 
@@ -135,8 +141,24 @@ export async function parseResume(formData: FormData): Promise<Result> {
     const start = json.indexOf("{");
     const end = json.lastIndexOf("}");
     if (start < 0 || end < 0) return { ok: false, error: "Parser returned no data." };
-    const parsed = JSON.parse(json.slice(start, end + 1));
-    return { ok: true, data: coerce(parsed) };
+    const parsed = coerce(JSON.parse(json.slice(start, end + 1)));
+
+    // Store the original file so recruiters can view/download it later. If the
+    // storage bucket/policies aren't set up yet, this is skipped silently.
+    let resumeUrl = "";
+    try {
+      const supa = await createSupabase();
+      const ext = (name.split(".").pop() || "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supa.storage
+        .from("resumes")
+        .upload(path, buf, { contentType: file.type || undefined });
+      if (!error) resumeUrl = path;
+    } catch {
+      /* storage optional */
+    }
+
+    return { ok: true, data: parsed, resumeUrl };
   } catch (e) {
     return {
       ok: false,

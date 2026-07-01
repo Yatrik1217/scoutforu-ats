@@ -140,6 +140,7 @@ export function CandidateFormModal({
         industry: keep(d.industry, s.industry),
         maritalStatus: keep(d.maritalStatus, s.maritalStatus),
         birthDate: keep(d.birthDate, s.birthDate),
+        resumeUrl: res.resumeUrl || s.resumeUrl,
       }));
       if (d.skills.length) setTagsText(d.skills.join(", "));
       checkDup(d.email, d.phone);

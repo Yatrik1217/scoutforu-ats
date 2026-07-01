@@ -13,7 +13,7 @@ export type BulkResult = {
   message: string;
 };
 
-function toForm(d: ParsedResume): CandidateForm {
+function toForm(d: ParsedResume, resumeUrl = ""): CandidateForm {
   return {
     name: d.name,
     email: d.email,
@@ -40,7 +40,7 @@ function toForm(d: ParsedResume): CandidateForm {
     altPhone: d.altPhone,
     function: d.function,
     industry: d.industry,
-    resumeUrl: "",
+    resumeUrl,
   };
 }
 
@@ -65,7 +65,7 @@ export async function bulkProcessResume(
       message: `Already in database as ${dup.name} (by ${dup.via})`,
     };
 
-  const created = await createCandidate(toForm(d));
+  const created = await createCandidate(toForm(d, res.resumeUrl));
   if (!created.ok)
     return { status: "error", name: d.name, message: created.error ?? "Create failed" };
 

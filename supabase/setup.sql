@@ -447,3 +447,18 @@ create policy candidate_notes_staff_write on public.candidate_notes
 
 alter publication supabase_realtime add table public.candidate_notes;
 
+-- supabase/migrations/0011_storage_policies.sql
+-- Access policies for the private "resumes" storage bucket: only staff
+-- (master_admin / recruiter) can upload, read, or delete resume files.
+create policy "resumes staff read" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'resumes' and public.is_staff());
+
+create policy "resumes staff insert" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'resumes' and public.is_staff());
+
+create policy "resumes staff delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'resumes' and public.is_staff());
+
