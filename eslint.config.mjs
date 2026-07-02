@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Browser extension (Chrome APIs, not part of the Next app).
+    "extension/**",
+    "scripts/**",
   ]),
 ]);
 

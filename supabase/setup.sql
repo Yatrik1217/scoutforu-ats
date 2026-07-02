@@ -493,3 +493,9 @@ create policy feedback_staff_write on public.interview_feedback
 
 alter publication supabase_realtime add table public.interview_feedback;
 
+-- supabase/migrations/0013_api_token.sql
+-- Per-recruiter API token used by the Naukri Resdex browser extension to import
+-- candidates into the ATS without a full login session.
+alter table public.profiles
+  add column if not exists api_token text unique;
+

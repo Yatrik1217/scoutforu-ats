@@ -1,8 +1,10 @@
 import { loadWorkspace } from "@/lib/data";
+import { getProfile } from "@/lib/auth";
 import { ROLE_LABEL } from "@/lib/domain";
 import { Avatar } from "@/components/bits";
 import { SettingsToggle, UserActiveToggle } from "@/components/view-actions";
 import { ClientManager } from "@/components/client-manager";
+import { ApiTokenCard } from "@/components/api-token-card";
 import type { UserRole } from "@/lib/database.types";
 
 const ROLE_BADGE: Record<UserRole, { color: string; bg: string }> = {
@@ -24,6 +26,7 @@ const SETTINGS: {
 
 export default async function AdminPage() {
   const { ws, scope } = await loadWorkspace();
+  const me = await getProfile();
   const users = Array.from(ws.profileById.values()).sort((a, b) =>
     a.role === "master_admin" ? -1 : b.role === "master_admin" ? 1 : 0,
   );
@@ -99,6 +102,7 @@ export default async function AdminPage() {
             </div>
           ))}
         </div>
+        <ApiTokenCard initialToken={me?.api_token ?? null} />
       </div>
     </div>
   );

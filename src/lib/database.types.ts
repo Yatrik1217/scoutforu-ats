@@ -48,6 +48,7 @@ export type ProfileRow = {
   color: string;
   client_id: string | null;
   active: boolean;
+  api_token: string | null;
   created_at: string;
 };
 

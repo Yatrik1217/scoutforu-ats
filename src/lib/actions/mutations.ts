@@ -484,6 +484,29 @@ export async function deleteInterviewFeedback(id: string): Promise<Result> {
   return { ok: true };
 }
 
+export async function regenerateApiToken(): Promise<{
+  ok: boolean;
+  token?: string;
+  error?: string;
+}> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+  const token =
+    "sfu_" +
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "");
+  const { error } = await sb
+    .from("profiles")
+    .update({ api_token: token })
+    .eq("id", user.id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, token };
+}
+
 export async function updateSetting(
   key: "email_notif" | "auto_reject" | "client_portal" | "two_factor",
   value: boolean,
