@@ -115,15 +115,30 @@ export async function POST(req: NextRequest) {
   ]);
   const ai: ParsedResume | null = mergeParsed(aiFile, aiText);
 
-  // Store the original resume file so recruiters can view/download it later.
+  // Decide what résumé file to store: the original download if the extension
+  // captured one, otherwise the rendered CV HTML snapshot from the page (which
+  // Resdex always shows), so a résumé document is attached either way.
+  let storeBuf = resumeBuf;
+  let storeName = resumeName;
+  let storeType = resumeType;
+  if (!storeBuf) {
+    const cvHtml = s(b.cvHtml);
+    if (cvHtml.length > 500) {
+      storeBuf = Buffer.from(cvHtml, "utf8");
+      storeName = "resume.html";
+      storeType = "text/html";
+    }
+  }
+
+  // Store the résumé file so recruiters can view/download it later.
   let resumeUrl = "";
-  if (resumeBuf) {
+  if (storeBuf && storeBuf.length <= 8 * 1024 * 1024) {
     try {
-      const ext = (resumeName.split(".").pop() || "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf";
+      const ext = (storeName.split(".").pop() || "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf";
       const path = `${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await sb.storage
         .from("resumes")
-        .upload(path, resumeBuf, { contentType: resumeType || undefined });
+        .upload(path, storeBuf, { contentType: storeType || undefined });
       if (!upErr) resumeUrl = path;
     } catch {
       /* storage optional */
@@ -194,5 +209,5 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return json({ ok: false, error: error.message }, 500);
-  return json({ ok: true, status: "created", name, candidateId: created.id });
+  return json({ ok: true, status: "created", name, candidateId: created.id, resume: !!resumeUrl });
 }

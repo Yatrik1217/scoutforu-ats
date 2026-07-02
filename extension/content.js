@@ -105,6 +105,44 @@
     return false;
   }
 
+  // The CV is rendered as HTML on the page (cv-educ, cv-prev-*, etc.). Capture
+  // that section as a standalone HTML document so a résumé file is always
+  // attached, even when the original file download can't be captured.
+  function captureCvHtml(name) {
+    try {
+      const anchor = document.querySelector(
+        "[class*='cv-prev'],[class*='cv-educ'],[class*='cv-emp'],[class*='cvPreview' i],[class*='cv-']",
+      );
+      let el = anchor;
+      if (el) {
+        for (let i = 0; i < 6 && el.parentElement; i++) {
+          el = el.parentElement;
+          if ((el.innerText || "").length > 900) break;
+        }
+      } else {
+        el = document.querySelector("main, #root") || document.body;
+      }
+      const clone = el.cloneNode(true);
+      clone
+        .querySelectorAll("script,style,noscript,svg,button,input,iframe,[class*='action' i],[class*='sim' i],[class*='btn' i]")
+        .forEach((n) => n.remove());
+      const inner = clone.innerHTML || "";
+      if (inner.length < 400) return "";
+      const safeName = (name || "Candidate").replace(/[<>&]/g, "");
+      return (
+        "<!doctype html><html><head><meta charset='utf-8'><title>" +
+        safeName +
+        " — CV</title><style>body{font:14px/1.55 system-ui,Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 18px;color:#16203a}h1,h2,h3{margin:.7em 0 .25em}*{max-width:100%}table{border-collapse:collapse}td,th{padding:2px 8px}</style></head><body><h2>" +
+        safeName +
+        "</h2>" +
+        inner +
+        "</body></html>"
+      );
+    } catch {
+      return "";
+    }
+  }
+
   function scrape() {
     // We deliberately do NOT regex-scrape email/phone here: a blind page scan
     // grabs shared page-chrome values (the recruiter's own inbox, a Naukri
@@ -123,7 +161,7 @@
     }
     if (!name || name.length > 60) name = (document.title || "").split(/[-|]/)[0].trim();
 
-    return { name, rawText, resumeUrls: resumeUrls() };
+    return { name, rawText, resumeUrls: resumeUrls(), cvHtml: captureCvHtml(name) };
   }
 
   function toast(msg, ok) {
@@ -219,7 +257,7 @@
         if (!res) return toast("Extension not configured — open the popup", false);
         if (!res.ok) return toast(res.error || "Import failed", false);
         if (res.status === "duplicate") return toast(`Already in ATS (${res.existing || data.name})`, true);
-        toast(`Imported ${res.name || data.name}${res.withResume ? " + resume" : ""} to Sourced ✓`, true);
+        toast(`Imported ${res.name || data.name}${res.withResume || res.resume ? " + resume" : ""} to Sourced ✓`, true);
       };
       // Arm the download capture BEFORE clicking Naukri's download button, so
       // the background worker doesn't miss the download event.
