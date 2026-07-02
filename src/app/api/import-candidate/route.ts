@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { extractFromText, type ParsedResume } from "@/lib/ai/extract";
 
 // Import a candidate from an external source (Naukri Resdex extension / bookmarklet).
 // Authenticated with a per-recruiter API token, not a login session.
@@ -52,11 +53,22 @@ export async function POST(req: NextRequest) {
     const x = parseFloat(String(v ?? ""));
     return Number.isFinite(x) ? x : 0;
   };
-  const name = s(b.name);
+
+  // When the extension sends the raw profile text, run the same Haiku extractor
+  // the resume parser uses — far more reliable than page-scraping selectors.
+  let ai: ParsedResume | null = null;
+  const rawText = s(b.rawText);
+  if (rawText) ai = await extractFromText(rawText);
+
+  // Prefer explicitly-scraped values (unlocked contacts etc.), fall back to AI.
+  const pickS = (scraped: unknown, aiVal?: string) => s(scraped) || (aiVal ?? "");
+  const pickN = (scraped: unknown, aiVal?: number) => n(scraped) || (aiVal ?? 0);
+
+  const name = pickS(b.name, ai?.name);
   if (!name) return json({ ok: false, error: "name is required" }, 400);
 
-  const email = s(b.email).toLowerCase();
-  const phone = digits10(s(b.phone));
+  const email = pickS(b.email, ai?.email).toLowerCase();
+  const phone = digits10(pickS(b.phone, ai?.phone));
 
   // Duplicate check (email or phone, incl. alternates)
   const { data: existing } = await sb
@@ -69,23 +81,37 @@ export async function POST(req: NextRequest) {
       return json({ ok: true, status: "duplicate", name, existing: c.name });
   }
 
-  const skills = Array.isArray(b.skills) ? (b.skills as unknown[]).map(String) : [];
+  const skills =
+    Array.isArray(b.skills) && b.skills.length
+      ? (b.skills as unknown[]).map(String)
+      : ai?.skills ?? [];
+  const birthDate = pickS(b.birthDate, ai?.birthDate);
+
   const { data: created, error } = await sb
     .from("candidates")
     .insert({
       name,
-      email: s(b.email) || null,
-      phone: s(b.phone) || null,
+      email: pickS(b.email, ai?.email) || null,
+      phone: pickS(b.phone, ai?.phone) || null,
       recruiter_id: profile.id,
       stage: "sourced",
       source: "Naukri Resdex",
-      location: s(b.location) || null,
-      exp_years: n(b.expYears),
-      current_designation: s(b.currentDesignation),
-      current_company: s(b.currentCompany),
-      current_ctc_lpa: n(b.currentCtc),
-      expected_ctc_lpa: n(b.expectedCtc),
-      notice_period_days: n(b.noticePeriod),
+      location: pickS(b.location, ai?.location) || null,
+      exp_years: pickN(b.expYears, ai?.expYears),
+      current_designation: pickS(b.currentDesignation, ai?.currentDesignation),
+      current_company: pickS(b.currentCompany, ai?.currentCompany),
+      current_ctc_lpa: pickN(b.currentCtc, ai?.currentCtc),
+      expected_ctc_lpa: pickN(b.expectedCtc, ai?.expectedCtc),
+      notice_period_days: pickN(b.noticePeriod, ai?.noticePeriod),
+      alt_email: pickS(b.altEmail, ai?.altEmail),
+      alt_phone: pickS(b.altPhone, ai?.altPhone),
+      gender: pickS(b.gender, ai?.gender),
+      graduation: pickS(b.graduation, ai?.graduation),
+      post_graduation: pickS(b.postGraduation, ai?.postGraduation),
+      marital_status: pickS(b.maritalStatus, ai?.maritalStatus),
+      birth_date: birthDate || null,
+      function: pickS(b.function, ai?.function),
+      industry: pickS(b.industry, ai?.industry),
       tags: skills,
     })
     .select("id")

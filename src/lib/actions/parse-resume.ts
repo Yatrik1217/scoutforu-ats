@@ -3,36 +3,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import mammoth from "mammoth";
 import { createClient as createSupabase } from "@/lib/supabase/server";
-import {
-  GENDERS,
-  MARITAL_STATUSES,
-  QUALIFICATIONS,
-  FUNCTIONAL_AREAS,
-  INDUSTRIES,
-} from "@/lib/domain";
+import { extractFromContent, type ParsedResume } from "@/lib/ai/extract";
 
-export type ParsedResume = {
-  name: string;
-  email: string;
-  phone: string;
-  altEmail: string;
-  altPhone: string;
-  location: string;
-  expYears: number;
-  currentDesignation: string;
-  currentCompany: string;
-  currentCtc: number;
-  expectedCtc: number;
-  noticePeriod: number;
-  gender: string;
-  graduation: string;
-  postGraduation: string;
-  function: string;
-  industry: string;
-  maritalStatus: string;
-  birthDate: string;
-  skills: string[];
-};
+export type { ParsedResume } from "@/lib/ai/extract";
 
 type Result = {
   ok: boolean;
@@ -40,48 +13,6 @@ type Result = {
   resumeUrl?: string;
   error?: string;
 };
-
-const SYSTEM = `You are a precise resume parser for an Indian recruitment ATS. Extract candidate details from the resume and return ONLY a single JSON object — no prose, no markdown fences. Use empty string "" for unknown text fields, 0 for unknown numbers, and [] for skills if none found. CTC values are in ₹ Lakhs Per Annum (LPA) as numbers (e.g. 12.5). Experience is total years as a number. Notice period is in days as a number. Birth date as YYYY-MM-DD or "".
-
-For these fields, choose the closest value from the allowed list (or "" if none fits):
-- gender: ${GENDERS.join(" | ")}
-- maritalStatus: ${MARITAL_STATUSES.join(" | ")}
-- graduation: ${QUALIFICATIONS.join(" | ")}
-- postGraduation: ${QUALIFICATIONS.join(" | ")}
-- function: ${FUNCTIONAL_AREAS.join(" | ")}
-- industry: ${INDUSTRIES.join(" | ")}
-
-JSON keys exactly: name, email, phone, altEmail, altPhone, location, expYears, currentDesignation, currentCompany, currentCtc, expectedCtc, noticePeriod, gender, graduation, postGraduation, function, industry, maritalStatus, birthDate, skills (array of short skill strings).`;
-
-function coerce(raw: Record<string, unknown>): ParsedResume {
-  const s = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
-  const n = (v: unknown) => {
-    const x = typeof v === "number" ? v : parseFloat(String(v ?? ""));
-    return Number.isFinite(x) ? x : 0;
-  };
-  return {
-    name: s(raw.name),
-    email: s(raw.email),
-    phone: s(raw.phone),
-    altEmail: s(raw.altEmail),
-    altPhone: s(raw.altPhone),
-    location: s(raw.location),
-    expYears: n(raw.expYears),
-    currentDesignation: s(raw.currentDesignation),
-    currentCompany: s(raw.currentCompany),
-    currentCtc: n(raw.currentCtc),
-    expectedCtc: n(raw.expectedCtc),
-    noticePeriod: n(raw.noticePeriod),
-    gender: s(raw.gender),
-    graduation: s(raw.graduation),
-    postGraduation: s(raw.postGraduation),
-    function: s(raw.function),
-    industry: s(raw.industry),
-    maritalStatus: s(raw.maritalStatus),
-    birthDate: s(raw.birthDate),
-    skills: Array.isArray(raw.skills) ? raw.skills.map((x) => String(x)).slice(0, 20) : [],
-  };
-}
 
 export async function parseResume(formData: FormData): Promise<Result> {
   if (!process.env.ANTHROPIC_API_KEY)
@@ -94,7 +25,6 @@ export async function parseResume(formData: FormData): Promise<Result> {
 
   const name = file.name.toLowerCase();
   const buf = Buffer.from(await file.arrayBuffer());
-  const client = new Anthropic();
 
   // Build the user content: PDFs go straight to Claude as a document; other
   // formats are converted to text first.
@@ -128,20 +58,8 @@ export async function parseResume(formData: FormData): Promise<Result> {
   }
 
   try {
-    const msg = await client.messages.create({
-      // Haiku is cost-effective (~0.4¢/resume) and strong at structured extraction.
-      model: "claude-haiku-4-5",
-      max_tokens: 1500,
-      system: SYSTEM,
-      messages: [{ role: "user", content }],
-    });
-    const textBlock = msg.content.find((b) => b.type === "text");
-    const out = textBlock && "text" in textBlock ? textBlock.text : "";
-    const json = out.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-    const start = json.indexOf("{");
-    const end = json.lastIndexOf("}");
-    if (start < 0 || end < 0) return { ok: false, error: "Parser returned no data." };
-    const parsed = coerce(JSON.parse(json.slice(start, end + 1)));
+    // Haiku is cost-effective (~0.4¢/resume) and strong at structured extraction.
+    const parsed = await extractFromContent(content);
 
     // Store the original file so recruiters can view/download it later. If the
     // storage bucket/policies aren't set up yet, this is skipped silently.
