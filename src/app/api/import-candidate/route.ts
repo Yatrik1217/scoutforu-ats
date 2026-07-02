@@ -20,6 +20,20 @@ export async function OPTIONS() {
 
 const digits10 = (s: string) => (s || "").replace(/\D/g, "").slice(-10);
 
+// Reject non-candidate "chrome" emails that appear on every Resdex page (the
+// recruiter's own posting inbox, Naukri support, role addresses) so they don't
+// poison dedupe / candidate data.
+const ROLE_LOCAL =
+  /^(careers?|jobs?|hr|recruit(?:ing|ment)?|talent|info|support|help|contact|care|sales|admin|noreply|no-?reply|donotreply|do-?not-?reply|mailer|team|hello|enquir(?:y|ies)|hiring|webmaster|office|feedback)$/i;
+const JUNK_DOMAIN = /(?:^|\.)(naukri|infoedge|resdex)\.[a-z.]+$/i;
+function cleanEmail(v: string): string {
+  const e = (v || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return "";
+  const [local, domain] = e.split("@");
+  if (ROLE_LOCAL.test(local) || JUNK_DOMAIN.test(domain)) return "";
+  return e;
+}
+
 export async function POST(req: NextRequest) {
   const token =
     req.headers.get("x-api-token") ||
@@ -67,8 +81,10 @@ export async function POST(req: NextRequest) {
   const name = pickS(b.name, ai?.name);
   if (!name) return json({ ok: false, error: "name is required" }, 400);
 
-  const email = pickS(b.email, ai?.email).toLowerCase();
-  const phone = digits10(pickS(b.phone, ai?.phone));
+  const email = cleanEmail(pickS(b.email, ai?.email));
+  const phoneRaw = pickS(b.phone, ai?.phone);
+  const phone = digits10(phoneRaw);
+  const phoneValid = phone.length === 10; // Indian mobile
 
   // Duplicate check (email or phone, incl. alternates)
   const { data: existing } = await sb
@@ -76,8 +92,11 @@ export async function POST(req: NextRequest) {
     .select("id,name,email,phone,alt_email,alt_phone");
   for (const c of existing ?? []) {
     const emails = [c.email, c.alt_email].filter(Boolean).map((x) => (x as string).toLowerCase());
-    const phones = [c.phone, c.alt_phone].filter(Boolean).map((x) => digits10(x as string));
-    if ((email && emails.includes(email)) || (phone.length >= 7 && phones.includes(phone)))
+    const phones = [c.phone, c.alt_phone]
+      .filter(Boolean)
+      .map((x) => digits10(x as string))
+      .filter((p) => p.length === 10);
+    if ((email && emails.includes(email)) || (phoneValid && phones.includes(phone)))
       return json({ ok: true, status: "duplicate", name, existing: c.name });
   }
 
@@ -91,8 +110,8 @@ export async function POST(req: NextRequest) {
     .from("candidates")
     .insert({
       name,
-      email: pickS(b.email, ai?.email) || null,
-      phone: pickS(b.phone, ai?.phone) || null,
+      email: email || null,
+      phone: phoneValid ? phoneRaw : null,
       recruiter_id: profile.id,
       stage: "sourced",
       source: "Naukri Resdex",

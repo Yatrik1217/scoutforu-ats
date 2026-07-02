@@ -52,10 +52,12 @@
   }
 
   function scrape() {
-    const text = textOf(document.body);
-    const email = (text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/) || [""])[0];
-    const phoneM = text.match(/(?:\+?91[-\s]?)?[6-9]\d{9}/);
-    const phone = phoneM ? phoneM[0] : "";
+    // We deliberately do NOT regex-scrape email/phone here: a blind page scan
+    // grabs shared page-chrome values (the recruiter's own inbox, a Naukri
+    // support number) that are identical on every profile and cause false
+    // "already in ATS" duplicates. Instead we send the profile text and let the
+    // server's AI extractor pull the *candidate's* own contact details.
+    const rawText = profileText();
 
     // Name: prefer a prominent heading, fall back to document title.
     let name = "";
@@ -67,9 +69,7 @@
     }
     if (!name || name.length > 60) name = (document.title || "").split(/[-|]/)[0].trim();
 
-    // Only send fields we can read reliably; everything else (experience, CTC,
-    // location, skills, education …) is extracted server-side from rawText.
-    return { name, email, phone, rawText: profileText() };
+    return { name, rawText };
   }
 
   function toast(msg, ok) {

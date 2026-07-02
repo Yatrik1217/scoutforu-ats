@@ -35,6 +35,8 @@ export type ParsedResume = {
 
 export const SYSTEM = `You are a precise candidate-profile parser for an Indian recruitment ATS. Extract candidate details from the supplied resume or job-portal profile text and return ONLY a single JSON object — no prose, no markdown fences. Use empty string "" for unknown text fields, 0 for unknown numbers, and [] for skills if none found. CTC values are in ₹ Lakhs Per Annum (LPA) as numbers (e.g. 12.5); if a salary is given in ₹/month multiply by 12 and divide by 100000. Experience is total years as a number. Notice period is in days as a number. Birth date as YYYY-MM-DD or "".
 
+email/phone MUST be the candidate's OWN personal contact. NEVER return a recruiter's, company's, job-portal's or support contact — e.g. ignore addresses like careers@, jobs@, hr@, support@, info@, noreply@, any address on a naukri.com / job-portal domain, and any phone labelled support/helpline/toll-free. If the candidate's own email or phone is not clearly present (e.g. masked/locked), return "".
+
 For these fields, choose the closest value from the allowed list (or "" if none fits):
 - gender: ${GENDERS.join(" | ")}
 - maritalStatus: ${MARITAL_STATUSES.join(" | ")}
