@@ -363,6 +363,18 @@ export const QUALIFICATIONS = [
 ] as const;
 
 export const CLIENT_RATINGS = ["A+", "A", "B", "C", "D"] as const;
+export const RECOMMENDATIONS: {
+  value: "strong_yes" | "yes" | "maybe" | "no" | "strong_no";
+  label: string;
+  color: string;
+}[] = [
+  { value: "strong_yes", label: "Strong Yes", color: "#16a34a" },
+  { value: "yes", label: "Yes", color: "#10b981" },
+  { value: "maybe", label: "Maybe", color: "#f59e0b" },
+  { value: "no", label: "No", color: "#ef4444" },
+  { value: "strong_no", label: "Strong No", color: "#b91c1c" },
+];
+
 export const GENDERS = ["Male", "Female", "Other"] as const;
 export const MARITAL_STATUSES = [
   "Single",

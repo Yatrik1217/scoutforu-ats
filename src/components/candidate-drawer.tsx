@@ -18,6 +18,7 @@ import {
   hexA,
   fmtSalary,
   daysInStage,
+  RECOMMENDATIONS,
   type StageKey,
 } from "@/lib/domain";
 import {
@@ -26,8 +27,14 @@ import {
   deleteCandidate,
   addCandidateNote,
   deleteCandidateNote,
+  addInterviewFeedback,
+  deleteInterviewFeedback,
 } from "@/lib/actions/mutations";
-import type { CandidateRow, StageEventRow } from "@/lib/database.types";
+import type {
+  CandidateRow,
+  StageEventRow,
+  FeedbackRecommendation,
+} from "@/lib/database.types";
 
 type Note = { id: string; body: string; created_at: string; author: string };
 
@@ -92,14 +99,60 @@ export function CandidateDrawer({
     });
   };
 
+  const [feedback, setFeedback] = useState<
+    { id: string; rating: number; recommendation: FeedbackRecommendation; notes: string; created_at: string; author: string }[]
+  >([]);
+  const [fbRec, setFbRec] = useState<FeedbackRecommendation>("yes");
+  const [fbRating, setFbRating] = useState(4);
+  const [fbNotes, setFbNotes] = useState("");
+  const [savingFb, setSavingFb] = useState(false);
+
+  const loadFeedback = async (id: string) => {
+    const sb = createClient();
+    const [{ data: rows }, { data: profs }] = await Promise.all([
+      sb
+        .from("interview_feedback")
+        .select("id,rating,recommendation,notes,created_at,interviewer_id")
+        .eq("candidate_id", id)
+        .order("created_at", { ascending: false }),
+      sb.from("profiles").select("id,name"),
+    ]);
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.name]));
+    setFeedback(
+      (rows ?? []).map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        recommendation: r.recommendation,
+        notes: r.notes,
+        created_at: r.created_at,
+        author: r.interviewer_id ? (nameById.get(r.interviewer_id) ?? "—") : "—",
+      })),
+    );
+  };
+
+  const submitFeedback = () => {
+    if (!candidateId) return;
+    setSavingFb(true);
+    addInterviewFeedback(candidateId, fbRating, fbRec, fbNotes).then((res) => {
+      setSavingFb(false);
+      if (res.ok) {
+        setFbNotes("");
+        loadFeedback(candidateId);
+      } else toast.error(res.error ?? "Could not submit feedback");
+    });
+  };
+
   useEffect(() => {
     if (!candidateId) {
       setDetail(null);
       setNotes([]);
       setNoteText("");
+      setFeedback([]);
+      setFbNotes("");
       return;
     }
     loadNotes(candidateId);
+    loadFeedback(candidateId);
     let active = true;
     (async () => {
       const sb = createClient();
@@ -405,6 +458,75 @@ export function CandidateDrawer({
                       </div>
                     </div>
                   ))}
+
+                  <div className="mb-2.5 mt-7 text-[13px] font-extrabold">
+                    Interview Feedback
+                  </div>
+                  <div className="mb-3 rounded-[11px] border border-[#eef1f6] p-3">
+                    <div className="mb-2 flex gap-2">
+                      <select
+                        value={fbRec}
+                        onChange={(e) => setFbRec(e.target.value as FeedbackRecommendation)}
+                        className="flex-1 cursor-pointer rounded-[9px] border border-[#e3e8f0] px-2.5 py-2 text-[12.5px] font-semibold"
+                      >
+                        {RECOMMENDATIONS.map((r) => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={fbRating}
+                        onChange={(e) => setFbRating(Number(e.target.value))}
+                        className="cursor-pointer rounded-[9px] border border-[#e3e8f0] px-2.5 py-2 text-[12.5px] font-semibold"
+                      >
+                        {[5, 4, 3, 2, 1].map((n) => (
+                          <option key={n} value={n}>{"★".repeat(n)} {n}/5</option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      value={fbNotes}
+                      onChange={(e) => setFbNotes(e.target.value)}
+                      rows={2}
+                      placeholder="Interview notes / justification…"
+                      className="w-full resize-y rounded-[9px] border border-[#e3e8f0] px-3 py-2 text-[12.5px] outline-none focus:border-[#2a6fdb]"
+                    />
+                    <button
+                      onClick={submitFeedback}
+                      disabled={savingFb}
+                      className="mt-2 rounded-[9px] bg-[#2a6fdb] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#1f5bc0] disabled:opacity-50"
+                    >
+                      Submit feedback
+                    </button>
+                  </div>
+                  {feedback.map((fb) => {
+                    const rec = RECOMMENDATIONS.find((r) => r.value === fb.recommendation);
+                    return (
+                      <div key={fb.id} className="group mb-2 rounded-[10px] bg-[#f7f9fc] p-[10px_12px]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11.5px] font-bold text-[#42506b]">{fb.author}</span>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                              style={{ color: rec?.color, background: hexA(rec?.color ?? "#64748b", 0.12) }}
+                            >
+                              {rec?.label}
+                            </span>
+                            <span className="tf-num text-[11px] font-extrabold text-[#b27400]">★ {fb.rating}/5</span>
+                          </div>
+                          <button
+                            onClick={() => deleteInterviewFeedback(fb.id).then(() => loadFeedback(candidateId))}
+                            className="text-[#c3cad6] opacity-0 transition group-hover:opacity-100 hover:text-[#dc2626]"
+                            title="Delete feedback"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        {fb.notes && (
+                          <div className="mt-1 whitespace-pre-wrap text-[12.5px] text-[#16203a]">{fb.notes}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </div>

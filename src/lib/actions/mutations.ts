@@ -12,6 +12,7 @@ import type {
   AppSettingsRow,
   CandidateStage,
   EmploymentType,
+  FeedbackRecommendation,
   InterviewTypeEnum,
 } from "@/lib/database.types";
 
@@ -448,6 +449,36 @@ export async function addCandidateNote(
 export async function deleteCandidateNote(id: string): Promise<Result> {
   const sb = await createClient();
   const { error } = await sb.from("candidate_notes").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function addInterviewFeedback(
+  candidateId: string,
+  rating: number,
+  recommendation: FeedbackRecommendation,
+  notes: string,
+): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const { error } = await sb.from("interview_feedback").insert({
+    candidate_id: candidateId,
+    interviewer_id: user?.id ?? null,
+    rating: Math.max(0, Math.min(5, rating)),
+    recommendation,
+    notes: notes.trim(),
+  });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Feedback submitted" };
+}
+
+export async function deleteInterviewFeedback(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("interview_feedback").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };

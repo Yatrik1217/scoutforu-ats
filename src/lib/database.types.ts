@@ -147,6 +147,23 @@ export type OfferRow = {
   status: OfferStatus;
 };
 
+export type FeedbackRecommendation =
+  | "strong_yes"
+  | "yes"
+  | "maybe"
+  | "no"
+  | "strong_no";
+
+export type InterviewFeedbackRow = {
+  id: string;
+  candidate_id: string;
+  interviewer_id: string | null;
+  rating: number;
+  recommendation: FeedbackRecommendation;
+  notes: string;
+  created_at: string;
+};
+
 export type CandidateNoteRow = {
   id: string;
   candidate_id: string;
@@ -181,6 +198,7 @@ export type Database = {
       stage_events: Table<StageEventRow>;
       offers: Table<OfferRow>;
       candidate_notes: Table<CandidateNoteRow>;
+      interview_feedback: Table<InterviewFeedbackRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;
