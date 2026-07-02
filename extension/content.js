@@ -77,6 +77,34 @@
     return urls.slice(0, 6);
   }
 
+  // Click Resdex's own "download CV" control. The original résumé is not a
+  // fetchable URL — it's produced by this button's JS. The background worker
+  // (armed just before) captures the resulting download.
+  function clickCvDownload() {
+    const sels = [
+      "i.naukri-icon-file_download",
+      "i.naukri-btn-icon.naukri-icon-download",
+      "i.naukri-icon-download",
+      "[title*='download cv' i]",
+      "[aria-label*='download cv' i]",
+      "[class*='downloadCv' i]",
+      "[class*='download-cv' i]",
+    ];
+    for (const sel of sels) {
+      let el;
+      try { el = document.querySelector(sel); } catch { el = null; }
+      if (!el) continue;
+      const target = el.closest("a,button,[role='button'],[onclick]") || el;
+      try {
+        target.click();
+        return true;
+      } catch {
+        /* try next */
+      }
+    }
+    return false;
+  }
+
   function scrape() {
     // We deliberately do NOT regex-scrape email/phone here: a blind page scan
     // grabs shared page-chrome values (the recruiter's own inbox, a Naukri
@@ -185,13 +213,19 @@
       if (!data.name) return toast("Couldn't find a candidate name on this page", false);
       btn.disabled = true;
       btn.textContent = "Importing…";
-      chrome.runtime.sendMessage({ type: "import", data }, (res) => {
+      const finish = (res) => {
         btn.disabled = false;
         btn.textContent = "➕ Import to ScoutforU";
         if (!res) return toast("Extension not configured — open the popup", false);
         if (!res.ok) return toast(res.error || "Import failed", false);
         if (res.status === "duplicate") return toast(`Already in ATS (${res.existing || data.name})`, true);
         toast(`Imported ${res.name || data.name}${res.withResume ? " + resume" : ""} to Sourced ✓`, true);
+      };
+      // Arm the download capture BEFORE clicking Naukri's download button, so
+      // the background worker doesn't miss the download event.
+      chrome.runtime.sendMessage({ type: "arm" }, () => {
+        const clicked = clickCvDownload();
+        chrome.runtime.sendMessage({ type: "import", data, expectDownload: clicked }, finish);
       });
     };
     document.body.appendChild(btn);

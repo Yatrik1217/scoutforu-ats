@@ -1,6 +1,7 @@
-// Receives scraped candidate data from the content script, tries to fetch the
-// candidate's resume file (using naukri.com host permission — bypasses page
-// CORS), and POSTs everything to the ScoutforU ATS import endpoint.
+// Receives scraped candidate data from the content script, captures the
+// candidate's résumé via Naukri's own "download CV" button (through the
+// chrome.downloads API), and POSTs everything to the ScoutforU ATS import
+// endpoint. The disk download is cancelled/erased after we grab the bytes.
 
 function abToB64(ab) {
   const bytes = new Uint8Array(ab);
@@ -13,41 +14,81 @@ function abToB64(ab) {
 }
 
 function nameFromUrl(url, type) {
-  let fn = (url.split("#")[0].split("?")[0].split("/").pop() || "resume").slice(0, 80);
+  let fn = ((url || "").split("#")[0].split("?")[0].split("/").pop() || "resume").slice(0, 80);
   if (!/\.(pdf|docx?|rtf)$/i.test(fn)) {
     const ext =
       /pdf/i.test(type) ? "pdf" :
       /wordprocessingml|docx/i.test(type) ? "docx" :
       /msword/i.test(type) ? "doc" : "pdf";
-    fn = fn.replace(/[^\w.-]+/g, "_") + "." + ext;
+    fn = (fn.replace(/[^\w.-]+/g, "_") || "resume") + "." + ext;
   }
   return fn;
 }
 
-// Try each candidate URL; return the first that looks like a real resume file.
-async function fetchResume(urls) {
-  for (const url of urls || []) {
-    try {
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) continue;
-      const type = r.headers.get("content-type") || "";
-      // Skip HTML pages / viewers that aren't the file itself.
-      if (/text\/html/i.test(type)) continue;
-      const ab = await r.arrayBuffer();
-      if (ab.byteLength < 1000 || ab.byteLength > 7 * 1024 * 1024) continue;
-      const isDoc =
-        /pdf|msword|wordprocessingml|officedocument|rtf|octet-stream/i.test(type) ||
-        /\.(pdf|docx?|rtf)(\?|#|$)/i.test(url);
-      if (!isDoc) continue;
-      return { name: nameFromUrl(url, type), type: type || "application/pdf", dataBase64: abToB64(ab) };
-    } catch {
-      /* try next */
+// ---- Download capture --------------------------------------------------------
+const armState = { armed: false, until: 0 };
+let captureResolve = null; // resolver for an in-flight waitForDownload
+let lastFile = null; // download captured before the waiter was ready
+
+chrome.downloads.onCreated.addListener(async (item) => {
+  if (!armState.armed || Date.now() > armState.until) return;
+  const url = item.finalUrl || item.url || "";
+  // Stop the file from actually landing in the user's Downloads folder.
+  try { await chrome.downloads.cancel(item.id); } catch { /* may already be done */ }
+  try { await chrome.downloads.erase({ id: item.id }); } catch { /* ignore */ }
+  try {
+    if (!url || /^blob:/i.test(url) || /^data:/i.test(url)) return; // not refetchable
+    const r = await fetch(url, { credentials: "include" });
+    if (!r.ok) return;
+    const type = item.mime || r.headers.get("content-type") || "application/pdf";
+    if (/text\/html/i.test(type)) return; // a viewer page, not the file
+    const ab = await r.arrayBuffer();
+    if (ab.byteLength < 500 || ab.byteLength > 7 * 1024 * 1024) return;
+    const file = {
+      name: nameFromUrl(item.filename || url, type),
+      type: type || "application/pdf",
+      dataBase64: abToB64(ab),
+    };
+    if (captureResolve) {
+      const done = captureResolve;
+      captureResolve = null;
+      done(file);
+    } else {
+      lastFile = file;
     }
+  } catch {
+    /* capture failed — import proceeds without a file */
   }
-  return null;
+});
+
+function waitForDownload(ms) {
+  if (lastFile) {
+    const f = lastFile;
+    lastFile = null;
+    return Promise.resolve(f);
+  }
+  return new Promise((resolve) => {
+    captureResolve = resolve;
+    setTimeout(() => {
+      if (captureResolve === resolve) {
+        captureResolve = null;
+        resolve(null);
+      }
+    }, ms);
+  });
 }
 
+// ---- Messages ----------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "arm") {
+    armState.armed = true;
+    armState.until = Date.now() + 12000;
+    lastFile = null;
+    captureResolve = null;
+    sendResponse({ ok: true });
+    return; // sync response
+  }
+
   if (msg.type !== "import") return;
   chrome.storage.sync.get(["baseUrl", "token"], async (cfg) => {
     if (!cfg.baseUrl || !cfg.token) {
@@ -56,9 +97,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     try {
       const data = { ...msg.data };
-      const urls = data.resumeUrls;
       delete data.resumeUrls;
-      const resumeFile = await fetchResume(urls);
+
+      let resumeFile = null;
+      if (msg.expectDownload) {
+        resumeFile = await waitForDownload(10000);
+      }
+      armState.armed = false;
       if (resumeFile) data.resumeFile = resumeFile;
 
       const resp = await fetch(cfg.baseUrl.replace(/\/$/, "") + "/api/import-candidate", {
@@ -70,6 +115,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (json && json.ok && resumeFile && json.status === "created") json.withResume = true;
       sendResponse(json);
     } catch (e) {
+      armState.armed = false;
       sendResponse({ ok: false, error: String(e && e.message ? e.message : e) });
     }
   });
