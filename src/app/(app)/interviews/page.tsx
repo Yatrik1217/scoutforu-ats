@@ -2,6 +2,7 @@ import { format, isToday, isTomorrow, isThisWeek } from "date-fns";
 import { loadWorkspace } from "@/lib/data";
 import { Avatar, RecBadge, TypePill, typeLabelFromEnum } from "@/components/bits";
 import { OpenOnClick, NewInterviewButton } from "@/components/view-actions";
+import { AddToCalendarButton } from "@/components/add-to-calendar";
 
 function dayLabel(d: Date) {
   if (isToday(d)) return "Today";
@@ -118,6 +119,13 @@ export default async function InterviewsPage() {
                       {interviewer?.name ?? "—"}
                     </span>
                   </div>
+                  <AddToCalendarButton
+                    id={iv.id}
+                    title={`Interview — ${c?.name ?? "Candidate"} (${typeLabelFromEnum(iv.type)})`}
+                    description={`Interview with ${c?.name ?? "candidate"} for ${c?.jobTitle ?? "the role"}. Interviewer: ${interviewer?.name ?? "TBD"}. Type: ${typeLabelFromEnum(iv.type)}.`}
+                    location={`${typeLabelFromEnum(iv.type)} interview`}
+                    startIso={iv.scheduled_at}
+                  />
                 </OpenOnClick>
               );
             })}
