@@ -109,6 +109,68 @@
     setTimeout(() => t.remove(), 3500);
   }
 
+  // Diagnostic: gather everything on the page that could be the résumé file, so
+  // the résumé finder can be tuned to this Resdex layout. Rendered on-page (no
+  // console needed) — the recruiter screenshots or copies it.
+  function collectDiag() {
+    const d = { url: location.href, iframes: [], embeds: [], links: [], resumeish: [] };
+    try {
+      document.querySelectorAll("iframe").forEach((f) => d.iframes.push(f.src || "(no src)"));
+      document.querySelectorAll("embed,object").forEach((e) => d.embeds.push(e.src || e.data || "(no src)"));
+      document.querySelectorAll("a[href]").forEach((a) => {
+        const h = a.href || "";
+        if (/\.(pdf|docx?|rtf)|resume|cv|download|attach/i.test(h + " " + (a.textContent || "")))
+          d.links.push(((a.textContent || "").trim().slice(0, 30) || "(link)") + " -> " + h);
+      });
+      document
+        .querySelectorAll("[class*='resume' i],[class*='cv' i],[class*='attach' i],[class*='download' i],[id*='resume' i],[data-testid*='resume' i]")
+        .forEach((el) => {
+          d.resumeish.push(
+            el.tagName.toLowerCase() +
+              " ." + (el.className || "").toString().replace(/\s+/g, ".").slice(0, 50) +
+              "  “" + (el.innerText || "").trim().slice(0, 30) + "”",
+          );
+        });
+    } catch (e) {
+      d.error = String(e && e.message);
+    }
+    return d;
+  }
+
+  function showDebug() {
+    document.getElementById("scoutforu-diag")?.remove();
+    const d = collectDiag();
+    const text =
+      "URL:\n" + d.url + "\n\n" +
+      "IFRAMES (" + d.iframes.length + "):\n" + (d.iframes.join("\n") || "(none)") + "\n\n" +
+      "EMBED/OBJECT (" + d.embeds.length + "):\n" + (d.embeds.join("\n") || "(none)") + "\n\n" +
+      "RESUME-ish LINKS (" + d.links.length + "):\n" + (d.links.join("\n") || "(none)") + "\n\n" +
+      "RESUME-ish ELEMENTS (" + d.resumeish.length + "):\n" + (d.resumeish.join("\n") || "(none)");
+    const box = document.createElement("div");
+    box.id = "scoutforu-diag";
+    box.style.cssText =
+      "position:fixed;top:20px;left:20px;right:20px;bottom:20px;z-index:2147483647;background:#0E1320;" +
+      "color:#dbe4f5;border-radius:14px;padding:16px 18px;box-shadow:0 20px 60px rgba(0,0,0,.6);" +
+      "display:flex;flex-direction:column;gap:10px";
+    const bar = document.createElement("div");
+    bar.style.cssText = "display:flex;gap:8px;align-items:center";
+    bar.innerHTML = "<b style='flex:1;font:700 14px system-ui'>ScoutforU — résumé diagnostic (screenshot or copy this)</b>";
+    const copy = document.createElement("button");
+    copy.textContent = "Copy";
+    copy.style.cssText = "background:#2a6fdb;color:#fff;border:none;padding:7px 14px;border-radius:8px;font:700 12px system-ui;cursor:pointer";
+    copy.onclick = () => { navigator.clipboard.writeText(text).then(() => (copy.textContent = "Copied ✓")); };
+    const close = document.createElement("button");
+    close.textContent = "Close";
+    close.style.cssText = "background:#31405e;color:#fff;border:none;padding:7px 14px;border-radius:8px;font:700 12px system-ui;cursor:pointer";
+    close.onclick = () => box.remove();
+    bar.appendChild(copy); bar.appendChild(close);
+    const pre = document.createElement("pre");
+    pre.textContent = text;
+    pre.style.cssText = "flex:1;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-all;font:12px ui-monospace,Menlo,monospace;background:#070a12;padding:12px;border-radius:8px";
+    box.appendChild(bar); box.appendChild(pre);
+    document.body.appendChild(box);
+  }
+
   function addButton() {
     if (document.getElementById(BTN_ID)) return;
     const btn = document.createElement("button");
@@ -133,6 +195,18 @@
       });
     };
     document.body.appendChild(btn);
+
+    // Small "CV debug" helper button beneath the import button.
+    const dbg = document.createElement("button");
+    dbg.id = "scoutforu-debug-btn";
+    dbg.textContent = "🔍 CV debug";
+    dbg.title = "Show what résumé files this page exposes";
+    dbg.style.cssText =
+      "position:fixed;top:134px;right:20px;z-index:2147483647;background:#31405e;color:#fff;" +
+      "border:none;padding:7px 12px;border-radius:9px;font:700 11px system-ui;cursor:pointer;" +
+      "box-shadow:0 3px 10px rgba(0,0,0,.35)";
+    dbg.onclick = showDebug;
+    document.body.appendChild(dbg);
   }
 
   addButton();
