@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { extractFromText, type ParsedResume } from "@/lib/ai/extract";
+import { extractFromText, extractFromFile, type ParsedResume } from "@/lib/ai/extract";
 
 // Import a candidate from an external source (Naukri Resdex extension / bookmarklet).
 // Authenticated with a per-recruiter API token, not a login session.
@@ -32,6 +32,27 @@ function cleanEmail(v: string): string {
   const [local, domain] = e.split("@");
   if (ROLE_LOCAL.test(local) || JUNK_DOMAIN.test(domain)) return "";
   return e;
+}
+
+// Merge two parsed results field-by-field, preferring `primary`'s non-empty
+// values (the actual resume file) and filling gaps from `fallback` (page text).
+function mergeParsed(
+  primary: ParsedResume | null,
+  fallback: ParsedResume | null,
+): ParsedResume | null {
+  if (!primary) return fallback;
+  if (!fallback) return primary;
+  const out = { ...fallback } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(primary as Record<string, unknown>)) {
+    if (Array.isArray(v)) {
+      if (v.length) out[k] = v;
+    } else if (typeof v === "number") {
+      if (v) out[k] = v;
+    } else if (v) {
+      out[k] = v;
+    }
+  }
+  return out as unknown as ParsedResume;
 }
 
 export async function POST(req: NextRequest) {
@@ -68,11 +89,46 @@ export async function POST(req: NextRequest) {
     return Number.isFinite(x) ? x : 0;
   };
 
-  // When the extension sends the raw profile text, run the same Haiku extractor
-  // the resume parser uses — far more reliable than page-scraping selectors.
-  let ai: ParsedResume | null = null;
-  const rawText = s(b.rawText);
-  if (rawText) ai = await extractFromText(rawText);
+  // Decode an attached resume file (base64) if the extension captured one.
+  let resumeBuf: Buffer | null = null;
+  let resumeName = "resume.pdf";
+  let resumeType = "application/pdf";
+  const rf = b.resumeFile as Record<string, unknown> | undefined;
+  if (rf && typeof rf.dataBase64 === "string" && rf.dataBase64.length > 100) {
+    try {
+      const buf = Buffer.from(rf.dataBase64, "base64");
+      if (buf.length > 1000 && buf.length <= 8 * 1024 * 1024) {
+        resumeBuf = buf;
+        resumeName = s(rf.name) || resumeName;
+        resumeType = s(rf.type) || resumeType;
+      }
+    } catch {
+      /* ignore bad file */
+    }
+  }
+
+  // Extract fields with the same Haiku engine the resume parser uses. Prefer the
+  // actual resume file (most accurate); fall back to / fill gaps from page text.
+  const [aiFile, aiText] = await Promise.all([
+    resumeBuf ? extractFromFile(resumeBuf, resumeName, resumeType) : Promise.resolve(null),
+    s(b.rawText) ? extractFromText(s(b.rawText)) : Promise.resolve(null),
+  ]);
+  const ai: ParsedResume | null = mergeParsed(aiFile, aiText);
+
+  // Store the original resume file so recruiters can view/download it later.
+  let resumeUrl = "";
+  if (resumeBuf) {
+    try {
+      const ext = (resumeName.split(".").pop() || "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await sb.storage
+        .from("resumes")
+        .upload(path, resumeBuf, { contentType: resumeType || undefined });
+      if (!upErr) resumeUrl = path;
+    } catch {
+      /* storage optional */
+    }
+  }
 
   // Prefer explicitly-scraped values (unlocked contacts etc.), fall back to AI.
   const pickS = (scraped: unknown, aiVal?: string) => s(scraped) || (aiVal ?? "");
@@ -131,6 +187,7 @@ export async function POST(req: NextRequest) {
       birth_date: birthDate || null,
       function: pickS(b.function, ai?.function),
       industry: pickS(b.industry, ai?.industry),
+      resume_url: resumeUrl,
       tags: skills,
     })
     .select("id")

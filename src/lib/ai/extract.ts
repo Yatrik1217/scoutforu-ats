@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import mammoth from "mammoth";
 import {
   GENDERS,
   MARITAL_STATUSES,
@@ -96,6 +97,41 @@ export async function extractFromContent(
   const end = jsonStr.lastIndexOf("}");
   if (start < 0 || end < 0) throw new Error("Parser returned no data.");
   return coerce(JSON.parse(jsonStr.slice(start, end + 1)));
+}
+
+// Extract candidate fields from an actual resume file buffer (PDF/DOCX/text).
+// PDFs go straight to Claude as a document; other formats are converted first.
+export async function extractFromFile(
+  buf: Buffer,
+  filename: string,
+  mime: string,
+): Promise<ParsedResume | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  const name = (filename || "").toLowerCase();
+  try {
+    if (name.endsWith(".pdf") || mime === "application/pdf") {
+      return await extractFromContent([
+        {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") },
+        },
+        { type: "text", text: "Parse this resume into the JSON object." },
+      ]);
+    }
+    let text = "";
+    if (name.endsWith(".docx") || /wordprocessingml/i.test(mime)) {
+      text = (await mammoth.extractRawText({ buffer: buf })).value;
+    } else {
+      text = buf.toString("utf8");
+    }
+    text = text.slice(0, 60000).trim();
+    if (!text) return null;
+    return await extractFromContent([
+      { type: "text", text: `Parse this resume into the JSON object.\n\nRESUME:\n${text}` },
+    ]);
+  } catch {
+    return null;
+  }
 }
 
 // Extract candidate fields from plain profile text (Resdex page, pasted text …).

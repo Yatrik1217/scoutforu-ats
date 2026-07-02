@@ -51,6 +51,32 @@
     return text.replace(/\n{3,}/g, "\n\n").slice(0, 15000);
   }
 
+  // Collect likely resume/CV file URLs on the page (rendered viewer iframe,
+  // embed/object, or download links). The background worker fetches the first
+  // valid one (it has naukri.com host permission, so no CORS trouble).
+  function resumeUrls() {
+    const urls = [];
+    const push = (u) => {
+      if (u && typeof u === "string" && /^https?:/i.test(u) && !urls.includes(u)) urls.push(u);
+    };
+    try {
+      document.querySelectorAll("iframe, embed, object").forEach((el) => {
+        const src = el.src || el.data || "";
+        if (/\.(pdf|docx?|rtf)(\?|#|$)/i.test(src) || /resume|cv|attach|docviewer|profiledoc|cvpreview/i.test(src))
+          push(src);
+      });
+      document.querySelectorAll("a[href]").forEach((a) => {
+        const href = a.href || "";
+        const label = (a.textContent || "") + " " + href;
+        if (/\.(pdf|docx?|rtf)(\?|#|$)/i.test(href) || /(download|view).{0,20}(resume|cv)|(resume|cv).{0,20}(download|view)|attachment/i.test(label))
+          push(href);
+      });
+    } catch {
+      /* ignore */
+    }
+    return urls.slice(0, 6);
+  }
+
   function scrape() {
     // We deliberately do NOT regex-scrape email/phone here: a blind page scan
     // grabs shared page-chrome values (the recruiter's own inbox, a Naukri
@@ -69,7 +95,7 @@
     }
     if (!name || name.length > 60) name = (document.title || "").split(/[-|]/)[0].trim();
 
-    return { name, rawText };
+    return { name, rawText, resumeUrls: resumeUrls() };
   }
 
   function toast(msg, ok) {
@@ -103,7 +129,7 @@
         if (!res) return toast("Extension not configured — open the popup", false);
         if (!res.ok) return toast(res.error || "Import failed", false);
         if (res.status === "duplicate") return toast(`Already in ATS (${res.existing || data.name})`, true);
-        toast(`Imported ${res.name || data.name} to Sourced ✓`, true);
+        toast(`Imported ${res.name || data.name}${res.withResume ? " + resume" : ""} to Sourced ✓`, true);
       });
     };
     document.body.appendChild(btn);
