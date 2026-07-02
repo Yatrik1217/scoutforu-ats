@@ -8,38 +8,63 @@
 (function () {
   const BTN_ID = "scoutforu-import-btn";
 
+  // Read an element's visible text safely — some framework elements throw or
+  // return non-strings when innerText is accessed.
+  function textOf(el) {
+    try {
+      const t = el && el.innerText;
+      if (typeof t === "string") return t.trim();
+      const tc = el && el.textContent;
+      return typeof tc === "string" ? tc.trim() : "";
+    } catch {
+      return "";
+    }
+  }
+
   // Grab the largest sensible profile container's text, falling back to body.
   function profileText() {
-    const sel = [
-      "[class*='profileCard' i]",
-      "[class*='candidate' i]",
-      "[class*='resdexProfile' i]",
-      "[class*='profile-detail' i]",
-      "main",
-      "#root",
-    ];
     let best = "";
-    for (const s of sel) {
-      for (const el of document.querySelectorAll(s)) {
-        const t = (el.innerText || "").trim();
-        if (t.length > best.length) best = t;
+    try {
+      const sel = [
+        "[class*='profileCard' i]",
+        "[class*='candidate' i]",
+        "[class*='resdexProfile' i]",
+        "[class*='profile-detail' i]",
+        "[class*='profile' i]",
+        "main",
+        "#root",
+      ];
+      for (const s of sel) {
+        let nodes = [];
+        try { nodes = document.querySelectorAll(s); } catch { nodes = []; }
+        for (const el of nodes) {
+          const t = textOf(el);
+          if (t.length > best.length) best = t;
+        }
       }
+    } catch {
+      /* ignore — fall back to body below */
     }
-    const body = (document.body.innerText || "").trim();
+    const body = textOf(document.body);
     // Prefer a focused container, but if nothing beat ~200 chars use the body.
-    const text = best.length > 200 ? best : body;
+    const text = (best.length > 200 ? best : body) || body || "";
     return text.replace(/\n{3,}/g, "\n\n").slice(0, 15000);
   }
 
   function scrape() {
-    const text = document.body.innerText || "";
+    const text = textOf(document.body);
     const email = (text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/) || [""])[0];
     const phoneM = text.match(/(?:\+?91[-\s]?)?[6-9]\d{9}/);
     const phone = phoneM ? phoneM[0] : "";
 
     // Name: prefer a prominent heading, fall back to document title.
-    const heading = document.querySelector("h1, h2, [class*='name' i]");
-    let name = heading ? heading.textContent.trim() : "";
+    let name = "";
+    try {
+      const heading = document.querySelector("h1, h2, [class*='name' i]");
+      name = textOf(heading);
+    } catch {
+      /* ignore */
+    }
     if (!name || name.length > 60) name = (document.title || "").split(/[-|]/)[0].trim();
 
     // Only send fields we can read reliably; everything else (experience, CTC,
