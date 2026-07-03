@@ -8,13 +8,23 @@
 (function () {
   const BTN_ID = "scoutforu-import-btn";
 
-  // The in-page interceptor (inject.js) posts the captured résumé file here.
+  // The in-page interceptor (inject.js) posts the captured résumé file — or a
+  // résumé/viewer URL for the background worker to fetch — here.
   let capturedCv = null;
+  let lastDocUrl = "";
   window.addEventListener("message", (e) => {
     if (e.source !== window) return;
     const d = e.data;
-    if (d && d.__scoutforu_cv && d.dataBase64) {
+    if (!d) return;
+    if (d.__scoutforu_cv && d.dataBase64) {
       capturedCv = { name: d.name, type: d.type, dataBase64: d.dataBase64 };
+    } else if (d.__scoutforu_docurl && d.url) {
+      lastDocUrl = d.url;
+      chrome.runtime.sendMessage({ type: "fetchDoc", url: d.url }, (res) => {
+        if (res && res.ok && res.dataBase64) {
+          capturedCv = { name: res.name, type: res.type, dataBase64: res.dataBase64 };
+        }
+      });
     }
   });
 
@@ -192,6 +202,7 @@
     const d = collectDiag();
     const text =
       "URL:\n" + d.url + "\n\n" +
+      "LAST CV/VIEWER URL CAPTURED (click Naukri's download first):\n" + (lastDocUrl || "(none yet)") + "\n\n" +
       "IFRAMES (" + d.iframes.length + "):\n" + (d.iframes.join("\n") || "(none)") + "\n\n" +
       "EMBED/OBJECT (" + d.embeds.length + "):\n" + (d.embeds.join("\n") || "(none)") + "\n\n" +
       "RESUME-ish LINKS (" + d.links.length + "):\n" + (d.links.join("\n") || "(none)") + "\n\n" +

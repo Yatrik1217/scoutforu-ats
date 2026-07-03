@@ -101,7 +101,30 @@
     return origCreate.apply(this, arguments);
   };
 
-  // Direct <a href> / download-link clicks: fetch same-origin with cookies.
+  // A résumé/CV URL that may be same-origin or on a Naukri CDN — hand it to the
+  // background worker to fetch (it can follow cross-origin + one viewer hop).
+  const DOC_OR_VIEWER = /\.(pdf|docx?|rtf)(\?|#|$)|cvpreview|viewcv|download-?cv|downloadcv|filedownload|documentviewer|attach-?cv|attachedcv|\/cv\/|resume|attachment/i;
+  function relay(url) {
+    try {
+      if (url && /^https?:/i.test(url)) window.postMessage({ __scoutforu_docurl: true, url: String(url) }, "*");
+    } catch { /* ignore */ }
+  }
+
+  // The CV often opens in a NEW TAB via window.open — capture that URL and
+  // suppress the popup (we fetch the file ourselves).
+  const origWinOpen = window.open;
+  window.open = function (url) {
+    try {
+      const u = String(url || "");
+      if (u && DOC_OR_VIEWER.test(u)) {
+        relay(u);
+        return { closed: false, focus() {}, close() {}, blur() {}, document: {} };
+      }
+    } catch { /* ignore */ }
+    return origWinOpen.apply(this, arguments);
+  };
+
+  // Direct <a href> / download / new-tab link clicks.
   document.addEventListener(
     "click",
     function (e) {
@@ -109,16 +132,7 @@
         const a = e.target && e.target.closest && e.target.closest("a[href]");
         if (!a) return;
         const href = a.href || "";
-        if (a.hasAttribute("download") || DOC_URL.test(href)) {
-          fetch(href, { credentials: "include" })
-            .then((r) => {
-              const ct = r.headers.get("content-type") || "";
-              if (/text\/html/i.test(ct)) return;
-              const cd = r.headers.get("content-disposition") || "";
-              return r.arrayBuffer().then((ab) => send(href, ct, cd, ab));
-            })
-            .catch(() => {});
-        }
+        if (a.hasAttribute("download") || DOC_OR_VIEWER.test(href)) relay(href);
       } catch { /* ignore */ }
     },
     true,
