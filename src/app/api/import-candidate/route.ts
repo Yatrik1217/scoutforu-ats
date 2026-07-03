@@ -107,11 +107,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // The rendered CV HTML (cvHtml) is anchored to the candidate's own CV section,
+  // whereas rawText can accidentally capture the "similar profiles" panel. Strip
+  // the CV HTML to text and use whichever source is richer for extraction.
+  const cvHtml = s(b.cvHtml);
+  const cvText = cvHtml
+    ? cvHtml
+        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)))
+        .replace(/\s+/g, " ")
+        .trim()
+    : "";
+  const rawText = s(b.rawText);
+  // cvHtml is anchored to the candidate's own CV section, so prefer it whenever
+  // it has real content — rawText can be dominated by the "similar profiles"
+  // panel and mislead the extractor.
+  const profileText = cvText.length > 200 ? cvText : rawText;
+
   // Extract fields with the same Haiku engine the resume parser uses. Prefer the
   // actual resume file (most accurate); fall back to / fill gaps from page text.
   const [aiFile, aiText] = await Promise.all([
     resumeBuf ? extractFromFile(resumeBuf, resumeName, resumeType) : Promise.resolve(null),
-    s(b.rawText) ? extractFromText(s(b.rawText)) : Promise.resolve(null),
+    profileText ? extractFromText(profileText) : Promise.resolve(null),
   ]);
   const ai: ParsedResume | null = mergeParsed(aiFile, aiText);
 
@@ -121,13 +144,10 @@ export async function POST(req: NextRequest) {
   let storeBuf = resumeBuf;
   let storeName = resumeName;
   let storeType = resumeType;
-  if (!storeBuf) {
-    const cvHtml = s(b.cvHtml);
-    if (cvHtml.length > 500) {
-      storeBuf = Buffer.from(cvHtml, "utf8");
-      storeName = "resume.html";
-      storeType = "text/html";
-    }
+  if (!storeBuf && cvHtml.length > 500) {
+    storeBuf = Buffer.from(cvHtml, "utf8");
+    storeName = "resume.html";
+    storeType = "text/html";
   }
 
   // Store the résumé file so recruiters can view/download it later.
