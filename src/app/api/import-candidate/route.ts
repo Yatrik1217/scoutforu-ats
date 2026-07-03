@@ -55,6 +55,48 @@ function mergeParsed(
   return out as unknown as ParsedResume;
 }
 
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)));
+}
+
+// Naukri's rendered CV markup is full of layout junk (timeline widgets, empty
+// nodes, pseudo "hover-style" text, lazy-loaded images). Convert it to clean,
+// readable lines so the stored résumé is presentable rather than raw HTML.
+const JUNK_LINE = /^(hover-style|no-hover|last-child|first-child|even|odd|["'“”\-•\s]*)$/i;
+function htmlToText(html: string): string {
+  const withBreaks = html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n• ")
+    .replace(/<\/(div|p|li|tr|h[1-6]|section|header|article)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    // Strip Naukri tooltip pseudo-text artifacts wherever they appear inline.
+    .replace(/\b(hover-style|no-hover|last-child|first-child)\b/gi, " ");
+  return decodeEntities(withBreaks)
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter((l) => l && !JUNK_LINE.test(l))
+    .filter((l, i, arr) => l !== arr[i - 1]) // drop consecutive duplicates
+    .join("\n");
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string);
+}
+
+// Build a clean, printable résumé document from Naukri's rendered CV HTML.
+function renderResumeDoc(name: string, cvHtml: string): string {
+  const text = htmlToText(cvHtml);
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)} — CV</title><style>body{font:14px/1.65 system-ui,-apple-system,Arial,sans-serif;max-width:800px;margin:32px auto;padding:0 22px;color:#16203a}h1{font-size:22px;margin:0 0 2px}.sfu-src{color:#7a8699;font-size:12px;margin:0 0 20px}pre{white-space:pre-wrap;word-wrap:break-word;font:inherit;margin:0}@media print{body{margin:0}}</style></head><body><h1>${escapeHtml(name)}</h1><div class="sfu-src">Imported from Naukri Resdex · ScoutforU ATS</div><pre>${escapeHtml(text)}</pre></body></html>`;
+}
+
 export async function POST(req: NextRequest) {
   const token =
     req.headers.get("x-api-token") ||
@@ -145,7 +187,7 @@ export async function POST(req: NextRequest) {
   let storeName = resumeName;
   let storeType = resumeType;
   if (!storeBuf && cvHtml.length > 500) {
-    storeBuf = Buffer.from(cvHtml, "utf8");
+    storeBuf = Buffer.from(renderResumeDoc(s(b.name) || "Candidate", cvHtml), "utf8");
     storeName = "resume.html";
     storeType = "text/html";
   }
