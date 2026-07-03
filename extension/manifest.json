@@ -1,16 +1,21 @@
 {
   "manifest_version": 3,
   "name": "ScoutforU — Resdex Import",
-  "version": "1.0.0",
-  "description": "Import a Naukri Resdex candidate into ScoutforU ATS with one click.",
-  "permissions": ["storage", "downloads"],
+  "version": "1.1.0",
+  "description": "Import a Naukri Resdex candidate (with résumé) into ScoutforU ATS with one click.",
+  "permissions": ["storage"],
   "host_permissions": [
-    "https://scoutforu-ats.vercel.app/*",
-    "<all_urls>"
+    "https://scoutforu-ats.vercel.app/*"
   ],
   "action": { "default_popup": "popup.html", "default_title": "ScoutforU Import" },
   "background": { "service_worker": "background.js" },
   "content_scripts": [
+    {
+      "matches": ["https://*.naukri.com/*"],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": ["https://*.naukri.com/*"],
       "js": ["content.js"],

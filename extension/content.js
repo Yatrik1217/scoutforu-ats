@@ -8,6 +8,16 @@
 (function () {
   const BTN_ID = "scoutforu-import-btn";
 
+  // The in-page interceptor (inject.js) posts the captured résumé file here.
+  let capturedCv = null;
+  window.addEventListener("message", (e) => {
+    if (e.source !== window) return;
+    const d = e.data;
+    if (d && d.__scoutforu_cv && d.dataBase64) {
+      capturedCv = { name: d.name, type: d.type, dataBase64: d.dataBase64 };
+    }
+  });
+
   // Read an element's visible text safely — some framework elements throw or
   // return non-strings when innerText is accessed.
   function textOf(el) {
@@ -49,32 +59,6 @@
     // Prefer a focused container, but if nothing beat ~200 chars use the body.
     const text = (best.length > 200 ? best : body) || body || "";
     return text.replace(/\n{3,}/g, "\n\n").slice(0, 15000);
-  }
-
-  // Collect likely resume/CV file URLs on the page (rendered viewer iframe,
-  // embed/object, or download links). The background worker fetches the first
-  // valid one (it has naukri.com host permission, so no CORS trouble).
-  function resumeUrls() {
-    const urls = [];
-    const push = (u) => {
-      if (u && typeof u === "string" && /^https?:/i.test(u) && !urls.includes(u)) urls.push(u);
-    };
-    try {
-      document.querySelectorAll("iframe, embed, object").forEach((el) => {
-        const src = el.src || el.data || "";
-        if (/\.(pdf|docx?|rtf)(\?|#|$)/i.test(src) || /resume|cv|attach|docviewer|profiledoc|cvpreview/i.test(src))
-          push(src);
-      });
-      document.querySelectorAll("a[href]").forEach((a) => {
-        const href = a.href || "";
-        const label = (a.textContent || "") + " " + href;
-        if (/\.(pdf|docx?|rtf)(\?|#|$)/i.test(href) || /(download|view).{0,20}(resume|cv)|(resume|cv).{0,20}(download|view)|attachment/i.test(label))
-          push(href);
-      });
-    } catch {
-      /* ignore */
-    }
-    return urls.slice(0, 6);
   }
 
   // Click Resdex's own "download CV" control. The original résumé is not a
@@ -161,7 +145,7 @@
     }
     if (!name || name.length > 60) name = (document.title || "").split(/[-|]/)[0].trim();
 
-    return { name, rawText, resumeUrls: resumeUrls(), cvHtml: captureCvHtml(name) };
+    return { name, rawText, cvHtml: captureCvHtml(name) };
   }
 
   function toast(msg, ok) {
@@ -257,14 +241,26 @@
         if (!res) return toast("Extension not configured — open the popup", false);
         if (!res.ok) return toast(res.error || "Import failed", false);
         if (res.status === "duplicate") return toast(`Already in ATS (${res.existing || data.name})`, true);
-        toast(`Imported ${res.name || data.name}${res.withResume || res.resume ? " + resume" : ""} to Sourced ✓`, true);
+        toast(`Imported ${res.name || data.name}${res.resume ? " + resume" : ""} to Sourced ✓`, true);
       };
-      // Arm the download capture BEFORE clicking Naukri's download button, so
-      // the background worker doesn't miss the download event.
-      chrome.runtime.sendMessage({ type: "arm" }, () => {
-        const clicked = clickCvDownload();
-        chrome.runtime.sendMessage({ type: "import", data, expectDownload: clicked }, finish);
-      });
+      const submit = () => {
+        if (capturedCv) data.resumeFile = capturedCv;
+        chrome.runtime.sendMessage({ type: "import", data }, finish);
+      };
+      // Trigger Naukri's own CV download; the in-page interceptor captures the
+      // file the moment the page fetches/creates it. Poll briefly for it, then
+      // submit (the server falls back to the HTML CV snapshot if none arrives).
+      capturedCv = null;
+      const clicked = clickCvDownload();
+      if (!clicked) return submit();
+      btn.textContent = "Grabbing CV…";
+      const started = Date.now();
+      const iv = setInterval(() => {
+        if (capturedCv || Date.now() - started > 7000) {
+          clearInterval(iv);
+          submit();
+        }
+      }, 250);
     };
     document.body.appendChild(btn);
 
