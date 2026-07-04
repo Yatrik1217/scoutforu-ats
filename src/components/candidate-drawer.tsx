@@ -275,9 +275,11 @@ export function CandidateDrawer({
                   <button
                     onClick={async () => {
                       const sb = createClient();
+                      const ext = (detail.cand.resume_url.split(".").pop() || "pdf").toLowerCase();
+                      const fname = `${(detail.cand.name || "resume").replace(/[^\w .-]+/g, " ").trim() || "resume"}.${ext}`;
                       const { data } = await sb.storage
                         .from("resumes")
-                        .createSignedUrl(detail.cand.resume_url, 120);
+                        .createSignedUrl(detail.cand.resume_url, 120, { download: fname });
                       if (data?.signedUrl) window.open(data.signedUrl, "_blank");
                       else toast.error("Could not open the resume file");
                     }}

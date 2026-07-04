@@ -273,7 +273,7 @@
       // file from that tab. The server falls back to the clean HTML CV snapshot
       // if nothing is captured.
       capturedCv = null;
-      chrome.runtime.sendMessage({ type: "arm" }, () => {
+      chrome.runtime.sendMessage({ type: "arm", name: data.name }, () => {
         const clicked = clickCvDownload();
         if (clicked) btn.textContent = "Grabbing CV…";
         if (capturedCv) data.resumeFile = capturedCv;

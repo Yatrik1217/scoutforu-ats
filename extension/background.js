@@ -69,10 +69,25 @@ async function fetchDoc(url, depth) {
 
 // ---- capture state -----------------------------------------------------------
 let armedUntil = 0;
+let armedName = ""; // candidate name, used to rename the disk download
 let pendingFile = null;
 let waiter = null;
 const watchedTabs = new Set(); // tabs opened during the armed window
 const handledTabs = new Set(); // tabs we've already tried to fetch from
+
+// Rename Naukri's on-disk download (a coded filename) to the candidate name.
+if (chrome.downloads && chrome.downloads.onDeterminingFilename) {
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    if (Date.now() > armedUntil || !armedName) { suggest(); return; }
+    const cur = item.filename || "";
+    let ext = (cur.split(".").pop() || "").toLowerCase();
+    if (!/^(pdf|docx?|rtf)$/.test(ext)) {
+      ext = /pdf/i.test(item.mime || "") ? "pdf" : /wordprocessingml|docx/i.test(item.mime || "") ? "docx" : /msword/i.test(item.mime || "") ? "doc" : "pdf";
+    }
+    const safe = armedName.replace(/[^\w .-]+/g, " ").trim() || "resume";
+    suggest({ filename: `${safe}.${ext}`, conflictAction: "uniquify" });
+  });
+}
 
 function storeFile(f) {
   if (!f || Date.now() > armedUntil) return;
@@ -113,6 +128,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "arm") {
     armedUntil = Date.now() + 15000;
+    armedName = (msg.name || "").toString().slice(0, 80);
     pendingFile = null;
     waiter = null;
     watchedTabs.clear();
