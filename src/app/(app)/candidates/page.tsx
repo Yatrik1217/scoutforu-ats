@@ -2,6 +2,7 @@ import { loadWorkspace } from "@/lib/data";
 import { Avatar, StageBadge } from "@/components/bits";
 import { ClickableTr, NewCandidateButton } from "@/components/view-actions";
 import { ExportCsvButton } from "@/components/export-csv";
+import { ShareClientButton } from "@/components/share-client-modal";
 
 export default async function CandidatesPage({
   searchParams,
@@ -9,7 +10,7 @@ export default async function CandidatesPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const { ws } = await loadWorkspace();
+  const { ws, scope } = await loadWorkspace();
   const query = (q ?? "").trim().toLowerCase();
   const rows = ws.candidates.filter(
     (c) =>
@@ -26,6 +27,21 @@ export default async function CandidatesPage({
           {rows.length} candidates
         </span>
         <div className="flex items-center gap-2">
+          {scope.role !== "client" && (
+            <ShareClientButton
+              candidates={rows.map((c) => ({
+                id: c.id,
+                name: c.name,
+                jobTitle: c.jobTitle,
+                stageKey: c.stageKey,
+                exp_years: c.exp_years,
+                location: c.location ?? null,
+              }))}
+              clients={ws.clients
+                .filter((cl) => cl.contact_email)
+                .map((cl) => ({ name: cl.name, email: cl.contact_email as string }))}
+            />
+          )}
           <ExportCsvButton
             filename="candidates"
             rows={rows.map((c) => ({
