@@ -36,7 +36,17 @@ export default async function AdminPage() {
   return (
     <div className="animate-sc-fadein grid grid-cols-[1.2fr_1fr] gap-[18px] p-[22px_26px_40px]">
       <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
-        <div className="mb-4 text-[15.5px] font-extrabold">Users &amp; Roles</div>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-[15.5px] font-extrabold">Users &amp; Roles</div>
+          {isAdmin && (
+            <a
+              href="/admin/settings"
+              className="rounded-[9px] border border-[#e6eaf1] bg-[#f6f8fb] px-3 py-1.5 text-[12px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
+            >
+              General Settings →
+            </a>
+          )}
+        </div>
         {users.map((u) => (
           <div
             key={u.id}
