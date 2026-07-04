@@ -9,7 +9,9 @@
   const BTN_ID = "scoutforu-import-btn";
 
   // The in-page interceptor (inject.js) posts the captured résumé file — or a
-  // résumé/viewer URL for the background worker to fetch — here.
+  // résumé/viewer URL for the background worker to fetch — here. This runs in
+  // BOTH the profile tab and any CV-viewer tab Naukri opens, so files captured
+  // in the viewer tab are forwarded to the background for the import to use.
   let capturedCv = null;
   let lastDocUrl = "";
   window.addEventListener("message", (e) => {
@@ -18,15 +20,27 @@
     if (!d) return;
     if (d.__scoutforu_cv && d.dataBase64) {
       capturedCv = { name: d.name, type: d.type, dataBase64: d.dataBase64 };
+      try { chrome.runtime.sendMessage({ type: "cvBytes", file: capturedCv }); } catch { /* ignore */ }
     } else if (d.__scoutforu_docurl && d.url) {
       lastDocUrl = d.url;
-      chrome.runtime.sendMessage({ type: "fetchDoc", url: d.url }, (res) => {
-        if (res && res.ok && res.dataBase64) {
-          capturedCv = { name: res.name, type: res.type, dataBase64: res.dataBase64 };
-        }
-      });
+      try { chrome.runtime.sendMessage({ type: "fetchDoc", url: d.url }); } catch { /* ignore */ }
     }
   });
+
+  // In a CV-viewer tab, the résumé may be an embedded PDF (iframe/embed/object)
+  // rather than a JS fetch — relay those src URLs to the background to fetch.
+  function relayEmbeddedDocs() {
+    try {
+      document.querySelectorAll("iframe[src], embed[src], object[data], a[href]").forEach((el) => {
+        const u = el.src || el.data || el.href || "";
+        if (/\.(pdf|docx?|rtf)(\?|#|$)|downloadcv|filedownload|documentviewer|downloadresume/i.test(u)) {
+          try { chrome.runtime.sendMessage({ type: "fetchDoc", url: u }); } catch { /* ignore */ }
+        }
+      });
+    } catch { /* ignore */ }
+  }
+  // Viewer tabs load async — scan a few times.
+  [800, 2000, 4000].forEach((t) => setTimeout(relayEmbeddedDocs, t));
 
   // Read an element's visible text safely — some framework elements throw or
   // return non-strings when innerText is accessed.
@@ -254,24 +268,17 @@
         if (res.status === "duplicate") return toast(`Already in ATS (${res.existing || data.name})`, true);
         toast(`Imported ${res.name || data.name}${res.resume ? " + resume" : ""} to Sourced ✓`, true);
       };
-      const submit = () => {
-        if (capturedCv) data.resumeFile = capturedCv;
-        chrome.runtime.sendMessage({ type: "import", data }, finish);
-      };
-      // Trigger Naukri's own CV download; the in-page interceptor captures the
-      // file the moment the page fetches/creates it. Poll briefly for it, then
-      // submit (the server falls back to the HTML CV snapshot if none arrives).
+      // Arm the background capture, click Naukri's own CV download (which opens
+      // the file/viewer in a new tab), and let the background worker grab the
+      // file from that tab. The server falls back to the clean HTML CV snapshot
+      // if nothing is captured.
       capturedCv = null;
-      const clicked = clickCvDownload();
-      if (!clicked) return submit();
-      btn.textContent = "Grabbing CV…";
-      const started = Date.now();
-      const iv = setInterval(() => {
-        if (capturedCv || Date.now() - started > 7000) {
-          clearInterval(iv);
-          submit();
-        }
-      }, 250);
+      chrome.runtime.sendMessage({ type: "arm" }, () => {
+        const clicked = clickCvDownload();
+        if (clicked) btn.textContent = "Grabbing CV…";
+        if (capturedCv) data.resumeFile = capturedCv;
+        chrome.runtime.sendMessage({ type: "import", data, expectDownload: clicked }, finish);
+      });
     };
     document.body.appendChild(btn);
 
