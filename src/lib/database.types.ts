@@ -116,7 +116,16 @@ export type CandidateRow = {
   function: string;
   industry: string;
   resume_url: string;
+  reject_reason: string;
   entered_stage_at: string;
+  created_at: string;
+};
+
+export type DisqualifyReasonRow = {
+  id: string;
+  label: string;
+  active: boolean;
+  sort: number;
   created_at: string;
 };
 
@@ -200,6 +209,7 @@ export type Database = {
       offers: Table<OfferRow>;
       candidate_notes: Table<CandidateNoteRow>;
       interview_feedback: Table<InterviewFeedbackRow>;
+      disqualify_reasons: Table<DisqualifyReasonRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

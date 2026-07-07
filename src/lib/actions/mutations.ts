@@ -56,17 +56,58 @@ export async function advanceCandidate(id: string): Promise<Result> {
   return res.ok ? { ...res, message: `${data.name} advanced to ${next}` } : res;
 }
 
-export async function rejectCandidate(id: string): Promise<Result> {
+export async function rejectCandidate(id: string, reason?: string): Promise<Result> {
   const sb = await createClient();
   const { data } = await sb
     .from("candidates")
     .select("name")
     .eq("id", id)
     .single();
+  const cleanReason = (reason ?? "").trim();
+  if (cleanReason) {
+    await sb.from("candidates").update({ reject_reason: cleanReason }).eq("id", id);
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    await sb.from("candidate_notes").insert({
+      candidate_id: id,
+      author_id: user?.id ?? null,
+      body: `Rejected — reason: ${cleanReason}`,
+    });
+  }
   const res = await setStage(id, "Not Joined");
   return res.ok
-    ? { ...res, message: `${data?.name ?? "Candidate"} marked as Not Joined` }
+    ? {
+        ...res,
+        message: `${data?.name ?? "Candidate"} marked as Not Joined${cleanReason ? ` (${cleanReason})` : ""}`,
+      }
     : res;
+}
+
+export async function addDisqualifyReason(label: string): Promise<Result> {
+  const clean = label.trim();
+  if (!clean) return { ok: false, error: "Reason is empty" };
+  const sb = await createClient();
+  const { error } = await sb.from("disqualify_reasons").insert({ label: clean, sort: 100 });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Reason added" };
+}
+
+export async function setDisqualifyReasonActive(id: string, active: boolean): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("disqualify_reasons").update({ active }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteDisqualifyReason(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("disqualify_reasons").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Reason removed" };
 }
 
 export async function acceptOffer(id: string): Promise<Result> {

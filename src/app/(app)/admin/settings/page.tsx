@@ -50,7 +50,7 @@ export default async function GeneralSettingsPage() {
     { title: "Default Emails", subtitle: "Templates & senders", desc: "Reusable email templates for common actions.", icon: Send, color: "#38a3e0", status: "planned" },
     { title: "Application Pipeline", subtitle: "Recruitment workflow", desc: "The 9-stage hiring pipeline candidates move through.", icon: Workflow, color: "#e0533a", href: "/pipeline" },
     { title: "Action Triggers", subtitle: "Automations", desc: "Auto-reject stale candidates, notify on stage change.", icon: Zap, color: "#e8833a", href: "/admin" },
-    { title: "Disqualify Reasons", subtitle: "Rejection reasons", desc: "Standard reasons used when rejecting candidates.", icon: Ban, color: "#e0533a", status: "planned" },
+    { title: "Disqualify Reasons", subtitle: "Rejection reasons", desc: "Standard reasons used when rejecting candidates.", icon: Ban, color: "#e0533a", href: "/admin/settings/disqualify-reasons" },
     { title: "Custom Fields", subtitle: "Extra columns", desc: "Add your own fields to candidates, jobs & clients.", icon: Columns3, color: "#38a3e0", status: "planned" },
     { title: "Invoice Setting", subtitle: "Billing details", desc: "Invoice numbering, GST & billing info.", icon: ReceiptIndianRupee, color: "#e0533a", status: "planned" },
     { title: "Import Data", subtitle: "Bulk import", desc: "Bulk-upload résumés and parse them into candidates.", icon: Upload, color: "#17a673", href: "/bulk" },

@@ -106,6 +106,18 @@ export function CandidateDrawer({
   const [fbRating, setFbRating] = useState(4);
   const [fbNotes, setFbNotes] = useState("");
   const [savingFb, setSavingFb] = useState(false);
+  const [reasons, setReasons] = useState<{ id: string; label: string }[]>([]);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejReason, setRejReason] = useState("");
+
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("disqualify_reasons")
+      .select("id,label")
+      .eq("active", true)
+      .order("sort")
+      .then(({ data }) => setReasons((data ?? []) as { id: string; label: string }[]));
+  }, []);
 
   const loadFeedback = async (id: string) => {
     const sb = createClient();
@@ -205,6 +217,20 @@ export function CandidateDrawer({
         toast.success(res.message ?? "Done");
         router.refresh();
         if (close) onClose();
+      } else {
+        toast.error(res.error ?? "Action failed");
+      }
+    });
+
+  const doReject = () =>
+    start(async () => {
+      const res = await rejectCandidate(candidateId, rejReason);
+      if (res.ok) {
+        toast.success(res.message ?? "Rejected");
+        setRejectOpen(false);
+        setRejReason("");
+        router.refresh();
+        onClose();
       } else {
         toast.error(res.error ?? "Action failed");
       }
@@ -548,7 +574,7 @@ export function CandidateDrawer({
                 </button>
                 <button
                   disabled={pending}
-                  onClick={() => run(rejectCandidate, true)}
+                  onClick={() => setRejectOpen(true)}
                   className="rounded-[11px] border border-[#f3c4c4] bg-[#fef2f2] px-4 py-3 text-[13px] font-bold text-[#dc2626] hover:bg-[#fee2e2] disabled:opacity-60"
                 >
                   Reject
@@ -566,6 +592,48 @@ export function CandidateDrawer({
           </>
         )}
       </div>
+
+      {rejectOpen && detail && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setRejectOpen(false)}
+        >
+          <div
+            className="w-full max-w-[400px] rounded-[14px] bg-white p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[15px] font-extrabold text-[#16203a]">Reject {detail.cand.name}?</div>
+            <p className="mt-1 text-[12.5px] text-[#8a94a6]">Pick a reason (optional) — it&apos;s logged on the candidate.</p>
+            <select
+              value={rejReason}
+              onChange={(e) => setRejReason(e.target.value)}
+              className="mt-3 w-full rounded-[9px] border border-[#e3e8f0] px-3 py-2 text-[13px] outline-none focus:border-[#dc2626]"
+            >
+              <option value="">— No reason —</option>
+              {reasons.map((r) => (
+                <option key={r.id} value={r.label}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setRejectOpen(false)}
+                className="rounded-[9px] border border-[#e6eaf1] bg-white px-4 py-2 text-[13px] font-bold text-[#42506b] hover:bg-[#f6f8fb]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doReject}
+                disabled={pending}
+                className="rounded-[9px] bg-[#dc2626] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#c11f1f] disabled:opacity-60"
+              >
+                {pending ? "Rejecting…" : "Reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
