@@ -56,7 +56,7 @@ export default async function GeneralSettingsPage() {
     { title: "Import Data", subtitle: "Bulk import", desc: "Bulk-upload résumés and parse them into candidates.", icon: Upload, color: "#17a673", href: "/bulk" },
     { title: "File Name Formats", subtitle: "Résumé naming", desc: "Downloads are named by the candidate — active.", icon: FileText, color: "#e8833a", status: "active" },
     { title: "Résumé Import Token", subtitle: "Naukri Resdex", desc: "API token for the one-click Resdex import extension.", icon: KeyRound, color: "#2a6fdb", href: "/admin" },
-    { title: "Career Section", subtitle: "Public careers page", desc: "A branded public page listing your open roles.", icon: Globe, color: "#38a3e0", status: "planned" },
+    { title: "Career Section", subtitle: "Public careers page", desc: "A branded public page (/careers) listing your open roles.", icon: Globe, color: "#38a3e0", href: "/careers" },
   ];
 
   return (
