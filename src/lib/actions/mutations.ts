@@ -110,6 +110,52 @@ export async function deleteDisqualifyReason(id: string): Promise<Result> {
   return { ok: true, message: "Reason removed" };
 }
 
+export async function updateOrganization(patch: {
+  name: string;
+  tagline: string;
+  logo_url: string;
+  address: string;
+  city: string;
+  gst: string;
+  phone: string;
+  email: string;
+  website: string;
+}): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("organization")
+    .upsert({ id: true, ...patch, updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Organization saved" };
+}
+
+export async function addBranch(name: string, city: string): Promise<Result> {
+  const clean = name.trim();
+  if (!clean) return { ok: false, error: "Branch name is required" };
+  const sb = await createClient();
+  const { error } = await sb.from("branches").insert({ name: clean, city: city.trim(), sort: 100 });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Branch added" };
+}
+
+export async function setBranchActive(id: string, active: boolean): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("branches").update({ active }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteBranch(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("branches").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Branch removed" };
+}
+
 export async function acceptOffer(id: string): Promise<Result> {
   const sb = await createClient();
   const { data } = await sb

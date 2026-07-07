@@ -84,6 +84,7 @@ export type JobRow = {
   hide_salary: boolean;
   walk_in: boolean;
   telephonic: boolean;
+  branch_id: string | null;
   created_at: string;
 };
 
@@ -124,6 +125,30 @@ export type CandidateRow = {
 export type DisqualifyReasonRow = {
   id: string;
   label: string;
+  active: boolean;
+  sort: number;
+  created_at: string;
+};
+
+export type OrganizationRow = {
+  id: boolean;
+  name: string;
+  tagline: string;
+  logo_url: string;
+  address: string;
+  city: string;
+  gst: string;
+  phone: string;
+  email: string;
+  website: string;
+  updated_at: string;
+};
+
+export type BranchRow = {
+  id: string;
+  name: string;
+  city: string;
+  address: string;
   active: boolean;
   sort: number;
   created_at: string;
@@ -210,6 +235,8 @@ export type Database = {
       candidate_notes: Table<CandidateNoteRow>;
       interview_feedback: Table<InterviewFeedbackRow>;
       disqualify_reasons: Table<DisqualifyReasonRow>;
+      organization: Table<OrganizationRow>;
+      branches: Table<BranchRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;
