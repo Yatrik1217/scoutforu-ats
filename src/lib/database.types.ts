@@ -50,6 +50,7 @@ export type ProfileRow = {
   client_id: string | null;
   active: boolean;
   api_token: string | null;
+  is_approver: boolean;
   created_at: string;
 };
 
@@ -87,6 +88,7 @@ export type JobRow = {
   telephonic: boolean;
   branch_id: string | null;
   custom: CustomValues;
+  approval_status: ApprovalStatus;
   created_at: string;
 };
 
@@ -156,6 +158,29 @@ export type BranchRow = {
   sort: number;
   created_at: string;
 };
+
+export type EmailTemplateRow = {
+  id: string;
+  template_key: string;
+  name: string;
+  subject: string;
+  body: string;
+  updated_at: string;
+};
+
+export type InvoiceSettingsRow = {
+  id: boolean;
+  prefix: string;
+  next_number: number;
+  gst_percent: number;
+  pan: string;
+  gstin: string;
+  bank_details: string;
+  terms: string;
+  updated_at: string;
+};
+
+export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export type CustomFieldModule = "candidate" | "job" | "client";
 export type CustomFieldType = "text" | "number" | "select";
@@ -256,6 +281,8 @@ export type Database = {
       organization: Table<OrganizationRow>;
       branches: Table<BranchRow>;
       custom_fields: Table<CustomFieldRow>;
+      email_templates: Table<EmailTemplateRow>;
+      invoice_settings: Table<InvoiceSettingsRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

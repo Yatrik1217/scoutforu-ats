@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Send, X, Search } from "lucide-react";
 import { toast } from "sonner";
 import { shareWithClient } from "@/lib/actions/share";
+import { createClient } from "@/lib/supabase/client";
 
 type Cand = {
   id: string;
@@ -54,6 +55,22 @@ function ShareModal({
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
 
+  // Prefill from the "Default Emails" client_submission template (if present).
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("email_templates")
+      .select("subject,body")
+      .eq("template_key", "client_submission")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setSubject((s) => s || data.subject);
+          setMessage((m) => m || data.body);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return s
@@ -82,13 +99,24 @@ function ShareModal({
   const send = () => {
     if (!selected.size) return toast.error("Select at least one candidate.");
     if (!to.trim()) return toast.error("Enter the client's email address.");
+    // Fill template placeholders at send time.
+    const clientName =
+      clients.find((c) => c.email.toLowerCase() === to.trim().toLowerCase())?.name || "team";
+    const fill = (s: string) =>
+      s
+        .replace(/\{\{count\}\}/g, String(selected.size))
+        .replace(/\{\{client_name\}\}/g, clientName)
+        .replace(/\{\{sender_name\}\}/g, "")
+        .replace(/\{\{[a-z_]+\}\}/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .trim();
     start(async () => {
       const res = await shareWithClient({
         candidateIds: [...selected],
         to,
         cc,
-        subject,
-        message,
+        subject: fill(subject),
+        message: fill(message),
       });
       if (res.ok) {
         toast.success(res.message || "Email sent to client.");

@@ -28,6 +28,7 @@ async function loadCareers(): Promise<{ org: OrgLite | null; jobs: JobLite[] }> 
     .from("jobs")
     .select("id,title,dept,location,type,exp_min,exp_max")
     .in("status", ["open", "hot"])
+    .eq("approval_status", "approved")
     .order("posted_at", { ascending: false });
   return { org: (orgData as OrgLite) ?? null, jobs: (jobsData ?? []) as JobLite[] };
 }

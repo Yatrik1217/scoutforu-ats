@@ -33,6 +33,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
       .from("jobs")
       .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status")
       .eq("id", jobId)
+      .eq("approval_status", "approved")
       .maybeSingle();
     org = (o as Org) ?? null;
     job = (j as Job) ?? null;

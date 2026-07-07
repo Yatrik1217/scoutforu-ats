@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     .from("jobs")
     .select("id,status,recruiter_id")
     .eq("id", jobId)
+    .eq("approval_status", "approved")
     .maybeSingle();
   if (!job || (job.status !== "open" && job.status !== "hot"))
     return NextResponse.json({ ok: false, error: "This position is no longer open." }, { status: 400 });

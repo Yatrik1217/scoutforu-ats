@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
+import { getProfile } from "@/lib/auth";
 import { DEPT_COLOR, hexA } from "@/lib/domain";
 import { RecBadge } from "@/components/bits";
 import { ScheduleButton, JobMenu } from "@/components/view-actions";
+import { JobApprovalActions } from "@/components/job-approval";
 
 function ago(iso: string) {
   const d = Math.floor((Date.now() - +new Date(iso)) / 86_400_000);
@@ -11,7 +13,10 @@ function ago(iso: string) {
 }
 
 export default async function JobsPage() {
-  const { ws } = await loadWorkspace();
+  const { ws, scope } = await loadWorkspace();
+  const me = await getProfile();
+  const canApprove =
+    scope.role === "master_admin" || (scope.role === "recruiter" && !!me?.is_approver);
   const inPipe = (jobId: string) =>
     ws.candidates.filter(
       (c) => c.job_id === jobId && c.stageKey !== "Not Joined",
@@ -41,11 +46,31 @@ export default async function JobsPage() {
                     <span
                       className="rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold"
                       style={{
-                        color: j.status === "hot" ? "#ef4444" : "#16a34a",
-                        background: j.status === "hot" ? "#fef2f2" : "#e9f9ef",
+                        color:
+                          j.approval_status === "pending"
+                            ? "#b45309"
+                            : j.approval_status === "rejected"
+                              ? "#6b7280"
+                              : j.status === "hot"
+                                ? "#ef4444"
+                                : "#16a34a",
+                        background:
+                          j.approval_status === "pending"
+                            ? "#fffbeb"
+                            : j.approval_status === "rejected"
+                              ? "#f3f4f6"
+                              : j.status === "hot"
+                                ? "#fef2f2"
+                                : "#e9f9ef",
                       }}
                     >
-                      {j.status === "hot" ? "Hot" : "Open"}
+                      {j.approval_status === "pending"
+                        ? "Pending Approval"
+                        : j.approval_status === "rejected"
+                          ? "Rejected"
+                          : j.status === "hot"
+                            ? "Hot"
+                            : "Open"}
                     </span>
                   </div>
                   <div className="mt-0.5 text-[12.5px] font-medium text-[#8a94a6]">
@@ -90,6 +115,10 @@ export default async function JobsPage() {
                   </div>
                 </div>
               </div>
+
+              {j.approval_status === "pending" && canApprove && (
+                <JobApprovalActions jobId={j.id} />
+              )}
 
               <div className="mt-3.5 flex gap-2">
                 <Link

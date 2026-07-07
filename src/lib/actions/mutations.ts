@@ -299,13 +299,106 @@ function jobPayload(form: ReqForm) {
 export async function createRequisition(form: ReqForm): Promise<Result> {
   if (!form.title.trim()) return { ok: false, error: "Job title is required" };
   const sb = await createClient();
+  // Approval workflow: if any approvers are configured, jobs created by
+  // non-admin, non-approver staff start pending until approved.
+  let approval: "pending" | "approved" = "approved";
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (user) {
+    const [{ data: me }, { count: approverCount }] = await Promise.all([
+      sb.from("profiles").select("role,is_approver").eq("id", user.id).maybeSingle(),
+      sb
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_approver", true)
+        .eq("active", true),
+    ]);
+    if (
+      (approverCount ?? 0) > 0 &&
+      me &&
+      me.role !== "master_admin" &&
+      !me.is_approver
+    )
+      approval = "pending";
+  }
   const { error } = await sb.from("jobs").insert({
     ...jobPayload(form),
+    approval_status: approval,
     posted_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };
   refresh();
-  return { ok: true, message: `Requisition "${form.title.trim()}" created` };
+  return {
+    ok: true,
+    message:
+      approval === "pending"
+        ? `"${form.title.trim()}" submitted for approval`
+        : `Requisition "${form.title.trim()}" created`,
+  };
+}
+
+export async function setJobApproval(
+  id: string,
+  status: "approved" | "rejected",
+): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data: me } = await sb
+    .from("profiles")
+    .select("role,is_approver")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!me || (me.role !== "master_admin" && !me.is_approver))
+    return { ok: false, error: "Only approvers can approve requisitions" };
+  const { error } = await sb.from("jobs").update({ approval_status: status }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: status === "approved" ? "Requisition approved" : "Requisition rejected" };
+}
+
+export async function setUserApprover(id: string, isApprover: boolean): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("profiles").update({ is_approver: isApprover }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function updateEmailTemplate(
+  id: string,
+  subject: string,
+  body: string,
+): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("email_templates")
+    .update({ subject, body, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Template saved" };
+}
+
+export async function updateInvoiceSettings(patch: {
+  prefix: string;
+  next_number: number;
+  gst_percent: number;
+  pan: string;
+  gstin: string;
+  bank_details: string;
+  terms: string;
+}): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("invoice_settings")
+    .upsert({ id: true, ...patch, updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Invoice settings saved" };
 }
 
 export async function updateRequisition(
