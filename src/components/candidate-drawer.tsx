@@ -109,6 +109,7 @@ export function CandidateDrawer({
   const [reasons, setReasons] = useState<{ id: string; label: string }[]>([]);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejReason, setRejReason] = useState("");
+  const [custFields, setCustFields] = useState<{ field_key: string; label: string }[]>([]);
 
   useEffect(() => {
     const sb = createClient();
@@ -117,6 +118,12 @@ export function CandidateDrawer({
       .eq("active", true)
       .order("sort")
       .then(({ data }) => setReasons((data ?? []) as { id: string; label: string }[]));
+    sb.from("custom_fields")
+      .select("field_key,label")
+      .eq("module", "candidate")
+      .eq("active", true)
+      .order("sort")
+      .then(({ data }) => setCustFields((data ?? []) as { field_key: string; label: string }[]));
   }, []);
 
   const loadFeedback = async (id: string) => {
@@ -355,6 +362,27 @@ export function CandidateDrawer({
                   </div>
                 ))}
               </div>
+
+              {(() => {
+                const custom = (detail.cand.custom ?? {}) as Record<string, unknown>;
+                const rows = custFields
+                  .map((cf) => [cf.label, custom[cf.field_key]] as const)
+                  .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+                if (!rows.length) return null;
+                return (
+                  <>
+                    <div className="mb-2.5 text-[13px] font-extrabold">Additional Details</div>
+                    <div className="mb-6 grid grid-cols-2 gap-[11px]">
+                      {rows.map(([label, value]) => (
+                        <div key={label} className="rounded-[11px] bg-[#f7f9fc] p-[12px_13px]">
+                          <div className="text-[10.5px] font-bold tracking-[.3px] text-[#9aa4b6]">{label}</div>
+                          <div className="mt-[3px] text-[13.5px] font-bold text-[#16203a]">{String(value)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
 
               {detail.cand.tags.length > 0 && (
                 <>

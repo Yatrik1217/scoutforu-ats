@@ -11,6 +11,7 @@ import {
 import type {
   AppSettingsRow,
   CandidateStage,
+  CustomValues,
   EmploymentType,
   FeedbackRecommendation,
   InterviewTypeEnum,
@@ -154,6 +155,54 @@ export async function deleteBranch(id: string): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true, message: "Branch removed" };
+}
+
+export async function addCustomField(input: {
+  module: "candidate" | "job" | "client";
+  label: string;
+  type: "text" | "number" | "select";
+  options?: string[];
+}): Promise<Result> {
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: "Label is required" };
+  const key =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || `field_${Date.now()}`;
+  const options =
+    input.type === "select"
+      ? (input.options ?? []).map((o) => o.trim()).filter(Boolean)
+      : [];
+  const sb = await createClient();
+  const { error } = await sb.from("custom_fields").insert({
+    module: input.module,
+    label,
+    field_key: key,
+    type: input.type,
+    options,
+    sort: 100,
+  });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Field added" };
+}
+
+export async function setCustomFieldActive(id: string, active: boolean): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("custom_fields").update({ active }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteCustomField(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("custom_fields").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Field removed" };
 }
 
 export async function acceptOffer(id: string): Promise<Result> {
@@ -306,6 +355,7 @@ export type CandidateForm = {
   function: string;
   industry: string;
   resumeUrl: string;
+  custom: CustomValues;
 };
 
 function candidatePayload(form: CandidateForm) {
@@ -337,6 +387,7 @@ function candidatePayload(form: CandidateForm) {
     function: form.function,
     industry: form.industry,
     resume_url: form.resumeUrl,
+    custom: form.custom ?? {},
   };
 }
 

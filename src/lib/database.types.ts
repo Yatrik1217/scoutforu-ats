@@ -37,6 +37,7 @@ export type ClientRow = {
   address: string;
   profile: string;
   remarks: string;
+  custom: CustomValues;
   created_at: string;
 };
 
@@ -85,6 +86,7 @@ export type JobRow = {
   walk_in: boolean;
   telephonic: boolean;
   branch_id: string | null;
+  custom: CustomValues;
   created_at: string;
 };
 
@@ -118,6 +120,7 @@ export type CandidateRow = {
   industry: string;
   resume_url: string;
   reject_reason: string;
+  custom: CustomValues;
   entered_stage_at: string;
   created_at: string;
 };
@@ -153,6 +156,21 @@ export type BranchRow = {
   sort: number;
   created_at: string;
 };
+
+export type CustomFieldModule = "candidate" | "job" | "client";
+export type CustomFieldType = "text" | "number" | "select";
+export type CustomFieldRow = {
+  id: string;
+  module: CustomFieldModule;
+  label: string;
+  field_key: string;
+  type: CustomFieldType;
+  options: string[];
+  sort: number;
+  active: boolean;
+  created_at: string;
+};
+export type CustomValues = Record<string, string | number | null>;
 
 export type InterviewRow = {
   id: string;
@@ -237,6 +255,7 @@ export type Database = {
       disqualify_reasons: Table<DisqualifyReasonRow>;
       organization: Table<OrganizationRow>;
       branches: Table<BranchRow>;
+      custom_fields: Table<CustomFieldRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

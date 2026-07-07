@@ -31,6 +31,8 @@ import {
 import type {
   CandidateRow,
   CandidateStage,
+  CustomFieldRow,
+  CustomValues,
   ProfileRow,
 } from "@/lib/database.types";
 
@@ -79,6 +81,7 @@ const empty: CForm = {
   function: "",
   industry: "",
   resumeUrl: "",
+  custom: {},
 };
 
 export function CandidateFormModal({
@@ -101,6 +104,7 @@ export function CandidateFormModal({
   const [tagsText, setTagsText] = useState("");
   const [parsing, setParsing] = useState(false);
   const [dup, setDup] = useState<DuplicateMatch | null>(null);
+  const [customFields, setCustomFields] = useState<CustomFieldRow[]>([]);
 
   const checkDup = (email: string, phone: string) => {
     findDuplicateCandidate(email, phone, candidate?.id).then(setDup);
@@ -180,6 +184,7 @@ export function CandidateFormModal({
         function: candidate.function,
         industry: candidate.industry,
         resumeUrl: candidate.resume_url,
+        custom: (candidate.custom as CustomValues) ?? {},
       });
       setTagsText(candidate.tags.join(", "));
     } else {
@@ -188,8 +193,17 @@ export function CandidateFormModal({
     }
     (async () => {
       const sb = createClient();
-      const { data } = await sb.from("jobs").select("id,title").order("title");
-      setJobs(data ?? []);
+      const [{ data: jobRows }, { data: cfRows }] = await Promise.all([
+        sb.from("jobs").select("id,title").order("title"),
+        sb
+          .from("custom_fields")
+          .select("*")
+          .eq("module", "candidate")
+          .eq("active", true)
+          .order("sort"),
+      ]);
+      setJobs(jobRows ?? []);
+      setCustomFields((cfRows ?? []) as CustomFieldRow[]);
     })();
   }, [open, candidate, team]);
 
@@ -439,6 +453,42 @@ export function CandidateFormModal({
               <input value={f.altPhone} onChange={(e) => set("altPhone", e.target.value)} className={fieldCls} placeholder="+91…" />
             </Field>
           </div>
+
+          {customFields.length > 0 && (
+            <>
+              <div className="mt-5 mb-3 border-b border-[#eef1f6] pb-1.5 text-[13px] font-extrabold text-[#16203a]">
+                Additional Details
+              </div>
+              <div className="grid grid-cols-3 gap-3.5">
+                {customFields.map((cf) => {
+                  const val = f.custom?.[cf.field_key] ?? "";
+                  const setCustom = (v: string | number) =>
+                    setF((s) => ({ ...s, custom: { ...s.custom, [cf.field_key]: v } }));
+                  return (
+                    <Field key={cf.id} label={cf.label}>
+                      {cf.type === "select" ? (
+                        <select value={String(val)} onChange={(e) => setCustom(e.target.value)} className={`${fieldCls} cursor-pointer`}>
+                          <option value="">— Select —</option>
+                          {cf.options.map((o) => (
+                            <option key={o}>{o}</option>
+                          ))}
+                        </select>
+                      ) : cf.type === "number" ? (
+                        <input
+                          inputMode="decimal"
+                          value={String(val)}
+                          onChange={(e) => setCustom(e.target.value.replace(/[^0-9.-]/g, ""))}
+                          className={fieldCls}
+                        />
+                      ) : (
+                        <input value={String(val)} onChange={(e) => setCustom(e.target.value)} className={fieldCls} />
+                      )}
+                    </Field>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <label className={`${labelCls} mt-4`}>Keywords / Skills (comma-separated)</label>
           <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} className={fieldCls} placeholder="React, TypeScript, Node" />

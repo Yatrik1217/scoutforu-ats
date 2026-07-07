@@ -41,6 +41,7 @@ function toForm(d: ParsedResume, resumeUrl = ""): CandidateForm {
     function: d.function,
     industry: d.industry,
     resumeUrl,
+    custom: {},
   };
 }
 
