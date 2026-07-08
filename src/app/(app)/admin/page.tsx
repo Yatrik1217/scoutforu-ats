@@ -5,6 +5,8 @@ import { Avatar } from "@/components/bits";
 import { SettingsToggle, UserActiveToggle } from "@/components/view-actions";
 import { ClientManager } from "@/components/client-manager";
 import { ApiTokenCard } from "@/components/api-token-card";
+import { AddUserButton } from "@/components/add-user-modal";
+import { emailConfigured } from "@/lib/email";
 import type { UserRole } from "@/lib/database.types";
 
 const ROLE_BADGE: Record<UserRole, { color: string; bg: string }> = {
@@ -39,12 +41,18 @@ export default async function AdminPage() {
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[15.5px] font-extrabold">Users &amp; Roles</div>
           {isAdmin && (
-            <a
-              href="/admin/settings"
-              className="rounded-[9px] border border-[#e6eaf1] bg-[#f6f8fb] px-3 py-1.5 text-[12px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
-            >
-              General Settings →
-            </a>
+            <div className="flex items-center gap-2">
+              <AddUserButton
+                clients={ws.clients.map((c) => ({ id: c.id, name: c.name }))}
+                smtpConfigured={emailConfigured()}
+              />
+              <a
+                href="/admin/settings"
+                className="rounded-[9px] border border-[#e6eaf1] bg-[#f6f8fb] px-3 py-1.5 text-[12px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
+              >
+                General Settings →
+              </a>
+            </div>
           )}
         </div>
         {users.map((u) => (
