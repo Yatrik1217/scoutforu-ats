@@ -45,11 +45,23 @@ export async function shareWithClient(input: {
   const { data: cands, error } = await sb
     .from("candidates")
     .select(
-      "id,name,email,phone,location,exp_years,current_ctc_lpa,expected_ctc_lpa,notice_period_days,current_designation,current_company,stage,source,tags,resume_url",
+      "id,name,email,phone,location,exp_years,current_ctc_lpa,expected_ctc_lpa,notice_period_days,current_designation,current_company,stage,source,tags,resume_url,review_status",
     )
     .in("id", input.candidateIds);
   if (error) return { ok: false, error: error.message };
   if (!cands?.length) return { ok: false, error: "No candidates found to share." };
+
+  // Internal approval gate: profiles awaiting/failing review can't go to clients.
+  const blocked = cands.filter(
+    (c) => c.review_status === "pending" || c.review_status === "rejected",
+  );
+  if (blocked.length)
+    return {
+      ok: false,
+      error: `Not approved for client submission yet: ${blocked
+        .map((c) => c.name)
+        .join(", ")}. An internal approver must approve them first (or unselect them).`,
+    };
 
   // Build the Excel tracker.
   const wb = new ExcelJS.Workbook();

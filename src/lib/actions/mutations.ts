@@ -25,13 +25,75 @@ function refresh() {
 
 async function setStage(id: string, to: StageKey): Promise<Result> {
   const sb = await createClient();
-  const { error } = await sb
-    .from("candidates")
-    .update({ stage: stageToSlug(to) as CandidateStage })
-    .eq("id", id);
+  const patch: { stage: CandidateStage; review_status?: "pending" } = {
+    stage: stageToSlug(to) as CandidateStage,
+  };
+
+  // Internal profile approval: when a plain recruiter submits a candidate to
+  // Screening (and approvers are configured), the profile goes to "pending"
+  // until an internal approver signs it off for client submission.
+  if (to === "Screening") {
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (user) {
+      const [{ data: me }, { count: approverCount }] = await Promise.all([
+        sb.from("profiles").select("role,is_approver").eq("id", user.id).maybeSingle(),
+        sb
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("is_approver", true)
+          .eq("active", true),
+      ]);
+      if ((approverCount ?? 0) > 0 && me && me.role !== "master_admin" && !me.is_approver)
+        patch.review_status = "pending";
+    }
+  }
+
+  const { error } = await sb.from("candidates").update(patch).eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };
+}
+
+// Internal approver signs off (or sends back) a submitted profile.
+export async function reviewCandidate(
+  id: string,
+  status: "approved" | "rejected",
+  note?: string,
+): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data: me } = await sb
+    .from("profiles")
+    .select("role,is_approver,name")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!me || (me.role !== "master_admin" && !me.is_approver))
+    return { ok: false, error: "Only internal approvers can review profiles" };
+
+  const { data: cand } = await sb.from("candidates").select("name").eq("id", id).single();
+  const { error } = await sb
+    .from("candidates")
+    .update({ review_status: status, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  const verdict =
+    status === "approved" ? "Profile approved for client submission" : "Profile sent back";
+  await sb.from("candidate_notes").insert({
+    candidate_id: id,
+    author_id: user.id,
+    body: `${verdict}${note?.trim() ? ` — ${note.trim()}` : ""}`,
+  });
+  refresh();
+  return {
+    ok: true,
+    message: `${cand?.name ?? "Candidate"}: ${status === "approved" ? "approved ✓" : "sent back"}`,
+  };
 }
 
 export async function moveCandidateStage(

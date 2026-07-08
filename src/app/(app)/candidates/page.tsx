@@ -13,6 +13,7 @@ type Params = {
   source?: string;
   recruiter?: string;
   job?: string;
+  review?: string;
 };
 
 // Build /candidates href with one filter removed (for chip × buttons).
@@ -31,7 +32,7 @@ export default async function CandidatesPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
-  const { q, stage, source, recruiter, job } = params;
+  const { q, stage, source, recruiter, job, review } = params;
   const { ws, scope } = await loadWorkspace();
   const query = (q ?? "").trim().toLowerCase();
 
@@ -47,6 +48,7 @@ export default async function CandidatesPage({
     if (source && (c.source ?? "").toLowerCase() !== source.toLowerCase()) return false;
     if (recruiter && c.recruiter_id !== recruiter) return false;
     if (job && c.job_id !== job) return false;
+    if (review && c.review_status !== review) return false;
     return true;
   });
 
@@ -63,6 +65,16 @@ export default async function CandidatesPage({
     chips.push({
       key: "job",
       label: `Job: ${ws.jobs.find((j) => j.id === job)?.title ?? "Unknown"}`,
+    });
+  if (review)
+    chips.push({
+      key: "review",
+      label:
+        review === "pending"
+          ? "Awaiting approval"
+          : review === "approved"
+            ? "Approved profiles"
+            : `Review: ${review}`,
     });
 
   return (

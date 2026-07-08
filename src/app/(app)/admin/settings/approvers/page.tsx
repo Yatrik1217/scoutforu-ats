@@ -19,11 +19,21 @@ export default async function ApproversPage() {
           ← General Settings
         </Link>
       </div>
-      <p className="mb-5 text-[13px] text-[#8a94a6]">
-        When at least one approver is set, new requisitions created by other recruiters start as
-        <b> Pending approval</b> — an approver (or Master Admin) approves them from the Jobs page
-        before they appear on the public careers page.
+      <p className="mb-3 text-[13px] text-[#8a94a6]">
+        Internal approvers review the work of other recruiters. With at least one approver set:
       </p>
+      <ul className="mb-5 list-disc space-y-1 pl-5 text-[13px] text-[#8a94a6]">
+        <li>
+          <b>Candidate profiles</b> — when a recruiter moves a candidate to <b>Screening</b>, the
+          profile becomes <b>Awaiting internal approval</b>. An approver reviews it in the candidate
+          drawer (Approve / Send back), and only approved profiles can be{" "}
+          <b>shared with the client</b>.
+        </li>
+        <li>
+          <b>Job requisitions</b> — new jobs created by other recruiters start as{" "}
+          <b>Pending approval</b> before they appear on the public careers page.
+        </li>
+      </ul>
       <ApproversManager staff={staff} />
     </div>
   );

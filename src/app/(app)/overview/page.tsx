@@ -14,6 +14,8 @@ import {
   activeCount,
   stageCount,
 } from "@/lib/data";
+import { getProfile } from "@/lib/auth";
+import { ShieldCheck } from "lucide-react";
 import {
   PIPELINE_STAGES,
   DEPT_COLOR,
@@ -49,6 +51,9 @@ function avgTimeToHire(events: { candidate_id: string; to_stage: string; created
 
 export default async function OverviewPage() {
   const { ws } = await loadWorkspace();
+  const me = await getProfile();
+  const canReview = me?.role === "master_admin" || !!me?.is_approver;
+  const pendingReviews = ws.candidates.filter((c) => c.review_status === "pending").length;
   const counts = funnelCounts(ws.candidates);
   const fmax = Math.max(1, ...counts);
   const interviewsThisWeek = ws.interviews.filter((i) =>
@@ -75,6 +80,20 @@ export default async function OverviewPage() {
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
+      {canReview && pendingReviews > 0 && (
+        <Link
+          href="/candidates?review=pending"
+          className="mb-4 flex items-center gap-3 rounded-[13px] border border-[#fde68a] bg-[#fffbeb] p-[13px_16px] transition hover:border-[#fcd34d]"
+        >
+          <ShieldCheck size={18} className="shrink-0 text-[#b45309]" />
+          <span className="flex-1 text-[13px] font-bold text-[#92400e]">
+            {pendingReviews} profile{pendingReviews > 1 ? "s" : ""} awaiting your internal approval
+            before client submission
+          </span>
+          <span className="text-[12.5px] font-extrabold text-[#b45309]">Review →</span>
+        </Link>
+      )}
+
       {/* metrics */}
       <div className="grid grid-cols-5 gap-4">
         {metrics.map((m) => {

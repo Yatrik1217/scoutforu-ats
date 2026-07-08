@@ -29,6 +29,7 @@ import {
   deleteCandidateNote,
   addInterviewFeedback,
   deleteInterviewFeedback,
+  reviewCandidate,
 } from "@/lib/actions/mutations";
 import type {
   CandidateRow,
@@ -110,6 +111,7 @@ export function CandidateDrawer({
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejReason, setRejReason] = useState("");
   const [custFields, setCustFields] = useState<{ field_key: string; label: string }[]>([]);
+  const [canReview, setCanReview] = useState(false);
 
   useEffect(() => {
     const sb = createClient();
@@ -124,6 +126,14 @@ export function CandidateDrawer({
       .eq("active", true)
       .order("sort")
       .then(({ data }) => setCustFields((data ?? []) as { field_key: string; label: string }[]));
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      sb.from("profiles")
+        .select("role,is_approver")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data }) => setCanReview(data?.role === "master_admin" || !!data?.is_approver));
+    });
   }, []);
 
   const loadFeedback = async (id: string) => {
@@ -243,6 +253,24 @@ export function CandidateDrawer({
       }
     });
 
+  const doReview = (status: "approved" | "rejected") => {
+    const note =
+      status === "rejected"
+        ? prompt("What should the recruiter fix? (optional)") ?? ""
+        : "";
+    start(async () => {
+      const res = await reviewCandidate(candidateId, status, note);
+      if (res.ok) {
+        toast.success(res.message ?? "Done");
+        setDetail((d) =>
+          d ? { ...d, cand: { ...d.cand, review_status: status } } : d,
+        );
+        loadNotes(candidateId);
+        router.refresh();
+      } else toast.error(res.error ?? "Action failed");
+    });
+  };
+
   const sc = detail ? stageColor(detail.stage) : "#64748b";
   const idx = detail ? stageIndex(detail.stage) : 0;
   const next = detail ? nextStage(detail.stage) : null;
@@ -338,6 +366,63 @@ export function CandidateDrawer({
                   </button>
                 )}
               </div>
+
+              {!!detail.cand.review_status && detail.cand.review_status !== "none" && (
+                <div
+                  className={`mb-4 rounded-[12px] border p-[12px_14px] ${
+                    detail.cand.review_status === "pending"
+                      ? "border-[#fde68a] bg-[#fffbeb]"
+                      : detail.cand.review_status === "approved"
+                        ? "border-[#bbf7d0] bg-[#f0fdf4]"
+                        : "border-[#fecaca] bg-[#fef2f2]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div
+                        className={`text-[12.5px] font-extrabold ${
+                          detail.cand.review_status === "pending"
+                            ? "text-[#b45309]"
+                            : detail.cand.review_status === "approved"
+                              ? "text-[#15803d]"
+                              : "text-[#b91c1c]"
+                        }`}
+                      >
+                        {detail.cand.review_status === "pending"
+                          ? "Awaiting internal approval"
+                          : detail.cand.review_status === "approved"
+                            ? "Approved for client submission ✓"
+                            : "Sent back — changes requested"}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-[#8a94a6]">
+                        {detail.cand.review_status === "pending"
+                          ? "Submitted by the recruiter — an internal approver must sign off before sharing with the client."
+                          : detail.cand.review_status === "approved"
+                            ? "This profile can be shared with the client."
+                            : "See the note in Notes below, fix the profile and resubmit."}
+                      </div>
+                    </div>
+                    {canReview && detail.cand.review_status === "pending" && (
+                      <div className="flex shrink-0 gap-1.5">
+                        <button
+                          disabled={pending}
+                          onClick={() => doReview("approved")}
+                          className="rounded-[8px] bg-[#16a34a] px-3 py-1.5 text-[11.5px] font-bold text-white hover:bg-[#15803d] disabled:opacity-60"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={pending}
+                          onClick={() => doReview("rejected")}
+                          className="rounded-[8px] border border-[#fecaca] bg-white px-3 py-1.5 text-[11.5px] font-bold text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-60"
+                        >
+                          Send back
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="mb-[22px] grid grid-cols-2 gap-[11px]">
                 {(

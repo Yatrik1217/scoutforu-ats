@@ -123,9 +123,14 @@ export type CandidateRow = {
   resume_url: string;
   reject_reason: string;
   custom: CustomValues;
+  review_status: ReviewStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   entered_stage_at: string;
   created_at: string;
 };
+
+export type ReviewStatus = "none" | "pending" | "approved" | "rejected";
 
 export type DisqualifyReasonRow = {
   id: string;
