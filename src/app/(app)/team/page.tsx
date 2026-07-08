@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { loadWorkspace } from "@/lib/data";
 import { Avatar } from "@/components/bits";
 
@@ -48,9 +49,9 @@ export default async function TeamPage() {
                 </span>
               </div>
               <div className="mt-[18px] flex gap-2.5">
-                <Tile value={active} label="Active" color="#2a6fdb" />
-                <Tile value={interviews} label="Interviews" color="#8b5cf6" />
-                <Tile value={hires} label="Hires" color="#16a34a" />
+                <Tile value={active} label="Active" color="#2a6fdb" href="/candidates" />
+                <Tile value={interviews} label="Interviews" color="#8b5cf6" href="/interviews" />
+                <Tile value={hires} label="Hires" color="#16a34a" href="/candidates" />
               </div>
               <div className="mt-4">
                 <div className="mb-1.5 flex justify-between text-[11.5px] font-semibold text-[#8a94a6]">
@@ -76,17 +77,29 @@ function Tile({
   value,
   label,
   color,
+  href,
 }: {
   value: number;
   label: string;
   color: string;
+  href?: string;
 }) {
-  return (
-    <div className="flex-1 rounded-[11px] bg-[#f7f9fc] p-3 text-center">
+  const inner = (
+    <>
       <div className="tf-num text-[21px] font-extrabold" style={{ color }}>
         {value}
       </div>
       <div className="text-[10.5px] font-semibold text-[#8a94a6]">{label}</div>
-    </div>
+    </>
   );
+  if (href)
+    return (
+      <Link
+        href={href}
+        className="flex-1 rounded-[11px] bg-[#f7f9fc] p-3 text-center transition hover:bg-[#eef1f6]"
+      >
+        {inner}
+      </Link>
+    );
+  return <div className="flex-1 rounded-[11px] bg-[#f7f9fc] p-3 text-center">{inner}</div>;
 }

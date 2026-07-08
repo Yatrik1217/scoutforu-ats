@@ -61,12 +61,13 @@ export default async function OverviewPage() {
     up: boolean;
     icon: LucideIcon;
     color: string;
+    href: string;
   }[] = [
-    { label: "Open Jobs", value: ws.jobs.length, delta: "+2", up: true, icon: Briefcase, color: "#2a6fdb" },
-    { label: "Active Candidates", value: activeCount(ws.candidates), delta: "+11", up: true, icon: Users, color: "#8b5cf6" },
-    { label: "Interviews / wk", value: interviewsThisWeek, delta: "+3", up: true, icon: Calendar, color: "#06b6d4" },
-    { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), delta: "+1", up: true, icon: FileText, color: "#f59e0b" },
-    { label: "Avg Time-to-Hire", value: avgTimeToHire(ws.events), delta: "-3d", up: true, icon: TrendingUp, color: "#16a34a" },
+    { label: "Open Jobs", value: ws.jobs.length, delta: "+2", up: true, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
+    { label: "Active Candidates", value: activeCount(ws.candidates), delta: "+11", up: true, icon: Users, color: "#8b5cf6", href: "/candidates" },
+    { label: "Interviews / wk", value: interviewsThisWeek, delta: "+3", up: true, icon: Calendar, color: "#06b6d4", href: "/interviews" },
+    { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), delta: "+1", up: true, icon: FileText, color: "#f59e0b", href: "/offers" },
+    { label: "Avg Time-to-Hire", value: avgTimeToHire(ws.events), delta: "-3d", up: true, icon: TrendingUp, color: "#16a34a", href: "/analytics" },
   ];
 
   const upcoming = ws.interviews.slice(0, 5);
@@ -78,9 +79,10 @@ export default async function OverviewPage() {
         {metrics.map((m) => {
           const Icon = m.icon;
           return (
-            <div
+            <Link
               key={m.label}
-              className="rounded-2xl border border-[#e9edf3] bg-white p-[18px]"
+              href={m.href}
+              className="rounded-2xl border border-[#e9edf3] bg-white p-[18px] transition hover:border-[#cbd7ea] hover:shadow-[0_6px_20px_rgba(20,32,58,.08)]"
             >
               <div className="flex items-center justify-between">
                 <div
@@ -105,7 +107,7 @@ export default async function OverviewPage() {
               <div className="mt-px text-[12.5px] font-semibold text-[#7a8696]">
                 {m.label}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -128,7 +130,11 @@ export default async function OverviewPage() {
             </Link>
           </div>
           {PIPELINE_STAGES.map((s, i) => (
-            <div key={s.key} className="mb-[11px] flex items-center gap-3.5">
+            <Link
+              key={s.key}
+              href="/pipeline"
+              className="-mx-2 mb-[3px] flex items-center gap-3.5 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
+            >
               <div className="w-[130px] shrink-0 text-right text-[12.5px] font-semibold text-[#42506b]">
                 {s.key}
               </div>
@@ -144,24 +150,30 @@ export default async function OverviewPage() {
               <div className="tf-num w-8 text-right text-[13px] font-extrabold">
                 {counts[i]}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-4 flex items-center justify-between">
-            <div className="text-[15.5px] font-extrabold">Upcoming Interviews</div>
-            <span className="tf-num rounded-full bg-[#eef4fe] px-2.5 py-[3px] text-[11.5px] font-bold text-[#2a6fdb]">
+            <Link href="/interviews" className="text-[15.5px] font-extrabold hover:text-[#2a6fdb]">
+              Upcoming Interviews
+            </Link>
+            <Link
+              href="/interviews"
+              className="tf-num rounded-full bg-[#eef4fe] px-2.5 py-[3px] text-[11.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+            >
               {ws.interviews.length} scheduled
-            </span>
+            </Link>
           </div>
           {upcoming.map((iv) => {
             const c = ws.byId.get(iv.candidate_id);
             const d = new Date(iv.scheduled_at);
             return (
-              <div
+              <Link
+                href="/interviews"
                 key={iv.id}
-                className="flex items-center gap-3 border-b border-[#f0f3f8] py-[11px] last:border-0"
+                className="-mx-2 flex items-center gap-3 rounded-[10px] border-b border-[#f0f3f8] px-2 py-[11px] last:border-0 hover:bg-[#f6f8fb]"
               >
                 <div className="w-[46px] shrink-0 text-center">
                   <div className="text-[11px] font-bold text-[#2a6fdb]">
@@ -181,7 +193,7 @@ export default async function OverviewPage() {
                   </div>
                 </div>
                 <TypePill type={typeLabelFromEnum(iv.type)} />
-              </div>
+              </Link>
             );
           })}
           {upcoming.length === 0 && (
@@ -195,7 +207,9 @@ export default async function OverviewPage() {
       {/* activity + open roles */}
       <div className="mt-[18px] grid grid-cols-[1fr_1.55fr] gap-[18px]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
-          <div className="mb-4 text-[15.5px] font-extrabold">Recent Activity</div>
+          <Link href="/candidates" className="mb-4 block text-[15.5px] font-extrabold hover:text-[#2a6fdb]">
+            Recent Activity
+          </Link>
           {ws.events.slice(0, 6).map((e) => {
             const actor = e.by_user_id
               ? ws.profileById.get(e.by_user_id)
@@ -203,7 +217,11 @@ export default async function OverviewPage() {
             const cand = ws.byId.get(e.candidate_id);
             const initial = !e.from_stage;
             return (
-              <div key={e.id} className="mb-[15px] flex gap-3 last:mb-0">
+              <Link
+                href="/candidates"
+                key={e.id}
+                className="-mx-2 mb-[7px] flex gap-3 rounded-[10px] px-2 py-1.5 last:mb-0 hover:bg-[#f6f8fb]"
+              >
                 <div
                   className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-extrabold text-white"
                   style={{ background: actor?.color ?? "#94a3b8" }}
@@ -232,7 +250,7 @@ export default async function OverviewPage() {
                     })}
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

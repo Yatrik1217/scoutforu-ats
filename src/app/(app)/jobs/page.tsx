@@ -91,9 +91,9 @@ export default async function JobsPage() {
               </div>
 
               <div className="mt-[18px] flex gap-[22px] border-t border-[#f0f3f8] pt-4">
-                <Stat value={j.openings} label="Openings" />
-                <Stat value={j.applicants_count} label="Applicants" />
-                <Stat value={inPipe(j.id)} label="In Pipeline" accent />
+                <Stat value={j.openings} label="Openings" href="/pipeline" />
+                <Stat value={j.applicants_count} label="Applicants" href="/candidates" />
+                <Stat value={inPipe(j.id)} label="In Pipeline" accent href="/pipeline" />
                 <div className="flex-1" />
                 <div className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
@@ -143,13 +143,15 @@ function Stat({
   value,
   label,
   accent,
+  href,
 }: {
   value: number;
   label: string;
   accent?: boolean;
+  href?: string;
 }) {
-  return (
-    <div>
+  const inner = (
+    <>
       <div
         className="tf-num text-[19px] font-extrabold"
         style={accent ? { color: "#2a6fdb" } : undefined}
@@ -157,6 +159,13 @@ function Stat({
         {value}
       </div>
       <div className="text-[11px] font-semibold text-[#9aa4b6]">{label}</div>
-    </div>
+    </>
   );
+  if (href)
+    return (
+      <Link href={href} className="-mx-1.5 rounded-[8px] px-1.5 py-0.5 hover:bg-[#f6f8fb]">
+        {inner}
+      </Link>
+    );
+  return <div>{inner}</div>;
 }
