@@ -49,9 +49,9 @@ export default async function TeamPage() {
                 </span>
               </div>
               <div className="mt-[18px] flex gap-2.5">
-                <Tile value={active} label="Active" color="#2a6fdb" href="/candidates" />
+                <Tile value={active} label="Active" color="#2a6fdb" href={`/candidates?recruiter=${t.id}`} />
                 <Tile value={interviews} label="Interviews" color="#8b5cf6" href="/interviews" />
-                <Tile value={hires} label="Hires" color="#16a34a" href="/candidates" />
+                <Tile value={hires} label="Hires" color="#16a34a" href={`/candidates?recruiter=${t.id}&stage=joined`} />
               </div>
               <div className="mt-4">
                 <div className="mb-1.5 flex justify-between text-[11.5px] font-semibold text-[#8a94a6]">

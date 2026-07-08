@@ -13,6 +13,7 @@ import {
   SOURCES,
   SOURCE_COLOR,
   hexA,
+  stageToSlug,
 } from "@/lib/domain";
 
 export default async function AnalyticsPage() {
@@ -77,7 +78,7 @@ export default async function AnalyticsPage() {
           {SOURCES.map((s) => (
             <Link
               key={s}
-              href="/candidates"
+              href={`/candidates?source=${encodeURIComponent(s)}`}
               className="-mx-2 mb-[5px] flex items-center gap-3 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
             >
               <div className="w-[90px] text-[12.5px] font-semibold text-[#42506b]">
@@ -106,7 +107,7 @@ export default async function AnalyticsPage() {
           {PIPELINE_STAGES.map((s, i) => (
             <Link
               key={s.key}
-              href="/pipeline"
+              href={`/candidates?stage=${stageToSlug(s.key)}`}
               className="-mx-2 mb-[3px] flex items-center gap-3 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
             >
               <div className="w-[130px] text-right text-[12px] font-semibold text-[#42506b]">
@@ -136,7 +137,7 @@ export default async function AnalyticsPage() {
             {PIPELINE_STAGES.map((s, i) => (
               <Link
                 key={s.key}
-                href="/pipeline"
+                href={`/candidates?stage=${stageToSlug(s.key)}`}
                 className="flex h-full flex-1 flex-col items-center justify-end rounded-[9px] hover:bg-[#f6f8fb]"
               >
                 <div className="tf-num mb-1.5 text-[13px] font-extrabold">

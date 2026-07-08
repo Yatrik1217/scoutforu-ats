@@ -19,6 +19,7 @@ import {
   DEPT_COLOR,
   hexA,
   stageFromSlug,
+  stageToSlug,
 } from "@/lib/domain";
 import { Avatar, TypePill, typeLabelFromEnum } from "@/components/bits";
 
@@ -132,7 +133,7 @@ export default async function OverviewPage() {
           {PIPELINE_STAGES.map((s, i) => (
             <Link
               key={s.key}
-              href="/pipeline"
+              href={`/candidates?stage=${stageToSlug(s.key)}`}
               className="-mx-2 mb-[3px] flex items-center gap-3.5 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
             >
               <div className="w-[130px] shrink-0 text-right text-[12.5px] font-semibold text-[#42506b]">
