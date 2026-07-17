@@ -52,7 +52,7 @@ export default async function GeneralSettingsPage() {
     { title: "Action Triggers", subtitle: "Automations", desc: "Auto-reject stale candidates, notify on stage change.", icon: Zap, color: "#e8833a", href: "/admin" },
     { title: "Disqualify Reasons", subtitle: "Rejection reasons", desc: "Standard reasons used when rejecting candidates.", icon: Ban, color: "#e0533a", href: "/admin/settings/disqualify-reasons" },
     { title: "Custom Fields", subtitle: "Extra columns", desc: "Add your own fields to candidates, jobs & clients.", icon: Columns3, color: "#38a3e0", href: "/admin/settings/custom-fields" },
-    { title: "Invoice Setting", subtitle: "Billing details", desc: "Invoice numbering, GST & billing info.", icon: ReceiptIndianRupee, color: "#e0533a", href: "/admin/settings/invoice" },
+    { title: "Invoice Setting", subtitle: "Billing details", desc: "Invoice numbering, GST & billing info — invoices live under Admin → Invoices.", icon: ReceiptIndianRupee, color: "#e0533a", href: "/admin/settings/invoice" },
     { title: "Import Data", subtitle: "Import from Excel", desc: "Candidates, jobs, clients & recruiter logins from .xlsx/.csv — plus AI résumé bulk upload.", icon: Upload, color: "#17a673", href: "/admin/settings/import" },
     { title: "File Name Formats", subtitle: "Résumé naming", desc: "Downloads are named by the candidate — active.", icon: FileText, color: "#e8833a", status: "active" },
     { title: "Résumé Import Token", subtitle: "Naukri Resdex", desc: "API token for the one-click Resdex import extension.", icon: KeyRound, color: "#2a6fdb", href: "/admin" },

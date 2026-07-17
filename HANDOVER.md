@@ -26,6 +26,9 @@ development chat. Written 8 Jul 2026.
 
 Database changes are separate: run the SQL file (in `supabase/migrations/`)
 once in **Supabase → SQL Editor**. All migrations up to `0018` are already applied.
+**Pending: `0019_invoices.sql`** — paste it into the SQL Editor once to switch on
+the Invoices module (tables + numbering function). Until then the Invoices pages
+open but show "run migration 0019" when you try to save.
 
 ## 3. Environment variables
 
@@ -62,6 +65,13 @@ and Admin → General Settings → Email shows "Configured ✓".
   Admin → Résumé Import Token; extension settings in its popup.
 - **Bulk import**: General Settings → Import Data (Excel/CSV) or Bulk Upload (résumé PDFs, AI-parsed).
 - **Rejection reasons / custom fields / templates / org info / invoice details**: General Settings tiles.
+- **Invoicing (Admin → Invoices, Master Admin only)**: dashboard of receivables,
+  overdue & expected payments · **New Invoice** (client autofill, GST CGST/SGST or
+  IGST, discount, terms) · Send emails the PDF + a public "View Invoice" link
+  (needs SMTP, §4) · Record payments (UPI/bank/cheque…) until Paid · Remind,
+  duplicate, void, write off · **Recurring** profiles auto-draft retainer invoices
+  when their date arrives. Numbering/GSTIN/PAN/bank details come from General
+  Settings → Invoice Setting.
 
 ## 6. Troubleshooting
 

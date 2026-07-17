@@ -255,6 +255,112 @@ export type CandidateNoteRow = {
   created_at: string;
 };
 
+export type InvoiceStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "partial"
+  | "paid"
+  | "void"
+  | "written_off";
+export type InvoiceTaxMode = "cgst_sgst" | "igst" | "none";
+export type PaymentMethod =
+  | "bank_transfer"
+  | "upi"
+  | "cheque"
+  | "cash"
+  | "card"
+  | "other";
+export type RecurringFrequency =
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "half_yearly"
+  | "yearly";
+
+export type InvoiceRow = {
+  id: string;
+  invoice_no: string;
+  client_id: string | null;
+  bill_to_name: string;
+  bill_to_email: string;
+  bill_to_address: string;
+  bill_to_gstin: string;
+  status: InvoiceStatus;
+  issue_date: string;
+  due_date: string | null;
+  payment_terms_days: number;
+  tax_mode: InvoiceTaxMode;
+  gst_percent: number;
+  discount_percent: number;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total: number;
+  amount_paid: number;
+  notes: string;
+  terms: string;
+  public_token: string;
+  recurring_id: string | null;
+  sent_at: string | null;
+  viewed_at: string | null;
+  paid_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InvoiceItemRow = {
+  id: string;
+  invoice_id: string;
+  description: string;
+  details: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  sort: number;
+};
+
+export type InvoicePaymentRow = {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  paid_on: string;
+  method: PaymentMethod;
+  reference: string;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type InvoiceRecurringRow = {
+  id: string;
+  name: string;
+  client_id: string | null;
+  frequency: RecurringFrequency;
+  next_date: string;
+  end_date: string | null;
+  active: boolean;
+  items: { description: string; details: string; qty: number; rate: number }[];
+  tax_mode: InvoiceTaxMode;
+  gst_percent: number;
+  discount_percent: number;
+  payment_terms_days: number;
+  notes: string;
+  terms: string;
+  last_generated_at: string | null;
+  created_at: string;
+};
+
+export type InvoiceEventRow = {
+  id: string;
+  invoice_id: string;
+  kind: string;
+  body: string;
+  by_user_id: string | null;
+  created_at: string;
+};
+
 export type AppSettingsRow = {
   id: boolean;
   email_notif: boolean;
@@ -288,6 +394,11 @@ export type Database = {
       custom_fields: Table<CustomFieldRow>;
       email_templates: Table<EmailTemplateRow>;
       invoice_settings: Table<InvoiceSettingsRow>;
+      invoices: Table<InvoiceRow>;
+      invoice_items: Table<InvoiceItemRow>;
+      invoice_payments: Table<InvoicePaymentRow>;
+      invoice_recurring: Table<InvoiceRecurringRow>;
+      invoice_events: Table<InvoiceEventRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;
@@ -296,6 +407,7 @@ export type Database = {
       auth_client_id: { Args: Record<string, never>; Returns: string };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_staff: { Args: Record<string, never>; Returns: boolean };
+      next_invoice_number: { Args: Record<string, never>; Returns: string };
     };
     Enums: {
       user_role: UserRole;

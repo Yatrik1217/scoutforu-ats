@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/careers"];
+// "/invoice/" (trailing slash) keeps the tokenized public invoice view open
+// without exposing the staff "/invoices" area.
+const PUBLIC_PATHS = ["/login", "/auth", "/careers", "/invoice/"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
