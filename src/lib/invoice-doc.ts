@@ -18,36 +18,60 @@ const LINE = "#e3e8f0";
 
 const fmtDate = (d: string | null) => (d ? format(new Date(d + "T00:00:00"), "dd MMM yyyy") : "—");
 
+// Fetch the organization logo (JPEG/PNG URL) for embedding; best-effort.
+export async function fetchLogoBytes(url: string | null | undefined): Promise<Buffer | null> {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const ab = await res.arrayBuffer();
+    if (ab.byteLength > 2_000_000) return null; // keep the PDF small
+    return Buffer.from(ab);
+  } catch {
+    return null;
+  }
+}
+
 export function buildInvoicePdf(opts: {
   invoice: InvoiceRow;
   items: InvoiceItemRow[];
   payments: InvoicePaymentRow[];
   org: OrganizationRow | null;
   settings: InvoiceSettingsRow | null;
+  logoBytes?: Buffer | null;
 }): Buffer {
   const { invoice: inv, items, payments, org, settings } = opts;
   const pdf = new Pdf();
   const right = A4.w - M;
   let y = 0;
 
+  const logo = opts.logoBytes ? pdf.addImage(opts.logoBytes) : null;
+
   const header = () => {
     y = 64;
-    pdf.text(org?.name || "ScoutforU", M, y, { size: 19, font: "bold", color: NAVY });
+    let textX = M;
+    if (logo) {
+      const lh = 38;
+      const lw = Math.min(130, (logo.width / logo.height) * lh);
+      pdf.drawImage(logo.idx, M, y - 26, lw, lh);
+      textX = M + lw + 14;
+    }
+    pdf.text(org?.name || "ScoutforU", textX, y, { size: 19, font: "bold", color: NAVY });
     pdf.text("TAX INVOICE", right, y, { size: 17, font: "bold", color: BLUE, align: "right" });
     y += 15;
     if (org?.tagline) {
-      pdf.text(org.tagline, M, y, { size: 9, color: MUTED });
+      pdf.text(org.tagline, textX, y, { size: 9, color: MUTED });
     }
     pdf.text(inv.invoice_no, right, y, { size: 10.5, font: "bold", color: NAVY, align: "right" });
     y += 13;
     const orgLine2 = [org?.address, org?.city].filter(Boolean).join(", ");
     if (orgLine2) {
-      pdf.text(orgLine2, M, y, { size: 9, color: MUTED });
+      pdf.text(orgLine2, textX, y, { size: 9, color: MUTED });
       y += 12;
     }
     const contact = [org?.phone, org?.email, org?.website].filter(Boolean).join("  |  ");
     if (contact) {
-      pdf.text(contact, M, y, { size: 9, color: MUTED });
+      pdf.text(contact, textX, y, { size: 9, color: MUTED });
       y += 12;
     }
     const tax = [
@@ -57,7 +81,7 @@ export function buildInvoicePdf(opts: {
       .filter(Boolean)
       .join("   ");
     if (tax) {
-      pdf.text(tax, M, y, { size: 9, font: "bold", color: NAVY });
+      pdf.text(tax, textX, y, { size: 9, font: "bold", color: NAVY });
       y += 12;
     }
     y += 8;

@@ -87,7 +87,16 @@ export default async function PublicInvoicePage({
           <div className="h-[6px] bg-gradient-to-r from-[#2a6fdb] to-[#5b96f0]" />
           <div className="p-[30px_34px]">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex items-start gap-4">
+                {orgRow?.logo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={orgRow.logo_url}
+                    alt=""
+                    className="h-[48px] w-auto max-w-[150px] shrink-0 object-contain"
+                  />
+                )}
+                <div>
                 <div className="text-[20px] font-extrabold text-[#16203a]">
                   {orgRow?.name || "ScoutforU"}
                 </div>
@@ -107,6 +116,7 @@ export default async function PublicInvoicePage({
                     {settingsRow?.pan && <>· PAN: {settingsRow.pan}</>}
                   </div>
                 )}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-[16px] font-extrabold tracking-wide text-[#2a6fdb]">

@@ -119,7 +119,16 @@ export default async function InvoiceDetailPage({
         <div className="overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
           <div className="border-b border-[#eef1f6] p-[26px_28px]">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex items-start gap-3.5">
+                {orgRow?.logo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={orgRow.logo_url}
+                    alt=""
+                    className="h-[44px] w-auto max-w-[140px] shrink-0 object-contain"
+                  />
+                )}
+                <div>
                 <div className="font-display text-[19px] font-extrabold text-[#16203a]">
                   {orgRow?.name || "ScoutforU"}
                 </div>
@@ -135,6 +144,7 @@ export default async function InvoiceDetailPage({
                     {settingsRow?.pan && <>· PAN: {settingsRow.pan}</>}
                   </div>
                 )}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-[15px] font-extrabold tracking-wide text-[#2a6fdb]">

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { emailConfigured, sendMail } from "@/lib/email";
-import { buildInvoicePdf } from "@/lib/invoice-doc";
+import { buildInvoicePdf, fetchLogoBytes } from "@/lib/invoice-doc";
 import {
   computeTotals,
   addDays,
@@ -60,6 +60,7 @@ async function requireAdmin() {
 // ---- create / edit ----------------------------------------------------------
 
 export type InvoiceForm = {
+  invoiceNo?: string; // blank = auto-number from Invoice Settings
   clientId: string | null;
   billToName: string;
   billToEmail: string;
@@ -117,24 +118,44 @@ export async function saveInvoice(id: string | null, form: InvoiceForm): Promise
     updated_at: new Date().toISOString(),
   };
 
+  const manualNo = (form.invoiceNo || "").trim();
+  if (manualNo.length > 24) return { ok: false, error: "Invoice number is too long (max 24 chars)." };
+  const friendlyDup = (msg: string) =>
+    msg.includes("duplicate key")
+      ? `Invoice number ${manualNo} already exists — pick another.`
+      : msg;
+
   let invoiceId = id;
   if (id) {
-    const { data: existing } = await sb.from("invoices").select("status").eq("id", id).single();
+    const { data: existing } = await sb
+      .from("invoices")
+      .select("status,invoice_no")
+      .eq("id", id)
+      .single();
     if (!existing) return { ok: false, error: "Invoice not found." };
     if (["paid", "void", "written_off"].includes(existing.status))
       return { ok: false, error: "Paid, void or written-off invoices can't be edited." };
-    const { error } = await sb.from("invoices").update(payload).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    const patch = manualNo && manualNo !== existing.invoice_no
+      ? { ...payload, invoice_no: manualNo }
+      : payload;
+    const { error } = await sb.from("invoices").update(patch).eq("id", id);
+    if (error) return { ok: false, error: friendlyDup(error.message) };
     await sb.from("invoice_items").delete().eq("invoice_id", id);
   } else {
-    const { data: no, error: numErr } = await sb.rpc("next_invoice_number");
-    if (numErr || !no) return { ok: false, error: numErr?.message || "Could not assign an invoice number — run migration 0019 first." };
+    let no = manualNo;
+    if (!no) {
+      const { data: auto, error: numErr } = await sb.rpc("next_invoice_number");
+      if (numErr || !auto)
+        return { ok: false, error: numErr?.message || "Could not assign an invoice number — run migration 0019 first." };
+      no = auto;
+    }
     const { data: created, error } = await sb
       .from("invoices")
       .insert({ ...payload, invoice_no: no, created_by: me.id })
       .select("id")
       .single();
-    if (error || !created) return { ok: false, error: error?.message || "Failed to create invoice." };
+    if (error || !created)
+      return { ok: false, error: error ? friendlyDup(error.message) : "Failed to create invoice." };
     invoiceId = created.id;
     await sb.from("invoice_events").insert({
       invoice_id: invoiceId,
@@ -330,7 +351,8 @@ export async function sendInvoice(
   if (["void", "written_off"].includes(inv.status))
     return { ok: false, error: "This invoice is void/written off — it can't be sent." };
 
-  const pdf = buildInvoicePdf({ invoice: inv, items, payments, org, settings });
+  const logoBytes = await fetchLogoBytes(org?.logo_url);
+  const pdf = buildInvoicePdf({ invoice: inv, items, payments, org, settings, logoBytes });
   const viewUrl = `${siteUrl()}/invoice/${inv.public_token}`;
   const orgName = org?.name || "ScoutforU";
   const dueStr = inv.due_date ? format(new Date(inv.due_date + "T00:00:00"), "dd MMM yyyy") : "—";

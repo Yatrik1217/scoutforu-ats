@@ -125,7 +125,7 @@ create policy invoice_recurring_admin on public.invoice_recurring
 create policy invoice_events_admin on public.invoice_events
   for all using (public.is_admin()) with check (public.is_admin());
 
--- ---- atomic invoice numbering (INV-0001, INV-0002, …) --------------------------
+-- ---- atomic invoice numbering (SFU001, SFU002, … — prefix from settings) -------
 create or replace function public.next_invoice_number()
 returns text
 language plpgsql
@@ -143,6 +143,6 @@ begin
      set next_number = next_number + 1, updated_at = now()
    where id = true
    returning next_number - 1, prefix into n, p;
-  return p || lpad(n::text, 4, '0');
+  return p || lpad(n::text, 3, '0');
 end;
 $$;

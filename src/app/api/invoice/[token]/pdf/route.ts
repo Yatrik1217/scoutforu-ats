@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { buildInvoicePdf } from "@/lib/invoice-doc";
+import { buildInvoicePdf, fetchLogoBytes } from "@/lib/invoice-doc";
 import type {
   InvoiceRow,
   InvoiceItemRow,
@@ -37,12 +37,14 @@ export async function GET(
       sb.from("invoice_settings").select("*").maybeSingle(),
     ]);
 
+  const logoBytes = await fetchLogoBytes((org as OrganizationRow | null)?.logo_url);
   const pdf = buildInvoicePdf({
     invoice: inv as InvoiceRow,
     items: (items ?? []) as InvoiceItemRow[],
     payments: (payments ?? []) as InvoicePaymentRow[],
     org: org as OrganizationRow | null,
     settings: settings as InvoiceSettingsRow | null,
+    logoBytes,
   });
 
   return new NextResponse(new Uint8Array(pdf), {

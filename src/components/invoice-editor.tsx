@@ -46,6 +46,7 @@ export function InvoiceEditor({
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState<InvoiceForm>({
+    invoiceNo: invoice?.invoice_no ?? "",
     clientId: invoice?.client_id ?? null,
     billToName: invoice?.bill_to_name ?? "",
     billToEmail: invoice?.bill_to_email ?? "",
@@ -166,7 +167,23 @@ export function InvoiceEditor({
 
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[20px]">
           <div className="mb-3 text-[13px] font-extrabold text-[#16203a]">Invoice details</div>
-          <div className="grid grid-cols-2 gap-3">
+          <label className={label}>
+            Invoice number
+            <input
+              value={f.invoiceNo}
+              onChange={(e) => set("invoiceNo", e.target.value)}
+              placeholder={
+                settings
+                  ? `Auto — next is ${settings.prefix}${String(settings.next_number).padStart(3, "0")}`
+                  : "Auto"
+              }
+              className={field + " mt-1 font-normal"}
+            />
+            <span className="mt-1 block text-[10.5px] font-medium text-[#a3acbd]">
+              Leave blank to auto-number, or type your own (e.g. SFU011).
+            </span>
+          </label>
+          <div className="mt-3 grid grid-cols-2 gap-3">
             <label className={label}>
               Invoice date
               <input
