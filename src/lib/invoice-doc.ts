@@ -1,7 +1,7 @@
 import "server-only";
 import { format } from "date-fns";
 import { Pdf, A4 } from "@/lib/pdf";
-import { money, amountInWords, balanceDue, STATUS_META, isOverdue } from "@/lib/invoice";
+import { money, amountInWords, balanceDue, STATUS_META, isOverdue, orgAddressLine } from "@/lib/invoice";
 import type {
   InvoiceRow,
   InvoiceItemRow,
@@ -64,7 +64,7 @@ export function buildInvoicePdf(opts: {
     }
     pdf.text(inv.invoice_no, right, y, { size: 10.5, font: "bold", color: NAVY, align: "right" });
     y += 13;
-    const orgLine2 = [org?.address, org?.city].filter(Boolean).join(", ");
+    const orgLine2 = orgAddressLine(org?.address, org?.city);
     if (orgLine2) {
       pdf.text(orgLine2, textX, y, { size: 9, color: MUTED });
       y += 12;

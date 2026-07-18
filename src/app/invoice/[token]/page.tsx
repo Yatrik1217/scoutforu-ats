@@ -8,6 +8,7 @@ import {
   balanceDue,
   isOverdue,
   STATUS_META,
+  orgAddressLine,
 } from "@/lib/invoice";
 import type {
   InvoiceRow,
@@ -102,7 +103,7 @@ export default async function PublicInvoicePage({
                 </div>
                 {orgRow?.tagline && <div className="text-[12px] text-[#8a94a6]">{orgRow.tagline}</div>}
                 <div className="mt-1.5 text-[11.5px] leading-relaxed text-[#8a94a6]">
-                  {[orgRow?.address, orgRow?.city].filter(Boolean).join(", ")}
+                  {orgAddressLine(orgRow?.address, orgRow?.city)}
                   {orgRow?.phone || orgRow?.email ? (
                     <>
                       <br />

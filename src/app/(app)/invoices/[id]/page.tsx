@@ -19,6 +19,7 @@ import {
   isOverdue,
   daysOverdue,
   METHOD_LABEL,
+  orgAddressLine,
 } from "@/lib/invoice";
 import { InvoiceStatusBadge } from "@/components/invoice-bits";
 import { InvoiceActions, DeletePaymentButton } from "@/components/invoice-actions";
@@ -136,7 +137,7 @@ export default async function InvoiceDetailPage({
                   <div className="text-[11.5px] text-[#8a94a6]">{orgRow.tagline}</div>
                 )}
                 <div className="mt-1.5 whitespace-pre-line text-[11.5px] leading-relaxed text-[#8a94a6]">
-                  {[orgRow?.address, orgRow?.city].filter(Boolean).join(", ")}
+                  {orgAddressLine(orgRow?.address, orgRow?.city)}
                 </div>
                 {(settingsRow?.gstin || settingsRow?.pan) && (
                   <div className="mt-1 text-[11px] font-bold text-[#42506b]">

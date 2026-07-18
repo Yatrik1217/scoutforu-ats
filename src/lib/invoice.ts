@@ -58,6 +58,16 @@ export function computeTotals(
   return { subtotal, discount, taxable, tax, total };
 }
 
+// Join org address + city without repeating the city when the address
+// already ends with it (users often paste the full address incl. city).
+export function orgAddressLine(address?: string | null, city?: string | null): string {
+  const a = (address || "").trim();
+  const c = (city || "").trim();
+  if (!a) return c;
+  if (!c || a.toLowerCase().includes(c.toLowerCase())) return a;
+  return `${a}, ${c}`;
+}
+
 // ---- labels ----------------------------------------------------------------
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
   bank_transfer: "Bank Transfer / NEFT",
