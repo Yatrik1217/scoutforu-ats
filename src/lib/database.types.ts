@@ -89,6 +89,8 @@ export type JobRow = {
   branch_id: string | null;
   custom: CustomValues;
   approval_status: ApprovalStatus;
+  published: boolean;
+  published_at: string | null;
   created_at: string;
 };
 

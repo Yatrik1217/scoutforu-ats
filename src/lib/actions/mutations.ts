@@ -422,6 +422,38 @@ export async function setJobApproval(
   return { ok: true, message: status === "approved" ? "Requisition approved" : "Requisition rejected" };
 }
 
+export async function setJobPublished(id: string, published: boolean): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  if (published) {
+    // Only approved, open roles can go on the public careers page.
+    const { data: job } = await sb
+      .from("jobs")
+      .select("approval_status,status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!job) return { ok: false, error: "Job not found" };
+    if (job.approval_status !== "approved")
+      return { ok: false, error: "Job must be approved before publishing" };
+    if (job.status !== "open" && job.status !== "hot")
+      return { ok: false, error: "Only open jobs can be published" };
+  }
+  const { error } = await sb
+    .from("jobs")
+    .update({ published, published_at: published ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) {
+    if (/published/.test(error.message) && /column|schema/.test(error.message))
+      return { ok: false, error: "Run migration 0021_job_publish.sql in Supabase → SQL Editor first" };
+    return { ok: false, error: error.message };
+  }
+  refresh();
+  return { ok: true, message: published ? "Job is live on your careers page" : "Job removed from careers page" };
+}
+
 export async function setUserApprover(id: string, isApprover: boolean): Promise<Result> {
   const sb = await createClient();
   const { error } = await sb.from("profiles").update({ is_approver: isApprover }).eq("id", id);

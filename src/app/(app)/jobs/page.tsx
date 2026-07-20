@@ -6,6 +6,7 @@ import { DEPT_COLOR, hexA } from "@/lib/domain";
 import { RecBadge } from "@/components/bits";
 import { ScheduleButton, JobMenu } from "@/components/view-actions";
 import { JobApprovalActions } from "@/components/job-approval";
+import { JobPublish } from "@/components/job-publish";
 
 function ago(iso: string) {
   const d = Math.floor((Date.now() - +new Date(iso)) / 86_400_000);
@@ -119,6 +120,15 @@ export default async function JobsPage() {
               {j.approval_status === "pending" && canApprove && (
                 <JobApprovalActions jobId={j.id} />
               )}
+
+              {j.approval_status === "approved" &&
+                (j.status === "open" || j.status === "hot") && (
+                  <JobPublish
+                    jobId={j.id}
+                    published={j.published}
+                    publishedAt={j.published_at}
+                  />
+                )}
 
               <div className="mt-3.5 flex gap-2">
                 <Link

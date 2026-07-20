@@ -29,12 +29,23 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
   try {
     const sb = createServiceClient();
     const { data: o } = await sb.from("organization").select("name,logo_url").maybeSingle();
-    const { data: j } = await sb
+    // eslint-disable-next-line prefer-const -- j is reassigned in the fallback below
+    let { data: j, error } = await sb
       .from("jobs")
       .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status")
       .eq("id", jobId)
       .eq("approval_status", "approved")
+      .eq("published", true)
       .maybeSingle();
+    if (error) {
+      // Migration 0021 not applied yet (no "published" column) — old behaviour.
+      ({ data: j } = await sb
+        .from("jobs")
+        .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status")
+        .eq("id", jobId)
+        .eq("approval_status", "approved")
+        .maybeSingle());
+    }
     org = (o as Org) ?? null;
     job = (j as Job) ?? null;
   } catch {
