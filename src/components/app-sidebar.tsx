@@ -16,6 +16,7 @@ import {
   Database,
   SlidersHorizontal,
   ReceiptIndianRupee,
+  HandCoins,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor, ROLE_LABEL } from "@/lib/domain";
@@ -62,7 +63,10 @@ export function AppSidebar({
     { href: "/team", label: "Team", icon: UserCheck },
     { href: "/talent", label: "Talent Pool", icon: Database },
     ...(role === "master_admin"
-      ? [{ href: "/invoices", label: "Invoices", icon: ReceiptIndianRupee } as NavItem]
+      ? [
+          { href: "/placements", label: "Placements", icon: HandCoins } as NavItem,
+          { href: "/invoices", label: "Invoices", icon: ReceiptIndianRupee } as NavItem,
+        ]
       : []),
     { href: "/admin", label: "Admin", icon: SlidersHorizontal },
   ];

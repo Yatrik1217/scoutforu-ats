@@ -29,6 +29,8 @@ once in **Supabase → SQL Editor**. All migrations up to `0018` are already app
 **Pending: `0019_invoices.sql`** — paste it into the SQL Editor once to switch on
 the Invoices module (tables + numbering function). Until then the Invoices pages
 open but show "run migration 0019" when you try to save.
+**Pending: `0021_placements.sql`** — switches on the Placements & Revenue tracker
+(placements + payments + activity tables). Run it once in the SQL Editor too.
 
 ## 3. Environment variables
 
@@ -65,6 +67,15 @@ and Admin → General Settings → Email shows "Configured ✓".
   Admin → Résumé Import Token; extension settings in its popup.
 - **Bulk import**: General Settings → Import Data (Excel/CSV) or Bulk Upload (résumé PDFs, AI-parsed).
 - **Rejection reasons / custom fields / templates / org info / invoice details**: General Settings tiles.
+- **Placements & Revenue (Admin → Placements, Master Admin only)**: record each
+  hire (candidate, client, date of joining, fee as % of CTC or a flat amount, GST),
+  and the tracker computes what the client owes and when it's due (DOJ + 30/60/90
+  days) plus the replacement-guarantee window. Dashboard shows expected revenue,
+  overdue, due-in-30-days, collected, fee-booked-vs-collected chart, payments aging
+  and top clients by outstanding. Record part-payments until Paid; mark
+  replacement/cancelled/written-off; one click **Generate invoice** turns a
+  placement into a draft in the Invoices module. Candidate picker autofills from
+  ATS candidates in Offered/Accepted/Joined stages.
 - **Invoicing (Admin → Invoices, Master Admin only)**: dashboard of receivables,
   overdue & expected payments · **New Invoice** (client autofill, GST CGST/SGST or
   IGST, discount, terms) · Send emails the PDF + a public "View Invoice" link

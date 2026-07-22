@@ -363,6 +363,68 @@ export type InvoiceEventRow = {
   created_at: string;
 };
 
+export type PlacementStatus =
+  | "pending"
+  | "invoiced"
+  | "partial"
+  | "paid"
+  | "replaced"
+  | "cancelled"
+  | "written_off";
+export type PlacementFeeMode = "percent" | "flat";
+
+export type PlacementRow = {
+  id: string;
+  candidate_id: string | null;
+  candidate_name: string;
+  position: string;
+  client_id: string | null;
+  client_name: string;
+  job_id: string | null;
+  recruiter_id: string | null;
+  joining_date: string;
+  fee_mode: PlacementFeeMode;
+  annual_ctc: number;
+  fee_percent: number;
+  fee_amount: number;
+  gst_applicable: boolean;
+  gst_percent: number;
+  gst_amount: number;
+  total_fee: number;
+  credit_days: number;
+  due_date: string | null;
+  replacement_days: number;
+  replacement_until: string | null;
+  status: PlacementStatus;
+  amount_received: number;
+  invoice_id: string | null;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlacementPaymentRow = {
+  id: string;
+  placement_id: string;
+  amount: number;
+  paid_on: string;
+  method: PaymentMethod;
+  reference: string;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type PlacementEventRow = {
+  id: string;
+  placement_id: string;
+  kind: string;
+  body: string;
+  by_user_id: string | null;
+  created_at: string;
+};
+
 export type AppSettingsRow = {
   id: boolean;
   email_notif: boolean;
@@ -401,6 +463,9 @@ export type Database = {
       invoice_payments: Table<InvoicePaymentRow>;
       invoice_recurring: Table<InvoiceRecurringRow>;
       invoice_events: Table<InvoiceEventRow>;
+      placements: Table<PlacementRow>;
+      placement_payments: Table<PlacementPaymentRow>;
+      placement_events: Table<PlacementEventRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;
