@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { savePlacement, type PlacementForm } from "@/lib/actions/placements";
 import { computeFee, addDaysISO, CREDIT_TERMS, GUARANTEE_TERMS } from "@/lib/placement";
 import { money } from "@/lib/invoice";
+import { NumberInput } from "@/components/number-input";
 import type { PlacementRow, PlacementFeeMode, PlacementTdsBase } from "@/lib/database.types";
 
 const field =
@@ -247,37 +248,29 @@ export function PlacementEditor({
             <div className="grid grid-cols-2 gap-3">
               <label className={label}>
                 Annual CTC (₹)
-                <input
-                  inputMode="decimal"
-                  value={String(f.annualCtc)}
-                  onChange={(e) =>
-                    set("annualCtc", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                  }
+                <NumberInput
+                  value={f.annualCtc}
+                  onChange={(n) => set("annualCtc", n)}
                   className={field + " mt-1 font-normal"}
                   placeholder="1200000"
                 />
               </label>
               <label className={label}>
                 Fee %
-                <input
-                  inputMode="decimal"
-                  value={String(f.feePercent)}
-                  onChange={(e) =>
-                    set("feePercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                  }
+                <NumberInput
+                  value={f.feePercent}
+                  onChange={(n) => set("feePercent", n)}
                   className={field + " mt-1 font-normal"}
+                  placeholder="8.33"
                 />
               </label>
             </div>
           ) : (
             <label className={label}>
               Flat fee (₹)
-              <input
-                inputMode="decimal"
-                value={String(f.flatFee)}
-                onChange={(e) =>
-                  set("flatFee", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                }
+              <NumberInput
+                value={f.flatFee}
+                onChange={(n) => set("flatFee", n)}
                 className={field + " mt-1 font-normal"}
                 placeholder="100000"
               />
@@ -324,12 +317,9 @@ export function PlacementEditor({
             />
             Add GST
             {f.gstApplicable && (
-              <input
-                inputMode="decimal"
-                value={String(f.gstPercent)}
-                onChange={(e) =>
-                  set("gstPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                }
+              <NumberInput
+                value={f.gstPercent}
+                onChange={(n) => set("gstPercent", n)}
                 className="ml-1 w-[64px] rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
               />
             )}
@@ -346,12 +336,9 @@ export function PlacementEditor({
             Client deducts TDS
             {f.tdsApplicable && (
               <>
-                <input
-                  inputMode="decimal"
-                  value={String(f.tdsPercent)}
-                  onChange={(e) =>
-                    set("tdsPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                  }
+                <NumberInput
+                  value={f.tdsPercent}
+                  onChange={(n) => set("tdsPercent", n)}
                   className="ml-1 w-[56px] rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
                 />
                 <span className="font-normal text-[#8a94a6]">% on</span>

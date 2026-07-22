@@ -26,6 +26,7 @@ import {
   type PlacementPaymentForm,
 } from "@/lib/actions/placements";
 import { money, METHOD_LABEL } from "@/lib/invoice";
+import { NumberInput } from "@/components/number-input";
 import { placementBalance, OPEN_PLACEMENT_STATUSES } from "@/lib/placement";
 import type { PlacementRow, PaymentMethod } from "@/lib/database.types";
 
@@ -208,12 +209,9 @@ function PaymentModal({ placement, onClose }: { placement: PlacementRow; onClose
           <div className="grid grid-cols-2 gap-3">
             <label className={lbl}>
               Amount received*
-              <input
-                inputMode="decimal"
-                value={String(f.amount)}
-                onChange={(e) =>
-                  setF((p) => ({ ...p, amount: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 }))
-                }
+              <NumberInput
+                value={f.amount}
+                onChange={(n) => setF((p) => ({ ...p, amount: n }))}
                 className={input + " mt-1 font-normal"}
               />
             </label>

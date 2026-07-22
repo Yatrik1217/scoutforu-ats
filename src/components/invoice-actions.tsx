@@ -30,6 +30,7 @@ import {
   type PaymentForm,
 } from "@/lib/actions/invoices";
 import { money, balanceDue, METHOD_LABEL, OPEN_STATUSES } from "@/lib/invoice";
+import { NumberInput } from "@/components/number-input";
 import type { InvoiceRow, PaymentMethod } from "@/lib/database.types";
 
 const input =
@@ -308,12 +309,9 @@ function PaymentModal({ invoice, onClose }: { invoice: InvoiceRow; onClose: () =
       <div className="grid grid-cols-2 gap-3">
         <label className={lbl}>
           Amount received <span className="text-[#dc2626]">*</span>
-          <input
-            inputMode="decimal"
-            value={String(f.amount)}
-            onChange={(e) =>
-              setF((p) => ({ ...p, amount: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 }))
-            }
+          <NumberInput
+            value={f.amount}
+            onChange={(n) => setF((p) => ({ ...p, amount: n }))}
             className={input + " mt-1 font-normal"}
           />
         </label>

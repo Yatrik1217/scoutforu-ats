@@ -19,6 +19,7 @@ import {
   TERMS_PRESETS,
   type ItemInput,
 } from "@/lib/invoice";
+import { NumberInput } from "@/components/number-input";
 import type {
   InvoiceRecurringRow,
   InvoiceSettingsRow,
@@ -312,21 +313,15 @@ function RecurringModal({
                 placeholder="Description"
                 className={input}
               />
-              <input
-                inputMode="decimal"
-                value={String(it.qty)}
-                onChange={(e) =>
-                  setItem(i, { qty: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 })
-                }
+              <NumberInput
+                value={it.qty}
+                onChange={(n) => setItem(i, { qty: n })}
                 className={input + " text-right"}
                 title="Qty"
               />
-              <input
-                inputMode="decimal"
-                value={String(it.rate)}
-                onChange={(e) =>
-                  setItem(i, { rate: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 })
-                }
+              <NumberInput
+                value={it.rate}
+                onChange={(n) => setItem(i, { rate: n })}
                 className={input + " text-right"}
                 title="Rate ₹"
               />
@@ -368,24 +363,18 @@ function RecurringModal({
             </label>
             <label className={lbl}>
               GST %
-              <input
-                inputMode="decimal"
-                value={String(f.gstPercent)}
+              <NumberInput
+                value={f.gstPercent}
                 disabled={f.taxMode === "none"}
-                onChange={(e) =>
-                  set("gstPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                }
+                onChange={(n) => set("gstPercent", n)}
                 className={input + " mt-1 font-normal disabled:opacity-50"}
               />
             </label>
             <label className={lbl}>
               Discount %
-              <input
-                inputMode="decimal"
-                value={String(f.discountPercent)}
-                onChange={(e) =>
-                  set("discountPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                }
+              <NumberInput
+                value={f.discountPercent}
+                onChange={(n) => set("discountPercent", n)}
                 className={input + " mt-1 font-normal"}
               />
             </label>

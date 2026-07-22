@@ -13,6 +13,7 @@ import {
   TAX_MODE_LABEL,
   type ItemInput,
 } from "@/lib/invoice";
+import { NumberInput } from "@/components/number-input";
 import type {
   InvoiceRow,
   InvoiceItemRow,
@@ -228,25 +229,19 @@ export function InvoiceEditor({
             </label>
             <label className={label}>
               GST %
-              <input
-                inputMode="decimal"
-                value={String(f.gstPercent)}
+              <NumberInput
+                value={f.gstPercent}
                 disabled={f.taxMode === "none"}
-                onChange={(e) =>
-                  set("gstPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-                }
+                onChange={(n) => set("gstPercent", n)}
                 className={field + " mt-1 font-normal disabled:opacity-50"}
               />
             </label>
           </div>
           <label className={label + " mt-3"}>
             Discount % (on subtotal)
-            <input
-              inputMode="decimal"
-              value={String(f.discountPercent)}
-              onChange={(e) =>
-                set("discountPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
-              }
+            <NumberInput
+              value={f.discountPercent}
+              onChange={(n) => set("discountPercent", n)}
               className={field + " mt-1 font-normal"}
             />
           </label>
@@ -282,21 +277,17 @@ export function InvoiceEditor({
                 className={field + " mt-1.5 text-[12px] text-[#7a8696]"}
               />
             </div>
-            <input
-              inputMode="decimal"
-              value={String(it.qty)}
-              onChange={(e) =>
-                setItem(i, { qty: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 })
-              }
+            <NumberInput
+              value={it.qty}
+              onChange={(n) => setItem(i, { qty: n })}
               className={field + " text-right"}
+              title="Qty"
             />
-            <input
-              inputMode="decimal"
-              value={String(it.rate)}
-              onChange={(e) =>
-                setItem(i, { rate: parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0 })
-              }
+            <NumberInput
+              value={it.rate}
+              onChange={(n) => setItem(i, { rate: n })}
               className={field + " text-right"}
+              title="Rate ₹"
             />
             <div className="tf-num pt-2 text-right text-[13px] font-extrabold text-[#16203a]">
               {money((it.qty || 0) * (it.rate || 0))}
