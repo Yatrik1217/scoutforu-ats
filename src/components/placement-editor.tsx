@@ -58,7 +58,7 @@ export function PlacementEditor({
     gstPercent: placement?.gst_percent ?? gstDefault,
     tdsApplicable: placement?.tds_applicable ?? true,
     tdsPercent: placement?.tds_percent ?? 10,
-    tdsOn: placement?.tds_on ?? "total",
+    tdsOn: placement?.tds_on ?? "fee",
     creditDays: placement?.credit_days ?? 30,
     replacementDays: placement?.replacement_days ?? 90,
     notes: placement?.notes ?? "",
@@ -347,8 +347,8 @@ export function PlacementEditor({
                   onChange={(e) => set("tdsOn", e.target.value as PlacementTdsBase)}
                   className="rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
                 >
-                  <option value="total">Total (incl GST)</option>
                   <option value="fee">Fee (excl GST)</option>
+                  <option value="total">Total (incl GST)</option>
                 </select>
               </>
             )}

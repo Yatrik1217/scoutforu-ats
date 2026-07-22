@@ -6,7 +6,7 @@
 alter table public.placements
   add column if not exists tds_applicable boolean not null default true,
   add column if not exists tds_percent numeric not null default 10,
-  add column if not exists tds_on text not null default 'total',
+  add column if not exists tds_on text not null default 'fee',
   add column if not exists tds_amount numeric not null default 0,
   add column if not exists net_payable numeric not null default 0;
 

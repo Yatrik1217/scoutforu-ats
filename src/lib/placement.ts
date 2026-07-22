@@ -71,9 +71,10 @@ export function computeFee(input: {
       : round2(input.flatFee || 0);
   const gst = input.gstApplicable ? round2((base * (input.gstPercent || 0)) / 100) : 0;
   const total = round2(base + gst);
-  // TDS is deducted by the client. 'total' = on the GST-inclusive amount (as in
-  // the user's example), 'fee' = on the fee excluding GST (the CBDT method).
-  const tdsBase = (input.tdsOn ?? "total") === "fee" ? base : total;
+  // TDS is deducted by the client on the professional fee EXCLUDING GST
+  // (CBDT Circular 23/2017) — that's the default. 'total' is offered for the
+  // clients who deduct on the GST-inclusive invoice instead.
+  const tdsBase = (input.tdsOn ?? "fee") === "total" ? total : base;
   const tds = input.tdsApplicable ? round2((tdsBase * (input.tdsPercent || 0)) / 100) : 0;
   const net = round2(total - tds);
   return { fee: base, gst, total, tds, net };
