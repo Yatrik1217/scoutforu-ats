@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { money, round2 } from "@/lib/invoice";
-import { computeFee, addDaysISO } from "@/lib/placement";
+import { computeFee, addDaysISO, netPayable } from "@/lib/placement";
 import { saveInvoice } from "@/lib/actions/invoices";
 import type {
   PlacementRow,
   PlacementFeeMode,
+  PlacementTdsBase,
   PaymentMethod,
 } from "@/lib/database.types";
 
@@ -51,19 +52,25 @@ export type PlacementForm = {
   flatFee: number;
   gstApplicable: boolean;
   gstPercent: number;
+  tdsApplicable: boolean;
+  tdsPercent: number;
+  tdsOn: PlacementTdsBase;
   creditDays: number;
   replacementDays: number;
   notes: string;
 };
 
 function buildPayload(form: PlacementForm) {
-  const { fee, gst, total } = computeFee({
+  const { fee, gst, total, tds, net } = computeFee({
     feeMode: form.feeMode,
     annualCtc: form.annualCtc,
     feePercent: form.feePercent,
     flatFee: form.flatFee,
     gstApplicable: form.gstApplicable,
     gstPercent: form.gstPercent,
+    tdsApplicable: form.tdsApplicable,
+    tdsPercent: form.tdsPercent,
+    tdsOn: form.tdsOn,
   });
   return {
     candidate_id: form.candidateId,
@@ -82,6 +89,11 @@ function buildPayload(form: PlacementForm) {
     gst_percent: form.gstPercent || 0,
     gst_amount: gst,
     total_fee: total,
+    tds_applicable: form.tdsApplicable,
+    tds_percent: form.tdsPercent || 0,
+    tds_on: form.tdsOn,
+    tds_amount: tds,
+    net_payable: net,
     credit_days: Math.max(0, form.creditDays),
     due_date: addDaysISO(form.joiningDate, Math.max(0, form.creditDays)),
     replacement_days: Math.max(0, form.replacementDays),
@@ -199,18 +211,20 @@ export type PlacementPaymentForm = {
 
 async function recompute(sb: Awaited<ReturnType<typeof createClient>>, placementId: string) {
   const [{ data: p }, { data: pays }] = await Promise.all([
-    sb.from("placements").select("total_fee,status").eq("id", placementId).single(),
+    sb.from("placements").select("total_fee,net_payable,status").eq("id", placementId).single(),
     sb.from("placement_payments").select("amount").eq("placement_id", placementId),
   ]);
   if (!p) return;
   const received = round2((pays ?? []).reduce((s, x) => s + x.amount, 0));
+  // "Paid" means the full NET (post-TDS) cash has been collected.
+  const collectible = netPayable(p);
   const patch: Partial<PlacementRow> = {
     amount_received: received,
     updated_at: new Date().toISOString(),
   };
   // Don't override terminal states set by hand.
   if (!["cancelled", "written_off", "replaced"].includes(p.status)) {
-    if (received >= p.total_fee - 0.01 && p.total_fee > 0) patch.status = "paid";
+    if (received >= collectible - 0.01 && collectible > 0) patch.status = "paid";
     else if (received > 0) patch.status = "partial";
     else patch.status = p.status === "invoiced" ? "invoiced" : "pending";
   }
@@ -228,13 +242,13 @@ export async function recordPlacementPayment(
   if (!form.paidOn) return { ok: false, error: "Payment date is required." };
   const { data: p } = await sb
     .from("placements")
-    .select("total_fee,amount_received,candidate_name,status")
+    .select("total_fee,net_payable,amount_received,candidate_name,status")
     .eq("id", placementId)
     .maybeSingle();
   if (!p) return { ok: false, error: "Placement not found." };
   if (["cancelled"].includes(p.status))
     return { ok: false, error: "This placement is cancelled." };
-  const balance = round2(p.total_fee - p.amount_received);
+  const balance = round2(netPayable(p) - p.amount_received);
   if (amount > balance + 0.01)
     return { ok: false, error: `Amount exceeds the balance due (${money(balance)}).` };
 

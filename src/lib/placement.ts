@@ -1,6 +1,11 @@
 // Placement (recruitment revenue) domain helpers — safe for server & client.
 import { round2 } from "@/lib/invoice";
-import type { PlacementRow, PlacementStatus, PlacementFeeMode } from "@/lib/database.types";
+import type {
+  PlacementRow,
+  PlacementStatus,
+  PlacementFeeMode,
+  PlacementTdsBase,
+} from "@/lib/database.types";
 
 export const PLACEMENT_STATUS_META: Record<PlacementStatus, { label: string; color: string }> = {
   pending: { label: "Awaiting Payment", color: "#2a6fdb" },
@@ -15,8 +20,17 @@ export const PLACEMENT_STATUS_META: Record<PlacementStatus, { label: string; col
 // Statuses where money is still expected.
 export const OPEN_PLACEMENT_STATUSES: PlacementStatus[] = ["pending", "invoiced", "partial"];
 
-export function placementBalance(p: Pick<PlacementRow, "total_fee" | "amount_received">): number {
-  return round2(Math.max(0, p.total_fee - p.amount_received));
+// What the client actually credits to the bank = total minus TDS. Falls back to
+// total_fee for rows created before TDS tracking existed.
+export function netPayable(p: Pick<PlacementRow, "net_payable" | "total_fee">): number {
+  return p.net_payable && p.net_payable > 0 ? p.net_payable : p.total_fee;
+}
+
+// Cash still to come = net payable minus what's been received.
+export function placementBalance(
+  p: Pick<PlacementRow, "net_payable" | "total_fee" | "amount_received">,
+): number {
+  return round2(Math.max(0, netPayable(p) - p.amount_received));
 }
 
 export function placementOverdue(
@@ -47,13 +61,22 @@ export function computeFee(input: {
   flatFee: number;
   gstApplicable: boolean;
   gstPercent: number;
+  tdsApplicable?: boolean;
+  tdsPercent?: number;
+  tdsOn?: PlacementTdsBase;
 }) {
   const base =
     input.feeMode === "percent"
       ? round2(((input.annualCtc || 0) * (input.feePercent || 0)) / 100)
       : round2(input.flatFee || 0);
   const gst = input.gstApplicable ? round2((base * (input.gstPercent || 0)) / 100) : 0;
-  return { fee: base, gst, total: round2(base + gst) };
+  const total = round2(base + gst);
+  // TDS is deducted by the client. 'total' = on the GST-inclusive amount (as in
+  // the user's example), 'fee' = on the fee excluding GST (the CBDT method).
+  const tdsBase = (input.tdsOn ?? "total") === "fee" ? base : total;
+  const tds = input.tdsApplicable ? round2((tdsBase * (input.tdsPercent || 0)) / 100) : 0;
+  const net = round2(total - tds);
+  return { fee: base, gst, total, tds, net };
 }
 
 // ---- dates -------------------------------------------------------------------

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { savePlacement, type PlacementForm } from "@/lib/actions/placements";
 import { computeFee, addDaysISO, CREDIT_TERMS, GUARANTEE_TERMS } from "@/lib/placement";
 import { money } from "@/lib/invoice";
-import type { PlacementRow, PlacementFeeMode } from "@/lib/database.types";
+import type { PlacementRow, PlacementFeeMode, PlacementTdsBase } from "@/lib/database.types";
 
 const field =
   "w-full rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#2a6fdb]";
@@ -55,6 +55,9 @@ export function PlacementEditor({
     flatFee: placement?.fee_mode === "flat" ? (placement?.fee_amount ?? 0) : 0,
     gstApplicable: placement?.gst_applicable ?? true,
     gstPercent: placement?.gst_percent ?? gstDefault,
+    tdsApplicable: placement?.tds_applicable ?? true,
+    tdsPercent: placement?.tds_percent ?? 10,
+    tdsOn: placement?.tds_on ?? "total",
     creditDays: placement?.credit_days ?? 30,
     replacementDays: placement?.replacement_days ?? 90,
     notes: placement?.notes ?? "",
@@ -100,8 +103,21 @@ export function PlacementEditor({
         flatFee: f.flatFee,
         gstApplicable: f.gstApplicable,
         gstPercent: f.gstPercent,
+        tdsApplicable: f.tdsApplicable,
+        tdsPercent: f.tdsPercent,
+        tdsOn: f.tdsOn,
       }),
-    [f.feeMode, f.annualCtc, f.feePercent, f.flatFee, f.gstApplicable, f.gstPercent],
+    [
+      f.feeMode,
+      f.annualCtc,
+      f.feePercent,
+      f.flatFee,
+      f.gstApplicable,
+      f.gstPercent,
+      f.tdsApplicable,
+      f.tdsPercent,
+      f.tdsOn,
+    ],
   );
   const dueDate = f.joiningDate ? addDaysISO(f.joiningDate, Math.max(0, f.creditDays)) : "—";
   const guaranteeUntil =
@@ -320,14 +336,59 @@ export function PlacementEditor({
             {f.gstApplicable && <span className="font-normal text-[#8a94a6]">%</span>}
           </label>
 
+          <label className="mt-2 flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#42506b]">
+            <input
+              type="checkbox"
+              checked={f.tdsApplicable}
+              onChange={(e) => set("tdsApplicable", e.target.checked)}
+              className="h-4 w-4 accent-[#2a6fdb]"
+            />
+            Client deducts TDS
+            {f.tdsApplicable && (
+              <>
+                <input
+                  inputMode="decimal"
+                  value={String(f.tdsPercent)}
+                  onChange={(e) =>
+                    set("tdsPercent", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)
+                  }
+                  className="ml-1 w-[56px] rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
+                />
+                <span className="font-normal text-[#8a94a6]">% on</span>
+                <select
+                  value={f.tdsOn}
+                  onChange={(e) => set("tdsOn", e.target.value as PlacementTdsBase)}
+                  className="rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
+                >
+                  <option value="total">Total (incl GST)</option>
+                  <option value="fee">Fee (excl GST)</option>
+                </select>
+              </>
+            )}
+          </label>
+
           {/* live summary */}
           <div className="mt-4 space-y-1.5 rounded-[12px] bg-[#f8fafc] p-4 text-[13px]">
             <Row label="Base fee" value={money(fee.fee)} />
             {f.gstApplicable && <Row label={`GST (${f.gstPercent}%)`} value={money(fee.gst)} />}
             <div className="flex items-center justify-between border-t border-[#e3e8f0] pt-2">
-              <span className="text-[13.5px] font-extrabold text-[#16203a]">Total receivable</span>
-              <span className="tf-num text-[16px] font-extrabold text-[#2a6fdb]">
-                {money(fee.total)}
+              <span className="font-semibold text-[#7a8696]">Invoice total (incl GST)</span>
+              <span className="tf-num font-bold text-[#16203a]">{money(fee.total)}</span>
+            </div>
+            {f.tdsApplicable && (
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#7a8696]">
+                  Less: TDS ({f.tdsPercent}% on {f.tdsOn === "fee" ? "fee" : "total"})
+                </span>
+                <span className="tf-num font-bold text-[#dc2626]">- {money(fee.tds)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-[#e3e8f0] pt-2">
+              <span className="text-[13.5px] font-extrabold text-[#16203a]">
+                Net client pays
+              </span>
+              <span className="tf-num text-[16px] font-extrabold text-[#16a34a]">
+                {money(fee.net)}
               </span>
             </div>
             <div className="flex items-center justify-between pt-1 text-[11.5px] font-semibold text-[#8a94a6]">

@@ -372,6 +372,7 @@ export type PlacementStatus =
   | "cancelled"
   | "written_off";
 export type PlacementFeeMode = "percent" | "flat";
+export type PlacementTdsBase = "fee" | "total";
 
 export type PlacementRow = {
   id: string;
@@ -391,6 +392,11 @@ export type PlacementRow = {
   gst_percent: number;
   gst_amount: number;
   total_fee: number;
+  tds_applicable: boolean;
+  tds_percent: number;
+  tds_on: PlacementTdsBase;
+  tds_amount: number;
+  net_payable: number;
   credit_days: number;
   due_date: string | null;
   replacement_days: number;

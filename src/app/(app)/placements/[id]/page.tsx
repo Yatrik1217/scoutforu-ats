@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   RefreshCcw,
   StickyNote,
-  CalendarClock,
 } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -70,16 +69,17 @@ export default async function PlacementDetailPage({
   const balance = placementBalance(p);
   const guarantee = withinGuarantee(p);
 
+  const netCollectible = p.net_payable && p.net_payable > 0 ? p.net_payable : p.total_fee;
   const facts: { label: string; value: string; icon: typeof IndianRupee; color: string }[] = [
-    { label: "Total fee", value: money(p.total_fee), icon: IndianRupee, color: "#2a6fdb" },
+    { label: "Invoice total (incl GST)", value: money(p.total_fee), icon: IndianRupee, color: "#2a6fdb" },
+    {
+      label: p.tds_applicable ? `Net after ${p.tds_percent}% TDS` : "Net payable",
+      value: money(netCollectible),
+      icon: IndianRupee,
+      color: "#16a34a",
+    },
     { label: "Received", value: money(p.amount_received), icon: IndianRupee, color: "#16a34a" },
     { label: "Balance due", value: money(balance), icon: IndianRupee, color: od ? "#dc2626" : "#e8833a" },
-    {
-      label: "Payment due",
-      value: fmtD(p.due_date),
-      icon: CalendarClock,
-      color: od ? "#dc2626" : "#8b5cf6",
-    },
   ];
 
   return (
@@ -169,11 +169,27 @@ export default async function PlacementDetailPage({
               </div>
             )}
             <div className="mt-2 flex items-center justify-between rounded-[8px] bg-[#eef4fe] px-3 py-2">
-              <span className="font-extrabold text-[#16203a]">Total receivable</span>
+              <span className="font-extrabold text-[#16203a]">Invoice total (incl GST)</span>
               <span className="tf-num text-[15px] font-extrabold text-[#2a6fdb]">
                 {money(p.total_fee)}
               </span>
             </div>
+            {p.tds_applicable && p.tds_amount > 0 && (
+              <>
+                <div className="mt-1.5 flex items-center justify-between text-[13px]">
+                  <span className="font-semibold text-[#7a8696]">
+                    Less: TDS ({p.tds_percent}% on {p.tds_on === "fee" ? "fee excl GST" : "total"})
+                  </span>
+                  <span className="tf-num font-bold text-[#dc2626]">- {money(p.tds_amount)}</span>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between rounded-[8px] bg-[#f0fdf4] px-3 py-2">
+                  <span className="font-extrabold text-[#166534]">Net client pays to bank</span>
+                  <span className="tf-num text-[15px] font-extrabold text-[#16a34a]">
+                    {money(netCollectible)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {p.notes && (
