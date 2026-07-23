@@ -1,8 +1,8 @@
 import { format } from "date-fns";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, ShieldAlert } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { leaveBalances } from "@/lib/hr";
+import { leaveBalances, onProbation, probationEndsOn } from "@/lib/hr";
 import { fyStartYear, fyRange } from "@/lib/incentive";
 import { hexA } from "@/lib/domain";
 import {
@@ -37,6 +37,9 @@ export default async function MyLeavePage() {
   const typeById = new Map(types.map((t) => [t.id, t]));
   const range = fyRange(fyStartYear(new Date()));
   const balances = employee ? leaveBalances(types, requests, range) : [];
+  const probationOn = employee ? onProbation(employee) : false;
+  const probationEnd = employee ? probationEndsOn(employee) : null;
+  const paidQuota = types.filter((t) => t.paid).reduce((s, t) => s + t.annual_quota, 0);
 
   if (!employee) {
     return (
@@ -63,6 +66,16 @@ export default async function MyLeavePage() {
         </div>
         <ApplyLeaveButton types={types} />
       </div>
+
+      {probationOn && (
+        <div className="mb-4 flex items-center gap-3 rounded-[13px] border border-[#fde68a] bg-[#fffbeb] p-[13px_16px]">
+          <ShieldAlert size={18} className="shrink-0 text-[#b45309]" />
+          <span className="text-[13px] font-bold text-[#92400e]">
+            You&apos;re on probation until {fmtD(probationEnd!)} — leave taken before then is
+            unpaid (LWP). Your {paidQuota} paid leaves become available from that date.
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-4">
         {balances.map((b) => (

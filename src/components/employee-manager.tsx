@@ -169,6 +169,7 @@ function EmployeeModal({
     department: employee?.department ?? "",
     employmentType: employee?.employment_type ?? "full_time",
     joinedOn: employee?.joined_on ?? null,
+    probationMonths: employee?.probation_months ?? 3,
     monthlyGross: employee?.monthly_gross ?? 0,
     pan: employee?.pan ?? "",
     bankAccount: employee?.bank_account ?? "",
@@ -258,6 +259,19 @@ function EmployeeModal({
                 onChange={(e) => set("joinedOn", e.target.value || null)}
                 className={input + " mt-1 font-normal"}
               />
+            </label>
+            <label className={lbl}>
+              Probation (months)
+              <NumberInput
+                value={f.probationMonths}
+                decimals={false}
+                onChange={(n) => set("probationMonths", n)}
+                className={input + " mt-1 font-normal"}
+                placeholder="3"
+              />
+              <span className="mt-1 block text-[11px] font-medium text-[#a3acbd]">
+                Leave taken during probation is unpaid (LWP). 0 = no probation.
+              </span>
             </label>
           </div>
 

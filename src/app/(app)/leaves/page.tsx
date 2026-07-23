@@ -9,7 +9,7 @@ import {
   LeaveDecisionButtons,
   LeaveStatusBadge,
 } from "@/components/leave-manager";
-import { leaveBalances } from "@/lib/hr";
+import { leaveBalances, onProbation, probationEndsOn } from "@/lib/hr";
 import { fyStartYear, fyRange } from "@/lib/incentive";
 import type { EmployeeRow, LeaveRequestRow, LeaveTypeRow } from "@/lib/database.types";
 
@@ -171,6 +171,11 @@ export default async function LeavesPage({
                   <div className="mb-2 flex items-center gap-2.5">
                     <Avatar name={e.name} size={28} />
                     <span className="text-[12.5px] font-bold text-[#16203a]">{e.name}</span>
+                    {onProbation(e) && (
+                      <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-bold text-[#b45309]">
+                        On probation till {probationEndsOn(e)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {bal.map((b) => (

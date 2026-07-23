@@ -10,6 +10,8 @@ import {
   lopDaysForMonth,
   monthLabel,
   incentiveDue,
+  onProbation,
+  probationEndsOn,
 } from "@/lib/hr";
 import { buildClosureStatement, buildRecruiterStats, fyStartYear, fyRange } from "@/lib/incentive";
 import { placementBalance } from "@/lib/placement";
@@ -65,6 +67,7 @@ export type EmployeeForm = {
   department: string;
   employmentType: EmployeeEmploymentType;
   joinedOn: string | null;
+  probationMonths: number;
   monthlyGross: number;
   pan: string;
   bankAccount: string;
@@ -88,6 +91,7 @@ export async function saveEmployee(id: string | null, form: EmployeeForm): Promi
     department: form.department.trim(),
     employment_type: form.employmentType,
     joined_on: form.joinedOn || null,
+    probation_months: Math.max(0, Number(form.probationMonths) || 0),
     monthly_gross: Math.max(0, Number(form.monthlyGross) || 0),
     pan: form.pan.trim(),
     bank_account: form.bankAccount.trim(),
@@ -199,6 +203,19 @@ export async function applyForLeave(input: {
   if (days <= 0) return { ok: false, error: "That date range is empty." };
   if (input.halfDay && input.fromDate !== input.toDate)
     return { ok: false, error: "A half day must be a single date." };
+
+  // Probation gate: paid leave only unlocks once probation is complete.
+  const [{ data: emp }, { data: type }] = await Promise.all([
+    sb.from("employees").select("joined_on,probation_months").eq("id", employeeId).maybeSingle(),
+    sb.from("leave_types").select("paid,name").eq("id", input.leaveTypeId).maybeSingle(),
+  ]);
+  if (emp && type?.paid && onProbation(emp, input.fromDate)) {
+    const ends = probationEndsOn(emp);
+    return {
+      ok: false,
+      error: `Paid leave starts after probation${ends ? ` (from ${ends})` : ""}. Apply this as Unpaid Leave (LWP) instead.`,
+    };
+  }
 
   const { error } = await sb.from("leave_requests").insert({
     employee_id: employeeId,

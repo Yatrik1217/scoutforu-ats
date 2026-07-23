@@ -488,6 +488,7 @@ export type EmployeeRow = {
   joined_on: string | null;
   exit_on: string | null;
   status: EmploymentStatus;
+  probation_months: number;
   monthly_gross: number;
   components: Record<string, number>;
   pan: string;

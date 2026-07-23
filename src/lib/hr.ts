@@ -58,6 +58,35 @@ export function leaveDaysInMonth(req: LeaveRequestRow, periodISO: string): numbe
   return total > 0 ? round2((req.days * overlap) / total) : 0;
 }
 
+// ---- probation ---------------------------------------------------------------
+
+// Paid leave only unlocks after probation. Before that everything is unpaid.
+export function probationEndsOn(
+  employee: Pick<EmployeeRow, "joined_on" | "probation_months">,
+): string | null {
+  if (!employee.joined_on) return null;
+  const months = employee.probation_months ?? 0;
+  if (months <= 0) return null;
+  const d = new Date(employee.joined_on + "T00:00:00");
+  // Clamp to the last day of the target month — adding 3 months to 30 Nov must
+  // land on 28 Feb, not overflow into March.
+  const target = new Date(d.getFullYear(), d.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d.getDate(), lastDay));
+  return toISODate(target);
+}
+
+// True while the given date still falls inside the probation window.
+export function onProbation(
+  employee: Pick<EmployeeRow, "joined_on" | "probation_months">,
+  onDateISO?: string,
+): boolean {
+  const ends = probationEndsOn(employee);
+  if (!ends) return false;
+  const when = onDateISO ?? toISODate(new Date());
+  return when < ends;
+}
+
 // ---- leave balances ----------------------------------------------------------
 
 export type LeaveBalance = {

@@ -17,6 +17,8 @@ create table if not exists public.employees (
   joined_on date,
   exit_on date,
   status text not null default 'active' check (status in ('active','exited')),
+  -- Paid leave only unlocks after probation; before that everything is LWP.
+  probation_months int not null default 3,
   -- Salary: monthly gross today; `components` is reserved for a future
   -- Basic/HRA/allowance breakdown without needing a schema change.
   monthly_gross numeric not null default 0,
@@ -50,10 +52,8 @@ create table if not exists public.leave_types (
   sort int not null default 0
 );
 insert into public.leave_types (name, code, annual_quota, paid, sort) values
-  ('Casual Leave', 'CL', 12, true, 1),
-  ('Sick Leave', 'SL', 6, true, 2),
-  ('Earned Leave', 'EL', 12, true, 3),
-  ('Unpaid Leave', 'LWP', 0, false, 4)
+  ('Annual Leave', 'AL', 12, true, 1),
+  ('Unpaid Leave', 'LWP', 0, false, 2)
 on conflict (code) do nothing;
 
 create table if not exists public.leave_requests (
