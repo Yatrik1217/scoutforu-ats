@@ -3,7 +3,15 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { toISODate } from "@/lib/invoice";
-import { monthStart, monthLabel, lopDaysForMonth, attendanceSummary } from "@/lib/hr";
+import {
+  monthStart,
+  monthLabel,
+  lopDaysForMonth,
+  attendanceSummary,
+  grossMinutes,
+  netMinutes,
+  formatDuration,
+} from "@/lib/hr";
 import { AttendanceGrid } from "@/components/attendance-widgets";
 import { Avatar } from "@/components/bits";
 import type {
@@ -88,12 +96,14 @@ export default async function AttendancePage({
 
       {/* per-employee summary + the LOP payroll will use */}
       <div className="mt-[18px] overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
-        <div className="grid grid-cols-[1.4fr_90px_90px_90px_90px_140px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+        <div className="grid grid-cols-[1.3fr_80px_70px_70px_70px_100px_100px_120px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
           <div>Employee</div>
           <div className="text-center">Present</div>
           <div className="text-center">Half</div>
           <div className="text-center">Leave</div>
           <div className="text-center">Absent</div>
+          <div className="text-right">Gross hrs</div>
+          <div className="text-right">Net hrs</div>
           <div className="text-right">Loss of pay</div>
         </div>
         {employees.map((e) => {
@@ -105,10 +115,12 @@ export default async function AttendancePage({
             period,
             mine,
           );
+          const gross = mine.reduce((s, r) => s + (grossMinutes(r) ?? 0), 0);
+          const net = mine.reduce((s, r) => s + (netMinutes(r) ?? 0), 0);
           return (
             <div
               key={e.id}
-              className="grid grid-cols-[1.4fr_90px_90px_90px_90px_140px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0"
+              className="grid grid-cols-[1.3fr_80px_70px_70px_70px_100px_100px_120px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0"
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar name={e.name} size={30} />
@@ -125,6 +137,12 @@ export default async function AttendancePage({
               </div>
               <div className="tf-num text-center text-[13px] font-bold text-[#dc2626]">
                 {s.absent || "—"}
+              </div>
+              <div className="tf-num text-right text-[12.5px] font-bold text-[#2a6fdb]">
+                {gross ? formatDuration(gross) : "—"}
+              </div>
+              <div className="tf-num text-right text-[12.5px] font-extrabold text-[#16a34a]">
+                {net ? formatDuration(net) : "—"}
               </div>
               <div className="tf-num text-right text-[13px] font-extrabold">
                 {lop ? `${lop} day${lop === 1 ? "" : "s"}` : "—"}

@@ -481,6 +481,9 @@ export type AttendanceStatus =
   | "week_off"
   | "holiday";
 
+// A break still in progress has end === null.
+export type AttendanceBreak = { start: string; end: string | null };
+
 export type AttendanceRow = {
   id: string;
   employee_id: string;
@@ -488,6 +491,7 @@ export type AttendanceRow = {
   status: AttendanceStatus;
   check_in_at: string | null;
   check_out_at: string | null;
+  breaks: AttendanceBreak[];
   note: string;
   marked_by: string | null;
   created_at: string;

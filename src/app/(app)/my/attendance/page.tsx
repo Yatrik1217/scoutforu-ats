@@ -2,7 +2,16 @@ import { format } from "date-fns";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { toISODate } from "@/lib/invoice";
-import { attendanceSummary, hoursWorked, monthStart, monthLabel } from "@/lib/hr";
+import {
+  attendanceSummary,
+  monthStart,
+  monthLabel,
+  formatClock,
+  formatDuration,
+  breakMinutes,
+  grossMinutes,
+  netMinutes,
+} from "@/lib/hr";
 import { CheckInCard, AttendancePill } from "@/components/attendance-widgets";
 import type { AttendanceRow, EmployeeRow } from "@/lib/database.types";
 
@@ -74,36 +83,39 @@ export default async function MyAttendancePage() {
       </div>
 
       <div className="mt-[18px] overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
-        <div className="grid grid-cols-[1.2fr_120px_120px_100px_1fr] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+        <div className="grid grid-cols-[1.1fr_105px_105px_90px_90px_90px_120px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
           <div>Date</div>
           <div>Check in</div>
           <div>Check out</div>
-          <div className="text-center">Hours</div>
+          <div className="text-center">Break</div>
+          <div className="text-center">Gross</div>
+          <div className="text-center">Net</div>
           <div className="text-right">Status</div>
         </div>
-        {rows.map((r) => {
-          const hrs = hoursWorked(r);
-          const t = (v: string | null) =>
-            v ? format(new Date(v), "hh:mm a") : "—";
-          return (
-            <div
-              key={r.id}
-              className="grid grid-cols-[1.2fr_120px_120px_100px_1fr] items-center gap-2 border-b border-[#f4f6fa] px-5 py-2.5 last:border-0"
-            >
-              <div className="text-[12.5px] font-bold text-[#16203a]">
-                {format(new Date(r.on_date + "T00:00:00"), "EEE, dd MMM")}
-              </div>
-              <div className="tf-num text-[12px] text-[#42506b]">{t(r.check_in_at)}</div>
-              <div className="tf-num text-[12px] text-[#42506b]">{t(r.check_out_at)}</div>
-              <div className="tf-num text-center text-[12px] font-bold">
-                {hrs != null ? hrs : "—"}
-              </div>
-              <div className="text-right">
-                <AttendancePill status={r.status} />
-              </div>
+        {rows.map((r) => (
+          <div
+            key={r.id}
+            className="grid grid-cols-[1.1fr_105px_105px_90px_90px_90px_120px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-2.5 last:border-0"
+          >
+            <div className="text-[12.5px] font-bold text-[#16203a]">
+              {format(new Date(r.on_date + "T00:00:00"), "EEE, dd MMM")}
             </div>
-          );
-        })}
+            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(r.check_in_at)}</div>
+            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(r.check_out_at)}</div>
+            <div className="tf-num text-center text-[12px] text-[#e8833a]">
+              {r.check_in_at ? formatDuration(breakMinutes(r)) : "—"}
+            </div>
+            <div className="tf-num text-center text-[12px] font-bold text-[#2a6fdb]">
+              {formatDuration(grossMinutes(r))}
+            </div>
+            <div className="tf-num text-center text-[12px] font-extrabold text-[#16a34a]">
+              {formatDuration(netMinutes(r))}
+            </div>
+            <div className="text-right">
+              <AttendancePill status={r.status} />
+            </div>
+          </div>
+        ))}
         {rows.length === 0 && (
           <div className="py-12 text-center text-[13px] font-semibold text-[#a3acbd]">
             Nothing marked this month yet — check in above to start.

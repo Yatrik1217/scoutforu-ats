@@ -2,6 +2,7 @@
 // Safe for both server and client components.
 import { round2, toISODate } from "@/lib/invoice";
 import type {
+  AttendanceBreak,
   AttendanceRow,
   AttendanceStatus,
   EmployeeRow,
@@ -213,11 +214,92 @@ export function attendanceSummary(rows: AttendanceRow[]) {
   };
 }
 
-// Hours between check-in and check-out, to one decimal.
-export function hoursWorked(row: Pick<AttendanceRow, "check_in_at" | "check_out_at">): number | null {
+// ---- clock times & durations ---------------------------------------------------
+//
+// Everything is stored as a UTC timestamp. Formatting MUST pin the timezone —
+// otherwise a server component renders UTC and a client component renders the
+// browser's zone, and the same record shows two different times.
+export const APP_TIMEZONE = "Asia/Kolkata";
+
+export function formatClock(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    timeZone: APP_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function formatDuration(minutes: number | null): string {
+  if (minutes == null) return "—";
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem ? `${h}h ${rem}m` : `${h}h`;
+}
+
+const minutesBetween = (a: string, b: string) =>
+  (+new Date(b) - +new Date(a)) / 60_000;
+
+// The break currently running, if any.
+export function openBreak(row: Pick<AttendanceRow, "breaks">): AttendanceBreak | null {
+  const list = row.breaks ?? [];
+  const last = list[list.length - 1];
+  return last && !last.end ? last : null;
+}
+
+// Total break minutes, clamped to the work window so a mis-entered break can
+// never make net hours negative or exceed the day.
+export function breakMinutes(
+  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
+  now = new Date(),
+): number {
+  if (!row.check_in_at) return 0;
+  const start = +new Date(row.check_in_at);
+  const end = row.check_out_at ? +new Date(row.check_out_at) : +now;
+  if (end <= start) return 0;
+
+  let total = 0;
+  for (const b of row.breaks ?? []) {
+    if (!b.start) continue;
+    // A break left open is counted up to check-out (or now).
+    const bStart = Math.max(start, Math.min(+new Date(b.start), end));
+    const bEnd = Math.min(end, b.end ? +new Date(b.end) : end);
+    if (bEnd > bStart) total += (bEnd - bStart) / 60_000;
+  }
+  return Math.round(total);
+}
+
+// Check-in to check-out. Works across midnight because both are timestamps.
+export function grossMinutes(
+  row: Pick<AttendanceRow, "check_in_at" | "check_out_at">,
+): number | null {
   if (!row.check_in_at || !row.check_out_at) return null;
-  const h = (+new Date(row.check_out_at) - +new Date(row.check_in_at)) / 3_600_000;
-  return h > 0 ? Math.round(h * 10) / 10 : null;
+  const m = minutesBetween(row.check_in_at, row.check_out_at);
+  return m > 0 ? Math.round(m) : 0;
+}
+
+// Gross minus break time, never below zero.
+export function netMinutes(
+  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
+): number | null {
+  const gross = grossMinutes(row);
+  if (gross == null) return null;
+  return Math.max(0, gross - breakMinutes(row));
+}
+
+// Live elapsed time for a day still in progress (used on the check-in card).
+export function elapsedMinutes(
+  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
+  now = new Date(),
+): { gross: number; brk: number; net: number } | null {
+  if (!row.check_in_at) return null;
+  const end = row.check_out_at ? +new Date(row.check_out_at) : +now;
+  const gross = Math.max(0, Math.round((end - +new Date(row.check_in_at)) / 60_000));
+  const brk = breakMinutes(row, now);
+  return { gross, brk, net: Math.max(0, gross - brk) };
 }
 
 export const sumLines = (rows: PayLine[] | null | undefined) =>

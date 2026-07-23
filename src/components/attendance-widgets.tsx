@@ -2,10 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, Coffee, Play } from "lucide-react";
 import { toast } from "sonner";
-import { checkIn, checkOut, setAttendance } from "@/lib/actions/hr";
-import { ATTENDANCE_META, ATTENDANCE_CYCLE, hoursWorked } from "@/lib/hr";
+import { checkIn, checkOut, setAttendance, startBreak, endBreak } from "@/lib/actions/hr";
+import {
+  ATTENDANCE_META,
+  ATTENDANCE_CYCLE,
+  openBreak,
+  elapsedMinutes,
+  formatClock,
+  formatDuration,
+} from "@/lib/hr";
 import { hexA } from "@/lib/domain";
 import type { AttendanceRow, AttendanceStatus, EmployeeRow } from "@/lib/database.types";
 
@@ -24,61 +31,100 @@ export function CheckInCard({ today }: { today: AttendanceRow | null }) {
       } else toast.error(res.error || "Failed");
     });
 
-  const inAt = today?.check_in_at ? new Date(today.check_in_at) : null;
-  const outAt = today?.check_out_at ? new Date(today.check_out_at) : null;
-  const hrs = today ? hoursWorked(today) : null;
-  const fmt = (d: Date) =>
-    d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const checkedIn = !!today?.check_in_at;
+  const checkedOut = !!today?.check_out_at;
+  const onBreak = today ? !!openBreak(today) : false;
+  const live = today ? elapsedMinutes(today) : null;
+
+  const stat = (label: string, value: string, color = "#16203a") => (
+    <div>
+      <div className="text-[10.5px] font-bold uppercase tracking-wide text-[#a3acbd]">{label}</div>
+      <div className="tf-num text-[15px] font-extrabold" style={{ color }}>
+        {value}
+      </div>
+    </div>
+  );
 
   return (
     <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-[15px] font-extrabold text-[#16203a]">
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-4 text-[12.5px] font-semibold text-[#7a8696]">
-            <span>
-              Check in{" "}
-              <b className="tf-num text-[#16203a]">{inAt ? fmt(inAt) : "—"}</b>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[15px] font-extrabold text-[#16203a]">
+              {new Date().toLocaleDateString("en-IN", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
             </span>
-            <span>
-              Check out{" "}
-              <b className="tf-num text-[#16203a]">{outAt ? fmt(outAt) : "—"}</b>
-            </span>
-            {hrs != null && (
-              <span className="rounded-full bg-[#e9f9ef] px-2.5 py-1 text-[11.5px] font-bold text-[#16a34a]">
-                {hrs} hrs
+            {onBreak && (
+              <span className="rounded-full bg-[#fff7ed] px-2.5 py-1 text-[11px] font-bold text-[#e8833a]">
+                On break
               </span>
             )}
           </div>
+
+          <div className="mt-3 flex flex-wrap items-start gap-x-8 gap-y-3">
+            {stat("Check in", formatClock(today?.check_in_at))}
+            {stat("Check out", formatClock(today?.check_out_at))}
+            {stat("Break", live ? formatDuration(live.brk) : "—", "#e8833a")}
+            {stat("Gross", live ? formatDuration(live.gross) : "—", "#2a6fdb")}
+            {stat("Net", live ? formatDuration(live.net) : "—", "#16a34a")}
+          </div>
         </div>
-        {!inAt ? (
-          <button
-            onClick={() => run(checkIn)}
-            disabled={pending}
-            className="flex items-center gap-2 rounded-[10px] bg-[#16a34a] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.3)] hover:bg-[#15803d] disabled:opacity-60"
-          >
-            <LogIn size={16} /> {pending ? "…" : "Check in"}
-          </button>
-        ) : !outAt ? (
-          <button
-            onClick={() => run(checkOut)}
-            disabled={pending}
-            className="flex items-center gap-2 rounded-[10px] bg-[#2a6fdb] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(42,111,219,.3)] hover:bg-[#245fc0] disabled:opacity-60"
-          >
-            <LogOut size={16} /> {pending ? "…" : "Check out"}
-          </button>
-        ) : (
-          <span className="rounded-[10px] bg-[#f1f4f9] px-5 py-3 text-[13px] font-bold text-[#7a8696]">
-            Day complete ✓
-          </span>
-        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {!checkedIn ? (
+            <button
+              onClick={() => run(checkIn)}
+              disabled={pending}
+              className="flex items-center gap-2 rounded-[10px] bg-[#16a34a] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.3)] hover:bg-[#15803d] disabled:opacity-60"
+            >
+              <LogIn size={16} /> {pending ? "…" : "Check in"}
+            </button>
+          ) : checkedOut ? (
+            <span className="rounded-[10px] bg-[#f1f4f9] px-5 py-3 text-[13px] font-bold text-[#7a8696]">
+              Day complete ✓
+            </span>
+          ) : (
+            <>
+              {onBreak ? (
+                <button
+                  onClick={() => run(endBreak)}
+                  disabled={pending}
+                  className="flex items-center gap-2 rounded-[10px] bg-[#e8833a] px-5 py-3 text-[13.5px] font-bold text-white hover:bg-[#d4762f] disabled:opacity-60"
+                >
+                  <Play size={15} /> {pending ? "…" : "End break"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => run(startBreak)}
+                  disabled={pending}
+                  className="flex items-center gap-2 rounded-[10px] border border-[#e6eaf1] bg-white px-5 py-3 text-[13.5px] font-bold text-[#42506b] hover:bg-[#f6f8fb] disabled:opacity-60"
+                >
+                  <Coffee size={15} /> Lunch / break
+                </button>
+              )}
+              <button
+                onClick={() => run(checkOut)}
+                disabled={pending}
+                className="flex items-center gap-2 rounded-[10px] bg-[#2a6fdb] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(42,111,219,.3)] hover:bg-[#245fc0] disabled:opacity-60"
+              >
+                <LogOut size={16} /> {pending ? "…" : "Check out"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {checkedIn && !checkedOut && (today?.breaks ?? []).length > 0 && (
+        <div className="mt-4 border-t border-[#f0f3f8] pt-3 text-[11.5px] text-[#8a94a6]">
+          Breaks today:{" "}
+          {(today?.breaks ?? [])
+            .map((b) => `${formatClock(b.start)} – ${b.end ? formatClock(b.end) : "running"}`)
+            .join(" · ")}
+        </div>
+      )}
     </div>
   );
 }

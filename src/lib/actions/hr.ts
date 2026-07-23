@@ -12,6 +12,8 @@ import {
   incentiveDue,
   onProbation,
   probationEndsOn,
+  openBreak,
+  formatDuration,
 } from "@/lib/hr";
 import { buildClosureStatement, buildRecruiterStats, fyStartYear, fyRange } from "@/lib/incentive";
 import { placementBalance } from "@/lib/placement";
@@ -316,29 +318,102 @@ export async function checkIn(): Promise<Result> {
   return { ok: true, message: "Checked in — have a good day" };
 }
 
+// The shift still running: today's row, or yesterday's if someone checked in
+// before midnight and is checking out after it.
+async function openShift(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  employeeId: string,
+) {
+  const today = new Date();
+  const yesterday = new Date(+today - 86_400_000);
+  const { data } = await sb
+    .from("attendance")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .in("on_date", [toISODate(today), toISODate(yesterday)])
+    .not("check_in_at", "is", null)
+    .is("check_out_at", null)
+    .order("on_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data as AttendanceRow | null;
+}
+
 export async function checkOut(): Promise<Result> {
   const { sb, userId } = await currentUser();
   if (!userId) return { ok: false, error: "Not signed in." };
   const me = await myEmployee(sb, userId);
   if (!me) return { ok: false, error: "No employee record is linked to your login." };
 
-  const today = toISODate(new Date());
-  const { data: existing } = await sb
-    .from("attendance")
-    .select("id,check_in_at,check_out_at")
-    .eq("employee_id", me.id)
-    .eq("on_date", today)
-    .maybeSingle();
-  if (!existing?.check_in_at) return { ok: false, error: "Check in first." };
-  if (existing.check_out_at) return { ok: false, error: "You've already checked out today." };
+  const shift = await openShift(sb, me.id);
+  if (!shift) {
+    const { data: done } = await sb
+      .from("attendance")
+      .select("check_out_at")
+      .eq("employee_id", me.id)
+      .eq("on_date", toISODate(new Date()))
+      .maybeSingle();
+    return {
+      ok: false,
+      error: done?.check_out_at ? "You've already checked out today." : "Check in first.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  // Close any break still running, so net hours can't be overstated.
+  const breaks = (shift.breaks ?? []).map((b, i, arr) =>
+    i === arr.length - 1 && !b.end ? { ...b, end: now } : b,
+  );
 
   const { error } = await sb
     .from("attendance")
-    .update({ check_out_at: new Date().toISOString() })
-    .eq("id", existing.id);
+    .update({ check_out_at: now, breaks })
+    .eq("id", shift.id);
   if (error) return { ok: false, error: error.message };
   refresh();
-  return { ok: true, message: "Checked out" };
+  const closed = openBreak(shift) ? " (your open break was closed)" : "";
+  return { ok: true, message: `Checked out${closed}` };
+}
+
+// ---- breaks --------------------------------------------------------------------
+
+export async function startBreak(): Promise<Result> {
+  const { sb, userId } = await currentUser();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const me = await myEmployee(sb, userId);
+  if (!me) return { ok: false, error: "No employee record is linked to your login." };
+
+  const shift = await openShift(sb, me.id);
+  if (!shift) return { ok: false, error: "Check in before starting a break." };
+  if (openBreak(shift)) return { ok: false, error: "You're already on a break." };
+
+  const breaks = [...(shift.breaks ?? []), { start: new Date().toISOString(), end: null }];
+  const { error } = await sb.from("attendance").update({ breaks }).eq("id", shift.id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Break started" };
+}
+
+export async function endBreak(): Promise<Result> {
+  const { sb, userId } = await currentUser();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const me = await myEmployee(sb, userId);
+  if (!me) return { ok: false, error: "No employee record is linked to your login." };
+
+  const shift = await openShift(sb, me.id);
+  if (!shift) return { ok: false, error: "No shift is running." };
+  const open = openBreak(shift);
+  if (!open) return { ok: false, error: "You're not on a break." };
+
+  const now = new Date().toISOString();
+  const breaks = (shift.breaks ?? []).map((b, i, arr) =>
+    i === arr.length - 1 && !b.end ? { ...b, end: now } : b,
+  );
+  const { error } = await sb.from("attendance").update({ breaks }).eq("id", shift.id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  const mins = Math.max(0, Math.round((+new Date(now) - +new Date(open.start)) / 60_000));
+  return { ok: true, message: `Break ended — ${formatDuration(mins)}` };
 }
 
 // Admin marking a day on the register (also used to clear it).
