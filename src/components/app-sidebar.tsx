@@ -20,6 +20,7 @@ import {
   Trophy,
   IdCard,
   CalendarDays,
+  CalendarCheck,
   BadgeIndianRupee,
   type LucideIcon,
 } from "lucide-react";
@@ -72,15 +73,17 @@ export function AppSidebar({
           { href: "/invoices", label: "Invoices", icon: ReceiptIndianRupee } as NavItem,
           { href: "/performance", label: "Performance", icon: Trophy } as NavItem,
           { href: "/employees", label: "Employees", icon: IdCard } as NavItem,
+          { href: "/attendance", label: "Attendance", icon: CalendarCheck } as NavItem,
           { href: "/leaves", label: "Leave Requests", icon: CalendarDays } as NavItem,
           { href: "/payroll", label: "Payroll", icon: BadgeIndianRupee } as NavItem,
+          { href: "/admin", label: "Admin", icon: SlidersHorizontal } as NavItem,
         ]
       : []),
-    { href: "/admin", label: "Admin", icon: SlidersHorizontal },
   ];
 
   // Everyone with a login gets their own leave and payslips.
   const mine: NavItem[] = [
+    { href: "/my/attendance", label: "My Attendance", icon: CalendarCheck },
     { href: "/my/leave", label: "My Leave", icon: CalendarDays },
     { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
   ];

@@ -473,6 +473,25 @@ export type EmploymentStatus = "active" | "exited";
 export type EmployeeEmploymentType = "full_time" | "part_time" | "intern" | "contract";
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type PayrollStatus = "draft" | "finalised" | "paid";
+export type AttendanceStatus =
+  | "present"
+  | "absent"
+  | "half_day"
+  | "leave"
+  | "week_off"
+  | "holiday";
+
+export type AttendanceRow = {
+  id: string;
+  employee_id: string;
+  on_date: string;
+  status: AttendanceStatus;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  note: string;
+  marked_by: string | null;
+  created_at: string;
+};
 export type PayLine = { label: string; amount: number };
 
 export type EmployeeRow = {
@@ -599,6 +618,7 @@ export type Database = {
       leave_requests: Table<LeaveRequestRow>;
       payroll_runs: Table<PayrollRunRow>;
       payroll_lines: Table<PayrollLineRow>;
+      attendance: Table<AttendanceRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

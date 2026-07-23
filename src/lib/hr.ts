@@ -2,6 +2,8 @@
 // Safe for both server and client components.
 import { round2, toISODate } from "@/lib/invoice";
 import type {
+  AttendanceRow,
+  AttendanceStatus,
   EmployeeRow,
   LeaveRequestRow,
   LeaveTypeRow,
@@ -139,13 +141,83 @@ export function lopDaysForMonth(
   requests: LeaveRequestRow[],
   types: LeaveTypeRow[],
   periodISO: string,
+  attendance: AttendanceRow[] = [],
 ): number {
   const unpaid = new Set(types.filter((t) => !t.paid).map((t) => t.id));
-  return round2(
-    requests
-      .filter((r) => r.status === "approved" && unpaid.has(r.leave_type_id))
-      .reduce((s, r) => s + leaveDaysInMonth(r, periodISO), 0),
-  );
+  // Weight per calendar date, so a day that is BOTH marked absent and covered
+  // by an unpaid-leave request is only ever docked once.
+  const weight = new Map<string, number>();
+  const bump = (date: string, w: number) =>
+    weight.set(date, Math.max(weight.get(date) ?? 0, w));
+
+  for (const r of requests) {
+    if (r.status !== "approved" || !unpaid.has(r.leave_type_id)) continue;
+    for (const d of datesInRange(r.from_date, r.to_date, periodISO))
+      bump(d, r.half_day ? 0.5 : 1);
+  }
+  for (const a of attendance) {
+    if (!a.on_date.startsWith(periodISO.slice(0, 7))) continue;
+    if (a.status === "absent") bump(a.on_date, 1);
+    else if (a.status === "half_day") bump(a.on_date, 0.5);
+  }
+  return round2([...weight.values()].reduce((s, w) => s + w, 0));
+}
+
+// Every date from..to that falls inside the given month.
+function datesInRange(fromISO: string, toISO: string, periodISO: string): string[] {
+  const month = periodISO.slice(0, 7);
+  const out: string[] = [];
+  const d = new Date(fromISO + "T00:00:00");
+  const end = new Date(toISO + "T00:00:00");
+  while (d <= end) {
+    const iso = toISODate(d);
+    if (iso.startsWith(month)) out.push(iso);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+// ---- attendance ---------------------------------------------------------------
+
+export const ATTENDANCE_META: Record<
+  AttendanceStatus,
+  { label: string; short: string; color: string }
+> = {
+  present: { label: "Present", short: "P", color: "#16a34a" },
+  absent: { label: "Absent", short: "A", color: "#dc2626" },
+  half_day: { label: "Half day", short: "H", color: "#e8833a" },
+  leave: { label: "On leave", short: "L", color: "#2a6fdb" },
+  week_off: { label: "Week off", short: "W", color: "#94a3b8" },
+  holiday: { label: "Holiday", short: "HO", color: "#8b5cf6" },
+};
+
+// Order the grid cycles through when you click a day.
+export const ATTENDANCE_CYCLE: AttendanceStatus[] = [
+  "present",
+  "absent",
+  "half_day",
+  "leave",
+  "week_off",
+  "holiday",
+];
+
+export function attendanceSummary(rows: AttendanceRow[]) {
+  const count = (s: AttendanceStatus) => rows.filter((r) => r.status === s).length;
+  return {
+    present: count("present"),
+    absent: count("absent"),
+    halfDay: count("half_day"),
+    leave: count("leave"),
+    weekOff: count("week_off"),
+    holiday: count("holiday"),
+  };
+}
+
+// Hours between check-in and check-out, to one decimal.
+export function hoursWorked(row: Pick<AttendanceRow, "check_in_at" | "check_out_at">): number | null {
+  if (!row.check_in_at || !row.check_out_at) return null;
+  const h = (+new Date(row.check_out_at) - +new Date(row.check_in_at)) / 3_600_000;
+  return h > 0 ? Math.round(h * 10) / 10 : null;
 }
 
 export const sumLines = (rows: PayLine[] | null | undefined) =>

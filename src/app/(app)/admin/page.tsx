@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { loadWorkspace } from "@/lib/data";
 import { getProfile } from "@/lib/auth";
 import { ROLE_LABEL } from "@/lib/domain";
@@ -28,6 +29,9 @@ const SETTINGS: {
 
 export default async function AdminPage() {
   const { ws, scope } = await loadWorkspace();
+  // Users, clients and system settings are Master Admin only — recruiters
+  // could otherwise read every colleague's email and the full client list.
+  if (scope.role !== "master_admin") redirect("/overview");
   const me = await getProfile();
   const users = Array.from(ws.profileById.values()).sort((a, b) =>
     a.role === "master_admin" ? -1 : b.role === "master_admin" ? 1 : 0,

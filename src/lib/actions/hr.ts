@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { round2 } from "@/lib/invoice";
+import { round2, toISODate } from "@/lib/invoice";
 import {
   computeNet,
   dayCount,
@@ -16,6 +16,8 @@ import {
 import { buildClosureStatement, buildRecruiterStats, fyStartYear, fyRange } from "@/lib/incentive";
 import { placementBalance } from "@/lib/placement";
 import type {
+  AttendanceRow,
+  AttendanceStatus,
   EmployeeRow,
   LeaveRequestRow,
   LeaveTypeRow,
@@ -267,6 +269,114 @@ export async function withdrawLeave(id: string): Promise<Result> {
   return { ok: true, message: "Request withdrawn" };
 }
 
+// ---- attendance ----------------------------------------------------------------
+
+async function myEmployee(sb: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await sb
+    .from("employees")
+    .select("id,name")
+    .eq("profile_id", userId)
+    .maybeSingle();
+  return data;
+}
+
+// Self check-in for today. Creates today's row (or fills in the time if the
+// admin already marked the day).
+export async function checkIn(): Promise<Result> {
+  const { sb, userId } = await currentUser();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const me = await myEmployee(sb, userId);
+  if (!me)
+    return { ok: false, error: "No employee record is linked to your login — ask the admin." };
+
+  const today = toISODate(new Date());
+  const { data: existing } = await sb
+    .from("attendance")
+    .select("id,check_in_at")
+    .eq("employee_id", me.id)
+    .eq("on_date", today)
+    .maybeSingle();
+
+  if (existing?.check_in_at) return { ok: false, error: "You've already checked in today." };
+
+  const now = new Date().toISOString();
+  const { error } = existing
+    ? await sb
+        .from("attendance")
+        .update({ status: "present", check_in_at: now })
+        .eq("id", existing.id)
+    : await sb.from("attendance").insert({
+        employee_id: me.id,
+        on_date: today,
+        status: "present",
+        check_in_at: now,
+      });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Checked in — have a good day" };
+}
+
+export async function checkOut(): Promise<Result> {
+  const { sb, userId } = await currentUser();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const me = await myEmployee(sb, userId);
+  if (!me) return { ok: false, error: "No employee record is linked to your login." };
+
+  const today = toISODate(new Date());
+  const { data: existing } = await sb
+    .from("attendance")
+    .select("id,check_in_at,check_out_at")
+    .eq("employee_id", me.id)
+    .eq("on_date", today)
+    .maybeSingle();
+  if (!existing?.check_in_at) return { ok: false, error: "Check in first." };
+  if (existing.check_out_at) return { ok: false, error: "You've already checked out today." };
+
+  const { error } = await sb
+    .from("attendance")
+    .update({ check_out_at: new Date().toISOString() })
+    .eq("id", existing.id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Checked out" };
+}
+
+// Admin marking a day on the register (also used to clear it).
+export async function setAttendance(
+  employeeId: string,
+  onDate: string,
+  status: AttendanceStatus | null,
+): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can edit the register." };
+
+  if (status === null) {
+    const { error } = await sb
+      .from("attendance")
+      .delete()
+      .eq("employee_id", employeeId)
+      .eq("on_date", onDate);
+    if (error) return { ok: false, error: error.message };
+    refresh();
+    return { ok: true, message: "Cleared" };
+  }
+
+  const { data: existing } = await sb
+    .from("attendance")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .eq("on_date", onDate)
+    .maybeSingle();
+  const { error } = existing
+    ? await sb.from("attendance").update({ status, marked_by: me.id }).eq("id", existing.id)
+    : await sb
+        .from("attendance")
+        .insert({ employee_id: employeeId, on_date: onDate, status, marked_by: me.id });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
 // ---- payroll ------------------------------------------------------------------
 
 // How much incentive each employee has earned so far this financial year,
@@ -334,13 +444,18 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
     .single();
   if (error || !run) return { ok: false, error: error?.message || "Could not create the run." };
 
-  const [{ data: emps }, { data: types }, { data: leaves }, { data: priorLines }] =
+  const monthEnd = toISODate(
+    new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0),
+  );
+  const [{ data: emps }, { data: types }, { data: leaves }, { data: priorLines }, { data: att }] =
     await Promise.all([
       sb.from("employees").select("*").eq("status", "active"),
       sb.from("leave_types").select("*"),
       sb.from("leave_requests").select("*").eq("status", "approved"),
       sb.from("payroll_lines").select("employee_id,incentive,run_id"),
+      sb.from("attendance").select("*").gte("on_date", period).lte("on_date", monthEnd),
     ]);
+  const attendance = (att ?? []) as AttendanceRow[];
 
   // Incentive already carried on finalised/paid runs, per employee.
   const { data: doneRuns } = await sb
@@ -360,7 +475,12 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
 
   const rows = ((emps ?? []) as EmployeeRow[]).map((e) => {
     const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
-    const lop = lopDaysForMonth(mine, leaveTypes, period);
+    const lop = lopDaysForMonth(
+      mine,
+      leaveTypes,
+      period,
+      attendance.filter((a) => a.employee_id === e.id),
+    );
     const incentive = e.profile_id
       ? incentiveDue({
           earnedThisFY: earned.get(e.profile_id) ?? 0,
