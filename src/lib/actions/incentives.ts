@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { IncentiveBasis, IncentiveMode, IncentiveSlab } from "@/lib/database.types";
+import type {
+  IncentiveBasis,
+  IncentiveMode,
+  IncentiveSlab,
+  QuarterTier,
+  BonusTier,
+} from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; message?: string };
 
@@ -26,6 +32,13 @@ export async function updateIncentiveSettings(input: {
   mode: IncentiveMode;
   flatPercent: number;
   slabs: IncentiveSlab[];
+  quarterlyTiers?: QuarterTier[];
+  halfyearlyTiers?: BonusTier[];
+  annualTiers?: BonusTier[];
+  minTenureDays?: number;
+  requireCollected?: boolean;
+  quarterlyMinTarget?: number;
+  halfyearlyRequiresBoth?: boolean;
 }): Promise<Result> {
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can change incentive settings." };
@@ -44,6 +57,33 @@ export async function updateIncentiveSettings(input: {
       error: "Add a final open-ended slab (leave its 'up to' blank) so large totals are covered.",
     };
 
+  const cleanQuarter = (input.quarterlyTiers ?? [])
+    .map((t) => ({
+      from: Math.max(1, Number(t.from) || 1),
+      to: t.to == null || Number.isNaN(t.to) ? null : Number(t.to),
+      per_closure: Number(t.per_closure) || 0,
+      bonus: Number(t.bonus) || 0,
+      bonus_at: t.bonus_at == null || Number.isNaN(t.bonus_at) ? null : Number(t.bonus_at),
+    }))
+    .sort((a, b) => a.from - b.from);
+  const cleanBonus = (rows: BonusTier[] | undefined) =>
+    (rows ?? [])
+      .map((t) => ({
+        from: Math.max(1, Number(t.from) || 1),
+        to: t.to == null || Number.isNaN(t.to) ? null : Number(t.to),
+        bonus: Number(t.bonus) || 0,
+        reward: (t.reward ?? "").trim(),
+      }))
+      .sort((a, b) => a.from - b.from);
+
+  if (input.mode === "closure" && !cleanQuarter.length)
+    return { ok: false, error: "Add at least one quarterly closure tier." };
+  if (input.mode === "closure" && !cleanQuarter.some((t) => t.to == null))
+    return {
+      ok: false,
+      error: "Leave the top quarterly tier's 'to' blank so high performers are covered.",
+    };
+
   const { error } = await sb
     .from("incentive_settings")
     .update({
@@ -51,6 +91,13 @@ export async function updateIncentiveSettings(input: {
       mode: input.mode,
       flat_percent: Number(input.flatPercent) || 0,
       slabs,
+      quarterly_tiers: cleanQuarter,
+      halfyearly_tiers: cleanBonus(input.halfyearlyTiers),
+      annual_tiers: cleanBonus(input.annualTiers),
+      min_tenure_days: Math.max(0, Number(input.minTenureDays ?? 30)),
+      require_collected: input.requireCollected ?? true,
+      quarterly_min_target: Math.max(0, Number(input.quarterlyMinTarget ?? 2)),
+      halfyearly_requires_both: input.halfyearlyRequiresBoth ?? true,
       updated_at: new Date().toISOString(),
     })
     .eq("id", true);

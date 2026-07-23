@@ -433,8 +433,23 @@ export type PlacementEventRow = {
 };
 
 export type IncentiveBasis = "booked" | "collected";
-export type IncentiveMode = "flat" | "slab";
+export type IncentiveMode = "flat" | "slab" | "closure";
 export type IncentiveSlab = { upto: number | null; percent: number };
+
+// Closure-count tiers (per recruiter, per financial-year period).
+export type QuarterTier = {
+  from: number;
+  to: number | null; // null = and above
+  per_closure: number;
+  bonus: number; // milestone bonus within this band
+  bonus_at: number | null; // closures needed to unlock the bonus
+};
+export type BonusTier = {
+  from: number;
+  to: number | null;
+  bonus: number;
+  reward?: string; // non-cash reward, e.g. "Domestic trip for 2"
+};
 
 export type IncentiveSettingsRow = {
   id: boolean;
@@ -442,6 +457,13 @@ export type IncentiveSettingsRow = {
   mode: IncentiveMode;
   flat_percent: number;
   slabs: IncentiveSlab[];
+  quarterly_tiers: QuarterTier[];
+  halfyearly_tiers: BonusTier[];
+  annual_tiers: BonusTier[];
+  min_tenure_days: number;
+  require_collected: boolean;
+  quarterly_min_target: number;
+  halfyearly_requires_both: boolean;
   updated_at: string;
 };
 

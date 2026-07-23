@@ -1,8 +1,10 @@
 // Recruiter performance & incentive helpers — safe for server & client.
-import { round2 } from "@/lib/invoice";
+import { round2, toISODate } from "@/lib/invoice";
 import type {
   IncentiveSettingsRow,
   IncentiveSlab,
+  QuarterTier,
+  BonusTier,
   PlacementRow,
   PlacementPaymentRow,
 } from "@/lib/database.types";
@@ -25,11 +27,40 @@ export const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: "all", label: "All time" },
 ];
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = toISODate;
 
 // Financial year that a date falls in (returns the starting calendar year).
-function fyStartYear(d: Date): number {
+export function fyStartYear(d: Date): number {
   return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+export function fyLabel(startYear: number): string {
+  return `FY ${startYear}–${String(startYear + 1).slice(2)}`;
+}
+
+// FY quarters: Q1 Apr–Jun, Q2 Jul–Sep, Q3 Oct–Dec, Q4 Jan–Mar.
+export function fyQuarterRange(
+  startYear: number,
+  q: 0 | 1 | 2 | 3,
+): { from: string; to: string; label: string } {
+  const startMonth = 3 + q * 3; // 3 = April
+  const from = new Date(startYear, startMonth, 1);
+  const to = new Date(startYear, startMonth + 3, 0);
+  return { from: iso(from), to: iso(to), label: `Q${q + 1}` };
+}
+
+// FY halves: H1 Apr–Sep, H2 Oct–Mar.
+export function fyHalfRange(
+  startYear: number,
+  h: 0 | 1,
+): { from: string; to: string; label: string } {
+  const a = fyQuarterRange(startYear, h === 0 ? 0 : 2);
+  const b = fyQuarterRange(startYear, h === 0 ? 1 : 3);
+  return { from: a.from, to: b.to, label: h === 0 ? "H1 (Apr–Sep)" : "H2 (Oct–Mar)" };
+}
+
+export function fyRange(startYear: number) {
+  return { from: `${startYear}-04-01`, to: `${startYear + 1}-03-31`, label: fyLabel(startYear) };
 }
 
 export function periodRange(
@@ -116,6 +147,160 @@ export function feeShareOfPayment(payment: number, placement: PlacementRow): num
   const collectible = placement.net_payable > 0 ? placement.net_payable : placement.total_fee;
   if (collectible <= 0) return 0;
   return round2((payment * placement.fee_amount) / collectible);
+}
+
+// ---- closure-count incentive plan --------------------------------------------
+
+// A closure counts once the candidate has stayed the minimum tenure and (if
+// required) the client's invoice is fully settled. Cancelled placements and
+// candidates who left inside the guarantee never count.
+export function closureEligible(
+  p: PlacementRow,
+  settings: Pick<IncentiveSettingsRow, "min_tenure_days" | "require_collected">,
+  today = new Date(),
+): boolean {
+  if (p.status === "cancelled" || p.status === "replaced") return false;
+  if (settings.require_collected && p.status !== "paid") return false;
+  const joined = new Date(p.joining_date + "T00:00:00");
+  const daysServed = Math.floor((+today - +joined) / 86_400_000);
+  return daysServed >= (settings.min_tenure_days ?? 0);
+}
+
+// A placement is "achieved" (work done) even if not yet payable.
+export function closureAchieved(p: PlacementRow): boolean {
+  return p.status !== "cancelled" && p.status !== "replaced";
+}
+
+export function quarterTierFor(count: number, tiers: QuarterTier[]): QuarterTier | null {
+  if (count <= 0) return null;
+  const sorted = [...(tiers ?? [])].sort((a, b) => a.from - b.from);
+  for (const t of sorted) if (count >= t.from && (t.to == null || count <= t.to)) return t;
+  return sorted.length ? sorted[sorted.length - 1] : null;
+}
+
+export function quarterPayout(
+  count: number,
+  tiers: QuarterTier[],
+): { perClosure: number; base: number; bonus: number; total: number } {
+  const tier = quarterTierFor(count, tiers);
+  if (!tier || count <= 0) return { perClosure: 0, base: 0, bonus: 0, total: 0 };
+  const base = round2(count * (tier.per_closure || 0));
+  const bonus =
+    tier.bonus && tier.bonus_at != null && count >= tier.bonus_at ? tier.bonus : 0;
+  return { perClosure: tier.per_closure || 0, base, bonus, total: round2(base + bonus) };
+}
+
+export function bonusTierFor(count: number, tiers: BonusTier[]): BonusTier | null {
+  if (count <= 0) return null;
+  const sorted = [...(tiers ?? [])].sort((a, b) => a.from - b.from);
+  for (const t of sorted) if (count >= t.from && (t.to == null || count <= t.to)) return t;
+  return null;
+}
+
+export type QuarterResult = {
+  label: string;
+  from: string;
+  to: string;
+  achieved: number;
+  eligible: number;
+  perClosure: number;
+  base: number;
+  bonus: number;
+  total: number;
+};
+
+export type ClosureStatement = {
+  fyLabel: string;
+  quarters: QuarterResult[];
+  halves: {
+    label: string;
+    eligible: number;
+    bonus: number;
+    qualified: boolean;
+    note: string;
+  }[];
+  annual: { eligible: number; bonus: number; reward: string; note: string };
+  quarterlyTotal: number;
+  halfYearlyTotal: number;
+  annualTotal: number;
+  total: number;
+  achievedTotal: number;
+  pendingClosures: number; // achieved but not yet payable
+};
+
+// Full per-recruiter incentive statement for one financial year.
+export function buildClosureStatement(input: {
+  placements: PlacementRow[]; // this recruiter's placements only
+  settings: IncentiveSettingsRow;
+  startYear: number;
+  today?: Date;
+}): ClosureStatement {
+  const { placements, settings, startYear } = input;
+  const today = input.today ?? new Date();
+
+  const countIn = (r: { from: string; to: string }) => {
+    const inWindow = placements.filter((p) => inRange(p.joining_date, r));
+    return {
+      achieved: inWindow.filter(closureAchieved).length,
+      eligible: inWindow.filter((p) => closureEligible(p, settings, today)).length,
+    };
+  };
+
+  const quarters: QuarterResult[] = ([0, 1, 2, 3] as const).map((q) => {
+    const r = fyQuarterRange(startYear, q);
+    const { achieved, eligible } = countIn(r);
+    const pay = quarterPayout(eligible, settings.quarterly_tiers);
+    return { label: r.label, from: r.from, to: r.to, achieved, eligible, ...pay };
+  });
+
+  const halves = ([0, 1] as const).map((h) => {
+    const r = fyHalfRange(startYear, h);
+    const { eligible } = countIn(r);
+    const qA = quarters[h === 0 ? 0 : 2];
+    const qB = quarters[h === 0 ? 1 : 3];
+    const bothMet =
+      !settings.halfyearly_requires_both ||
+      (qA.eligible >= settings.quarterly_min_target &&
+        qB.eligible >= settings.quarterly_min_target);
+    const tier = bonusTierFor(eligible, settings.halfyearly_tiers);
+    const qualified = !!tier && bothMet;
+    return {
+      label: r.label,
+      eligible,
+      bonus: qualified ? tier!.bonus : 0,
+      qualified,
+      note:
+        tier && !bothMet
+          ? `Needs ${settings.quarterly_min_target}+ closures in both quarters`
+          : "",
+    };
+  });
+
+  const annualRange = fyRange(startYear);
+  const annualCount = countIn(annualRange);
+  const annualTier = bonusTierFor(annualCount.eligible, settings.annual_tiers);
+
+  const quarterlyTotal = round2(quarters.reduce((s, q) => s + q.total, 0));
+  const halfYearlyTotal = round2(halves.reduce((s, h) => s + h.bonus, 0));
+  const annualTotal = annualTier?.bonus ?? 0;
+
+  return {
+    fyLabel: fyLabel(startYear),
+    quarters,
+    halves,
+    annual: {
+      eligible: annualCount.eligible,
+      bonus: annualTotal,
+      reward: annualTier?.reward ?? "",
+      note: "",
+    },
+    quarterlyTotal,
+    halfYearlyTotal,
+    annualTotal,
+    total: round2(quarterlyTotal + halfYearlyTotal + annualTotal),
+    achievedTotal: annualCount.achieved,
+    pendingClosures: Math.max(0, annualCount.achieved - annualCount.eligible),
+  };
 }
 
 export type RecruiterStats = {

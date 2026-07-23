@@ -1,5 +1,5 @@
 // Placement (recruitment revenue) domain helpers — safe for server & client.
-import { round2 } from "@/lib/invoice";
+import { round2, toISODate } from "@/lib/invoice";
 import type {
   PlacementRow,
   PlacementStatus,
@@ -84,7 +84,7 @@ export function computeFee(input: {
 export function addDaysISO(dateISO: string, days: number): string {
   const d = new Date(dateISO + "T00:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 // Common credit terms from the date of joining.

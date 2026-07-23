@@ -20,7 +20,10 @@ import {
   periodRange,
   inRange,
   buildRecruiterStats,
+  buildClosureStatement,
   feeShareOfPayment,
+  fyStartYear,
+  fyLabel,
   type PeriodKey,
 } from "@/lib/incentive";
 import { hexA } from "@/lib/domain";
@@ -75,6 +78,24 @@ export default async function PerformancePage({
     balanceOf: placementBalance,
   });
 
+  // In closure-tier mode the incentive is a financial-year figure, not a
+  // period one — compute each recruiter's FY statement and use that instead.
+  const closureMode = settings?.mode === "closure";
+  const fyYear = fyStartYear(new Date());
+  const closureTotals = new Map<string, { total: number; closures: number }>();
+  if (closureMode && settings) {
+    for (const r of recruiters) {
+      const st = buildClosureStatement({
+        placements: placements.filter((x) => x.recruiter_id === r.id),
+        settings,
+        startYear: fyYear,
+      });
+      closureTotals.set(r.id, { total: st.total, closures: st.annual.eligible });
+    }
+  }
+  const incentiveOf = (id: string) =>
+    closureMode ? (closureTotals.get(id)?.total ?? 0) : (stats.find((s) => s.id === id)?.incentive ?? 0);
+
   // Firm totals for the period.
   const periodPlacements = placements.filter(
     (x) => x.status !== "cancelled" && inRange(x.joining_date, range),
@@ -87,7 +108,9 @@ export default async function PerformancePage({
     const pl = byId.get(pay.placement_id);
     return pl ? s + feeShareOfPayment(pay.amount, pl) : s;
   }, 0);
-  const totalIncentive = stats.reduce((s, x) => s + x.incentive, 0);
+  const totalIncentive = closureMode
+    ? [...closureTotals.values()].reduce((s, x) => s + x.total, 0)
+    : stats.reduce((s, x) => s + x.incentive, 0);
   const totalOutstanding = placements
     .filter((x) => x.status !== "cancelled")
     .reduce((s, x) => s + placementBalance(x), 0);
@@ -122,7 +145,13 @@ export default async function PerformancePage({
     { label: "Fee Booked", value: moneyShort(totalBooked), sub: `${periodPlacements.length} placement${periodPlacements.length === 1 ? "" : "s"}`, icon: TrendingUp, color: "#2a6fdb" },
     { label: "Collected", value: moneyShort(totalCollected), sub: `${moneyShort(totalCollectedFee)} is fee`, icon: CircleCheckBig, color: "#16a34a" },
     { label: "Outstanding", value: moneyShort(totalOutstanding), sub: "across all placements", icon: Wallet, color: "#e8833a" },
-    { label: "Incentive Payable", value: moneyShort(totalIncentive), sub: `on ${basisLabel}`, icon: HandCoins, color: "#8b5cf6" },
+    {
+      label: "Incentive Payable",
+      value: moneyShort(totalIncentive),
+      sub: closureMode ? `closure plan · ${fyLabel(fyYear)}` : `on ${basisLabel}`,
+      icon: HandCoins,
+      color: "#8b5cf6",
+    },
   ];
 
   return (
@@ -191,7 +220,9 @@ export default async function PerformancePage({
             <span className="text-[15px] font-extrabold">Leaderboard</span>
           </div>
           <span className="text-[11.5px] font-semibold text-[#8a94a6]">
-            Ranked by {basisLabel} · incentive on base fee (excl GST)
+            {closureMode
+              ? `Ranked by ${basisLabel} · incentive = closure plan, ${fyLabel(fyYear)} to date`
+              : `Ranked by ${basisLabel} · incentive on base fee (excl GST)`}
           </span>
         </div>
         <div className="grid grid-cols-[1.5fr_80px_130px_130px_130px_150px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
@@ -240,10 +271,12 @@ export default async function PerformancePage({
             </div>
             <div className="text-right">
               <div className="tf-num text-[14px] font-extrabold text-[#8b5cf6]">
-                {money(s.incentive)}
+                {money(incentiveOf(s.id))}
               </div>
               <div className="text-[10.5px] font-semibold text-[#a3acbd]">
-                @ {s.incentiveRate}%{s.incentivePercent != null ? " (override)" : ""}
+                {closureMode
+                  ? `${closureTotals.get(s.id)?.closures ?? 0} qualifying · FY`
+                  : `@ ${s.incentiveRate}%${s.incentivePercent != null ? " (override)" : ""}`}
               </div>
             </div>
           </Link>

@@ -12,6 +12,8 @@ import type {
   IncentiveBasis,
   IncentiveMode,
   IncentiveSlab,
+  QuarterTier,
+  BonusTier,
 } from "@/lib/database.types";
 
 const field =
@@ -36,11 +38,54 @@ export function IncentiveSettingsForm({
           { upto: null, percent: 8 },
         ],
   );
+  const [qTiers, setQTiers] = useState<QuarterTier[]>(
+    settings?.quarterly_tiers?.length
+      ? settings.quarterly_tiers
+      : [
+          { from: 1, to: 2, per_closure: 2000, bonus: 0, bonus_at: null },
+          { from: 3, to: 4, per_closure: 3000, bonus: 3000, bonus_at: 4 },
+          { from: 5, to: null, per_closure: 4000, bonus: 6000, bonus_at: 6 },
+        ],
+  );
+  const [hTiers, setHTiers] = useState<BonusTier[]>(
+    settings?.halfyearly_tiers?.length
+      ? settings.halfyearly_tiers
+      : [
+          { from: 5, to: 6, bonus: 5000 },
+          { from: 7, to: 9, bonus: 10000 },
+          { from: 10, to: null, bonus: 18000 },
+        ],
+  );
+  const [aTiers, setATiers] = useState<BonusTier[]>(
+    settings?.annual_tiers?.length
+      ? settings.annual_tiers
+      : [
+          { from: 10, to: 13, bonus: 15000, reward: "" },
+          { from: 14, to: 18, bonus: 30000, reward: "" },
+          { from: 19, to: null, bonus: 50000, reward: "Domestic trip for 2" },
+        ],
+  );
+  const [minTenure, setMinTenure] = useState(settings?.min_tenure_days ?? 30);
+  const [requireCollected, setRequireCollected] = useState(settings?.require_collected ?? true);
+  const [minTarget, setMinTarget] = useState(settings?.quarterly_min_target ?? 2);
+  const [requireBoth, setRequireBoth] = useState(settings?.halfyearly_requires_both ?? true);
   const [pending, start] = useTransition();
 
   const save = () =>
     start(async () => {
-      const res = await updateIncentiveSettings({ basis, mode, flatPercent, slabs });
+      const res = await updateIncentiveSettings({
+        basis,
+        mode,
+        flatPercent,
+        slabs,
+        quarterlyTiers: qTiers,
+        halfyearlyTiers: hTiers,
+        annualTiers: aTiers,
+        minTenureDays: minTenure,
+        requireCollected,
+        quarterlyMinTarget: minTarget,
+        halfyearlyRequiresBoth: requireBoth,
+      });
       if (res.ok) toast.success(res.message || "Saved");
       else toast.error(res.error || "Failed");
     });
@@ -86,7 +131,7 @@ export function IncentiveSettingsForm({
 
       <div className="rounded-[12px] border border-[#e9edf3] bg-white p-5">
         <div className="mb-3 flex gap-1 rounded-[10px] bg-[#f1f4f9] p-1">
-          {(["flat", "slab"] as IncentiveMode[]).map((m) => (
+          {(["flat", "slab", "closure"] as IncentiveMode[]).map((m) => (
             <button
               key={m}
               type="button"
@@ -95,12 +140,29 @@ export function IncentiveSettingsForm({
                 mode === m ? "bg-white text-[#16203a] shadow-sm" : "text-[#8a94a6]"
               }`}
             >
-              {m === "flat" ? "Flat percentage" : "Slab-based"}
+              {m === "flat" ? "Flat %" : m === "slab" ? "Slab on value" : "Closure tiers"}
             </button>
           ))}
         </div>
 
-        {mode === "flat" ? (
+        {mode === "closure" ? (
+          <ClosureTierEditor
+            qTiers={qTiers}
+            setQTiers={setQTiers}
+            hTiers={hTiers}
+            setHTiers={setHTiers}
+            aTiers={aTiers}
+            setATiers={setATiers}
+            minTenure={minTenure}
+            setMinTenure={setMinTenure}
+            requireCollected={requireCollected}
+            setRequireCollected={setRequireCollected}
+            minTarget={minTarget}
+            setMinTarget={setMinTarget}
+            requireBoth={requireBoth}
+            setRequireBoth={setRequireBoth}
+          />
+        ) : mode === "flat" ? (
           <label className="block text-[12px] font-bold text-[#42506b]">
             Incentive %
             <NumberInput
@@ -185,11 +247,230 @@ export function IncentiveSettingsForm({
         )}
       </div>
 
-      <div className="rounded-[12px] bg-[#f8fafc] p-4 text-[12px] text-[#7a8696]">
-        <b className="text-[#16203a]">Example:</b> a placement with a base fee of {money(129411)}{" "}
-        at 5% earns {money(6470.55)} once{" "}
-        {basis === "collected" ? "the client's payment is received" : "the candidate joins"}.
+      {mode !== "closure" && (
+        <div className="rounded-[12px] bg-[#f8fafc] p-4 text-[12px] text-[#7a8696]">
+          <b className="text-[#16203a]">Example:</b> a placement with a base fee of {money(129411)}{" "}
+          at 5% earns {money(6470.55)} once{" "}
+          {basis === "collected" ? "the client's payment is received" : "the candidate joins"}.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- closure-count tier editor -------------------------------------------------
+
+const numCell =
+  "w-full rounded-[8px] border border-[#e3e8f0] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-[#2a6fdb]";
+
+function ClosureTierEditor({
+  qTiers,
+  setQTiers,
+  hTiers,
+  setHTiers,
+  aTiers,
+  setATiers,
+  minTenure,
+  setMinTenure,
+  requireCollected,
+  setRequireCollected,
+  minTarget,
+  setMinTarget,
+  requireBoth,
+  setRequireBoth,
+}: {
+  qTiers: QuarterTier[];
+  setQTiers: (f: (p: QuarterTier[]) => QuarterTier[]) => void;
+  hTiers: BonusTier[];
+  setHTiers: (f: (p: BonusTier[]) => BonusTier[]) => void;
+  aTiers: BonusTier[];
+  setATiers: (f: (p: BonusTier[]) => BonusTier[]) => void;
+  minTenure: number;
+  setMinTenure: (n: number) => void;
+  requireCollected: boolean;
+  setRequireCollected: (b: boolean) => void;
+  minTarget: number;
+  setMinTarget: (n: number) => void;
+  requireBoth: boolean;
+  setRequireBoth: (b: boolean) => void;
+}) {
+  const setQ = (i: number, patch: Partial<QuarterTier>) =>
+    setQTiers((p) => p.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+
+  return (
+    <div className="space-y-5">
+      <p className="rounded-[10px] bg-[#eef4fe] p-3 text-[11.5px] leading-relaxed text-[#42506b]">
+        Targets are <b>per recruiter</b>, counted on the Indian financial year — Q1 Apr–Jun, Q2
+        Jul–Sep, Q3 Oct–Dec, Q4 Jan–Mar.
+      </p>
+
+      {/* quarterly */}
+      <div>
+        <div className="mb-1.5 text-[12.5px] font-extrabold text-[#16203a]">Quarterly</div>
+        <div className="mb-1 grid grid-cols-[54px_54px_1fr_1fr_60px_30px] gap-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-[#8a94a6]">
+          <div>From</div>
+          <div>To</div>
+          <div>Per closure ₹</div>
+          <div>Bonus ₹</div>
+          <div>Bonus at</div>
+          <div />
+        </div>
+        {qTiers.map((t, i) => (
+          <div key={i} className="mb-1.5 grid grid-cols-[54px_54px_1fr_1fr_60px_30px] items-center gap-1.5">
+            <NumberInput value={t.from} decimals={false} onChange={(n) => setQ(i, { from: n })} className={numCell} />
+            <NumberInput
+              value={t.to ?? 0}
+              decimals={false}
+              onChange={(n) => setQ(i, { to: n || null })}
+              className={numCell}
+              placeholder="∞"
+            />
+            <NumberInput value={t.per_closure} onChange={(n) => setQ(i, { per_closure: n })} className={numCell} />
+            <NumberInput value={t.bonus} onChange={(n) => setQ(i, { bonus: n })} className={numCell} />
+            <NumberInput
+              value={t.bonus_at ?? 0}
+              decimals={false}
+              onChange={(n) => setQ(i, { bonus_at: n || null })}
+              className={numCell}
+              placeholder="—"
+            />
+            <button
+              onClick={() => setQTiers((p) => p.filter((_, j) => j !== i))}
+              disabled={qTiers.length === 1}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#c2cad8] hover:text-[#dc2626] disabled:opacity-30"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() =>
+            setQTiers((p) => [...p, { from: 1, to: null, per_closure: 0, bonus: 0, bonus_at: null }])
+          }
+          className="mt-1 flex items-center gap-1.5 rounded-[9px] bg-[#eef4fe] px-3 py-1.5 text-[12px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+        >
+          <Plus size={13} /> Add tier
+        </button>
+        <p className="mt-1.5 text-[11px] text-[#8a94a6]">
+          Leave the top tier&apos;s <b>To</b> blank for &ldquo;and above&rdquo;. <b>Bonus at</b> is
+          the closure count that unlocks the extra bonus.
+        </p>
       </div>
+
+      <BonusTierTable
+        title="Half-yearly (cumulative)"
+        rows={hTiers}
+        setRows={setHTiers}
+        withReward={false}
+      />
+      <BonusTierTable title="Annual (financial year)" rows={aTiers} setRows={setATiers} withReward />
+
+      {/* eligibility */}
+      <div className="rounded-[10px] border border-[#eef1f6] p-4">
+        <div className="mb-2 text-[12.5px] font-extrabold text-[#16203a]">
+          When does a closure count?
+        </div>
+        <label className="flex items-center gap-2 text-[12px] font-bold text-[#42506b]">
+          Candidate must complete
+          <NumberInput
+            value={minTenure}
+            decimals={false}
+            onChange={setMinTenure}
+            className="w-[70px] rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
+          />
+          days
+        </label>
+        <label className="mt-2 flex items-center gap-2 text-[12px] font-bold text-[#42506b]">
+          <input
+            type="checkbox"
+            checked={requireCollected}
+            onChange={(e) => setRequireCollected(e.target.checked)}
+            className="h-4 w-4 accent-[#2a6fdb]"
+          />
+          Client&apos;s invoice must be fully settled
+        </label>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#42506b]">
+          <input
+            type="checkbox"
+            checked={requireBoth}
+            onChange={(e) => setRequireBoth(e.target.checked)}
+            className="h-4 w-4 accent-[#2a6fdb]"
+          />
+          Half-yearly bonus needs at least
+          <NumberInput
+            value={minTarget}
+            decimals={false}
+            onChange={setMinTarget}
+            className="w-[56px] rounded-[8px] border border-[#e3e8f0] px-2 py-1 text-[12px] font-normal outline-none focus:border-[#2a6fdb]"
+          />
+          closures in <span className="font-normal">each</span> quarter
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function BonusTierTable({
+  title,
+  rows,
+  setRows,
+  withReward,
+}: {
+  title: string;
+  rows: BonusTier[];
+  setRows: (f: (p: BonusTier[]) => BonusTier[]) => void;
+  withReward: boolean;
+}) {
+  const set = (i: number, patch: Partial<BonusTier>) =>
+    setRows((p) => p.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  const cols = withReward
+    ? "grid-cols-[54px_54px_1fr_1.3fr_30px]"
+    : "grid-cols-[54px_54px_1fr_30px]";
+
+  return (
+    <div>
+      <div className="mb-1.5 text-[12.5px] font-extrabold text-[#16203a]">{title}</div>
+      <div className={`mb-1 grid ${cols} gap-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-[#8a94a6]`}>
+        <div>From</div>
+        <div>To</div>
+        <div>Bonus ₹</div>
+        {withReward && <div>Extra reward</div>}
+        <div />
+      </div>
+      {rows.map((t, i) => (
+        <div key={i} className={`mb-1.5 grid ${cols} items-center gap-1.5`}>
+          <NumberInput value={t.from} decimals={false} onChange={(n) => set(i, { from: n })} className={numCell} />
+          <NumberInput
+            value={t.to ?? 0}
+            decimals={false}
+            onChange={(n) => set(i, { to: n || null })}
+            className={numCell}
+            placeholder="∞"
+          />
+          <NumberInput value={t.bonus} onChange={(n) => set(i, { bonus: n })} className={numCell} />
+          {withReward && (
+            <input
+              value={t.reward ?? ""}
+              onChange={(e) => set(i, { reward: e.target.value })}
+              placeholder="e.g. Domestic trip for 2"
+              className={numCell}
+            />
+          )}
+          <button
+            onClick={() => setRows((p) => p.filter((_, j) => j !== i))}
+            disabled={rows.length === 1}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[#c2cad8] hover:text-[#dc2626] disabled:opacity-30"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={() => setRows((p) => [...p, { from: 1, to: null, bonus: 0, reward: "" }])}
+        className="mt-1 flex items-center gap-1.5 rounded-[9px] bg-[#eef4fe] px-3 py-1.5 text-[12px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+      >
+        <Plus size={13} /> Add tier
+      </button>
     </div>
   );
 }

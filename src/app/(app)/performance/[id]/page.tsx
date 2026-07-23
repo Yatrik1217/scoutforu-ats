@@ -12,6 +12,8 @@ import {
   periodRange,
   inRange,
   buildRecruiterStats,
+  buildClosureStatement,
+  fyStartYear,
   type PeriodKey,
 } from "@/lib/incentive";
 import { hexA } from "@/lib/domain";
@@ -95,12 +97,28 @@ export default async function RecruiterPerformancePage({
   );
 
   const basisLabel = settings?.basis === "booked" ? "fee booked" : "money collected";
+  const closureMode = settings?.mode === "closure";
+  const statement = closureMode
+    ? buildClosureStatement({
+        placements,
+        settings,
+        startYear: fyStartYear(new Date()),
+      })
+    : null;
 
   const cards: { label: string; value: string; sub: string; icon: LucideIcon; color: string }[] = [
     { label: "Fee Booked", value: moneyShort(stats.bookedFee), sub: `${stats.placements} hire${stats.placements === 1 ? "" : "s"}`, icon: TrendingUp, color: "#2a6fdb" },
     { label: "Collected", value: moneyShort(stats.collectedCash), sub: `${moneyShort(stats.collectedFee)} is fee`, icon: CircleCheckBig, color: "#16a34a" },
     { label: "Outstanding", value: moneyShort(stats.outstanding), sub: `${openPlacements.length} open`, icon: Wallet, color: "#e8833a" },
-    { label: "Incentive", value: money(stats.incentive), sub: `@ ${stats.incentiveRate}% on ${basisLabel}`, icon: HandCoins, color: "#8b5cf6" },
+    closureMode
+      ? {
+          label: `Incentive (${statement!.fyLabel})`,
+          value: money(statement!.total),
+          sub: `${statement!.annual.eligible} qualifying closure${statement!.annual.eligible === 1 ? "" : "s"}`,
+          icon: HandCoins,
+          color: "#8b5cf6",
+        }
+      : { label: "Incentive", value: money(stats.incentive), sub: `@ ${stats.incentiveRate}% on ${basisLabel}`, icon: HandCoins, color: "#8b5cf6" },
   ];
 
   return (
@@ -167,7 +185,112 @@ export default async function RecruiterPerformancePage({
         })}
       </div>
 
-      {/* incentive working */}
+      {/* closure-plan statement */}
+      {closureMode && statement && (
+        <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-[15px] font-extrabold">
+              Incentive statement · {statement.fyLabel}
+            </div>
+            {statement.pendingClosures > 0 && (
+              <span className="rounded-full bg-[#fffbeb] px-2.5 py-1 text-[11px] font-bold text-[#b45309]">
+                {statement.pendingClosures} closure{statement.pendingClosures > 1 ? "s" : ""} not
+                yet payable (awaiting tenure / payment)
+              </span>
+            )}
+          </div>
+
+          {/* quarters */}
+          <div className="mt-4 overflow-hidden rounded-[10px] border border-[#eef1f6]">
+            <div className="grid grid-cols-[70px_90px_100px_1fr_1fr_1fr] gap-2 bg-[#f8fafc] px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-[#8a94a6]">
+              <div>Quarter</div>
+              <div className="text-center">Qualifying</div>
+              <div className="text-right">Per closure</div>
+              <div className="text-right">Base</div>
+              <div className="text-right">Bonus</div>
+              <div className="text-right">Total</div>
+            </div>
+            {statement.quarters.map((q) => (
+              <div
+                key={q.label}
+                className="grid grid-cols-[70px_90px_100px_1fr_1fr_1fr] items-center gap-2 border-t border-[#f4f6fa] px-4 py-2.5 text-[12.5px]"
+              >
+                <div className="font-extrabold text-[#16203a]">{q.label}</div>
+                <div className="tf-num text-center font-bold">
+                  {q.eligible}
+                  {q.achieved > q.eligible && (
+                    <span className="ml-1 text-[10.5px] font-semibold text-[#b45309]">
+                      /{q.achieved}
+                    </span>
+                  )}
+                </div>
+                <div className="tf-num text-right text-[#7a8696]">
+                  {q.perClosure ? money(q.perClosure) : "—"}
+                </div>
+                <div className="tf-num text-right">{q.base ? money(q.base) : "—"}</div>
+                <div className="tf-num text-right text-[#16a34a]">
+                  {q.bonus ? money(q.bonus) : "—"}
+                </div>
+                <div className="tf-num text-right font-extrabold">
+                  {q.total ? money(q.total) : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* halves + annual */}
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-[10px] border border-[#eef1f6] p-4">
+              <div className="text-[12px] font-extrabold text-[#16203a]">Half-yearly bonus</div>
+              {statement.halves.map((h) => (
+                <div key={h.label} className="mt-2 flex items-baseline justify-between text-[12.5px]">
+                  <span className="text-[#7a8696]">
+                    {h.label} · <b className="text-[#42506b]">{h.eligible}</b>
+                    {h.note && (
+                      <span className="block text-[10.5px] text-[#b45309]">{h.note}</span>
+                    )}
+                  </span>
+                  <span className="tf-num font-bold">{h.bonus ? money(h.bonus) : "—"}</span>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-[10px] border border-[#eef1f6] p-4">
+              <div className="text-[12px] font-extrabold text-[#16203a]">Annual bonus</div>
+              <div className="mt-2 flex items-baseline justify-between text-[12.5px]">
+                <span className="text-[#7a8696]">
+                  {statement.annual.eligible} qualifying closures
+                  {statement.annual.reward && (
+                    <span className="block text-[10.5px] font-bold text-[#8b5cf6]">
+                      + {statement.annual.reward}
+                    </span>
+                  )}
+                </span>
+                <span className="tf-num font-bold">
+                  {statement.annual.bonus ? money(statement.annual.bonus) : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between rounded-[10px] bg-[#f3eefe] px-4 py-3">
+            <span className="text-[13px] font-extrabold text-[#16203a]">
+              Total incentive · {statement.fyLabel}
+            </span>
+            <span className="tf-num text-[17px] font-extrabold text-[#8b5cf6]">
+              {money(statement.total)}
+            </span>
+          </div>
+          <p className="mt-2 text-[11.5px] text-[#8a94a6]">
+            A closure qualifies once the candidate completes{" "}
+            <b>{settings?.min_tenure_days ?? 30} days</b>
+            {settings?.require_collected ? " and the client's invoice is fully settled" : ""}.
+            Cancelled placements and candidates who left inside the guarantee are excluded.
+          </p>
+        </div>
+      )}
+
+      {/* incentive working (percentage modes) */}
+      {!closureMode && (
       <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
         <div className="text-[15px] font-extrabold">Incentive working</div>
         <div className="mt-3 max-w-[520px] space-y-1.5 text-[13px]">
@@ -195,6 +318,7 @@ export default async function RecruiterPerformancePage({
           </p>
         </div>
       </div>
+      )}
 
       <div className="mt-[18px] grid grid-cols-[1.5fr_1fr] items-start gap-[18px]">
         {/* placements */}

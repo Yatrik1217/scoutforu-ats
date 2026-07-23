@@ -74,9 +74,11 @@ and Admin → General Settings → Email shows "Configured ✓".
   of fee booked / collected / outstanding / incentive per recruiter, filtered by
   month, quarter or **financial year (Apr–Mar)**. Click a recruiter for their
   placements, receipts and a step-by-step incentive working. Configure the scheme
-  in General Settings → **Recruiter Incentives**: pay on *money collected* or
-  *fee booked*, a flat % or slabs, plus per-recruiter overrides. Incentive is
-  always computed on the base fee (excl GST, before TDS).
+  in General Settings → **Recruiter Incentives**, in three modes: a flat %, slabs
+  on value, or **closure tiers** (quarterly per-closure rates + milestone bonus,
+  half-yearly and annual bonuses — all per recruiter, on FY quarters). A closure
+  counts only once the candidate completes the minimum tenure and the client's
+  invoice is settled. The plan text lives in `docs/incentive-plan-2026.md`.
 - **Placements & Revenue (Admin → Placements, Master Admin only)**: record each
   hire (candidate, client, date of joining, fee as % of CTC or a flat amount, GST),
   and the tracker computes what the client owes and when it's due (DOJ + 30/60/90

@@ -100,10 +100,19 @@ export const TERMS_PRESETS = [
   { days: 60, label: "Net 60" },
 ];
 
+// Calendar date as yyyy-mm-dd in LOCAL time. Never use toISOString() for this —
+// it converts to UTC and shifts the day backwards in IST (+05:30), which made
+// every due date land a day early.
+export function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 export function addDays(dateISO: string, days: number): string {
   const d = new Date(dateISO + "T00:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 export function nextRecurringDate(dateISO: string, freq: RecurringFrequency): string {
@@ -113,7 +122,7 @@ export function nextRecurringDate(dateISO: string, freq: RecurringFrequency): st
   else if (freq === "quarterly") d.setMonth(d.getMonth() + 3);
   else if (freq === "half_yearly") d.setMonth(d.getMonth() + 6);
   else d.setFullYear(d.getFullYear() + 1);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 // ---- receivables aging -------------------------------------------------------
