@@ -51,6 +51,7 @@ export type ProfileRow = {
   active: boolean;
   api_token: string | null;
   is_approver: boolean;
+  incentive_percent: number | null;
   created_at: string;
 };
 
@@ -431,6 +432,19 @@ export type PlacementEventRow = {
   created_at: string;
 };
 
+export type IncentiveBasis = "booked" | "collected";
+export type IncentiveMode = "flat" | "slab";
+export type IncentiveSlab = { upto: number | null; percent: number };
+
+export type IncentiveSettingsRow = {
+  id: boolean;
+  basis: IncentiveBasis;
+  mode: IncentiveMode;
+  flat_percent: number;
+  slabs: IncentiveSlab[];
+  updated_at: string;
+};
+
 export type AppSettingsRow = {
   id: boolean;
   email_notif: boolean;
@@ -472,6 +486,7 @@ export type Database = {
       placements: Table<PlacementRow>;
       placement_payments: Table<PlacementPaymentRow>;
       placement_events: Table<PlacementEventRow>;
+      incentive_settings: Table<IncentiveSettingsRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

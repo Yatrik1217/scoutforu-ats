@@ -31,6 +31,9 @@ the Invoices module (tables + numbering function). Until then the Invoices pages
 open but show "run migration 0019" when you try to save.
 **Pending: `0021_placements.sql`** — switches on the Placements & Revenue tracker
 (placements + payments + activity tables). Run it once in the SQL Editor too.
+Then `0022_placement_tds.sql` + `0023_tds_on_base_fee.sql` (TDS tracking) and
+`0024_incentives.sql` (recruiter incentive scheme). Note there are two files
+numbered `0021` — `0021_job_publish.sql` is a separate careers change; run both.
 
 ## 3. Environment variables
 
@@ -67,6 +70,13 @@ and Admin → General Settings → Email shows "Configured ✓".
   Admin → Résumé Import Token; extension settings in its popup.
 - **Bulk import**: General Settings → Import Data (Excel/CSV) or Bulk Upload (résumé PDFs, AI-parsed).
 - **Rejection reasons / custom fields / templates / org info / invoice details**: General Settings tiles.
+- **Recruiter Performance (Admin → Performance, Master Admin only)**: leaderboard
+  of fee booked / collected / outstanding / incentive per recruiter, filtered by
+  month, quarter or **financial year (Apr–Mar)**. Click a recruiter for their
+  placements, receipts and a step-by-step incentive working. Configure the scheme
+  in General Settings → **Recruiter Incentives**: pay on *money collected* or
+  *fee booked*, a flat % or slabs, plus per-recruiter overrides. Incentive is
+  always computed on the base fee (excl GST, before TDS).
 - **Placements & Revenue (Admin → Placements, Master Admin only)**: record each
   hire (candidate, client, date of joining, fee as % of CTC or a flat amount, GST),
   and the tracker computes what the client owes and when it's due (DOJ + 30/60/90
