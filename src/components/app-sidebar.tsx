@@ -18,6 +18,9 @@ import {
   ReceiptIndianRupee,
   HandCoins,
   Trophy,
+  IdCard,
+  CalendarDays,
+  BadgeIndianRupee,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor, ROLE_LABEL } from "@/lib/domain";
@@ -68,9 +71,18 @@ export function AppSidebar({
           { href: "/placements", label: "Placements", icon: HandCoins } as NavItem,
           { href: "/invoices", label: "Invoices", icon: ReceiptIndianRupee } as NavItem,
           { href: "/performance", label: "Performance", icon: Trophy } as NavItem,
+          { href: "/employees", label: "Employees", icon: IdCard } as NavItem,
+          { href: "/leaves", label: "Leave Requests", icon: CalendarDays } as NavItem,
+          { href: "/payroll", label: "Payroll", icon: BadgeIndianRupee } as NavItem,
         ]
       : []),
     { href: "/admin", label: "Admin", icon: SlidersHorizontal },
+  ];
+
+  // Everyone with a login gets their own leave and payslips.
+  const mine: NavItem[] = [
+    { href: "/my/leave", label: "My Leave", icon: CalendarDays },
+    { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
   ];
 
   const showAdmin = role !== "client";
@@ -114,6 +126,10 @@ export function AppSidebar({
 
       {showAdmin && (
         <>
+          <SectionLabel className="pt-3.5">Me</SectionLabel>
+          {mine.map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} />
+          ))}
           <SectionLabel className="pt-3.5">Administration</SectionLabel>
           {admin.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />

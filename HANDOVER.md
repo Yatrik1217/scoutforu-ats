@@ -70,6 +70,14 @@ and Admin → General Settings → Email shows "Configured ✓".
   Admin → Résumé Import Token; extension settings in its popup.
 - **Bulk import**: General Settings → Import Data (Excel/CSV) or Bulk Upload (résumé PDFs, AI-parsed).
 - **Rejection reasons / custom fields / templates / org info / invoice details**: General Settings tiles.
+- **Employee portal (Employees · Leave Requests · Payroll, Master Admin only)**:
+  staff records with monthly gross salary (Basic/HRA breakdown can be added
+  later), leave types with annual quotas, and a monthly payroll run. Staff apply
+  for leave from their own login (**My Leave**) and download payslips
+  (**My Payslips**) once a run is marked paid. Payroll pre-fills loss-of-pay from
+  approved unpaid leave and pulls each recruiter's incentive automatically —
+  earned this financial year minus whatever earlier payslips already paid, so it
+  can never double-pay. Payslips are generated as PDFs.
 - **Recruiter Performance (Admin → Performance, Master Admin only)**: leaderboard
   of fee booked / collected / outstanding / incentive per recruiter, filtered by
   month, quarter or **financial year (Apr–Mar)**. Click a recruiter for their

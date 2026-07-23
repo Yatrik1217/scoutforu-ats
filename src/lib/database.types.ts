@@ -467,6 +467,90 @@ export type IncentiveSettingsRow = {
   updated_at: string;
 };
 
+// ---- employee portal (HR & payroll) ----
+export type EmploymentStatus = "active" | "exited";
+// Employees allow part-time, which the jobs enum doesn't.
+export type EmployeeEmploymentType = "full_time" | "part_time" | "intern" | "contract";
+export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type PayrollStatus = "draft" | "finalised" | "paid";
+export type PayLine = { label: string; amount: number };
+
+export type EmployeeRow = {
+  id: string;
+  profile_id: string | null;
+  employee_code: string;
+  name: string;
+  email: string;
+  phone: string;
+  designation: string;
+  department: string;
+  employment_type: EmployeeEmploymentType;
+  joined_on: string | null;
+  exit_on: string | null;
+  status: EmploymentStatus;
+  monthly_gross: number;
+  components: Record<string, number>;
+  pan: string;
+  bank_account: string;
+  bank_ifsc: string;
+  uan: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeaveTypeRow = {
+  id: string;
+  name: string;
+  code: string;
+  annual_quota: number;
+  paid: boolean;
+  active: boolean;
+  sort: number;
+};
+
+export type LeaveRequestRow = {
+  id: string;
+  employee_id: string;
+  leave_type_id: string;
+  from_date: string;
+  to_date: string;
+  days: number;
+  half_day: boolean;
+  reason: string;
+  status: LeaveStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string;
+  created_at: string;
+};
+
+export type PayrollRunRow = {
+  id: string;
+  period_month: string;
+  status: PayrollStatus;
+  notes: string;
+  created_by: string | null;
+  finalised_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+};
+
+export type PayrollLineRow = {
+  id: string;
+  run_id: string;
+  employee_id: string;
+  monthly_gross: number;
+  total_days: number;
+  lop_days: number;
+  earned_gross: number;
+  incentive: number;
+  additions: PayLine[];
+  deductions: PayLine[];
+  net_pay: number;
+  notes: string;
+};
+
 export type AppSettingsRow = {
   id: boolean;
   email_notif: boolean;
@@ -509,6 +593,11 @@ export type Database = {
       placement_payments: Table<PlacementPaymentRow>;
       placement_events: Table<PlacementEventRow>;
       incentive_settings: Table<IncentiveSettingsRow>;
+      employees: Table<EmployeeRow>;
+      leave_types: Table<LeaveTypeRow>;
+      leave_requests: Table<LeaveRequestRow>;
+      payroll_runs: Table<PayrollRunRow>;
+      payroll_lines: Table<PayrollLineRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;
@@ -518,6 +607,7 @@ export type Database = {
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_staff: { Args: Record<string, never>; Returns: boolean };
       next_invoice_number: { Args: Record<string, never>; Returns: string };
+      my_employee_id: { Args: Record<string, never>; Returns: string };
     };
     Enums: {
       user_role: UserRole;
