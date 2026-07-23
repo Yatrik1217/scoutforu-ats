@@ -151,15 +151,12 @@ create policy leave_requests_self_cancel on public.leave_requests
 drop policy if exists payroll_runs_admin on public.payroll_runs;
 create policy payroll_runs_admin on public.payroll_runs
   for all using (public.is_admin()) with check (public.is_admin());
+-- Staff may see any non-draft run header (month + status only — no money is
+-- stored here). This must NOT reference payroll_lines: that table's own policy
+-- reads payroll_runs, and the two would recurse.
 drop policy if exists payroll_runs_self_read on public.payroll_runs;
 create policy payroll_runs_self_read on public.payroll_runs
-  for select using (
-    status <> 'draft'
-    and exists (
-      select 1 from public.payroll_lines l
-       where l.run_id = payroll_runs.id and l.employee_id = public.my_employee_id()
-    )
-  );
+  for select using (status <> 'draft');
 
 drop policy if exists payroll_lines_admin on public.payroll_lines;
 create policy payroll_lines_admin on public.payroll_lines
