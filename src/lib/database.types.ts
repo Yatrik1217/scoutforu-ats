@@ -444,6 +444,7 @@ export type FinancePaymentMethod =
   | "auto_debit"
   | "other";
 export type FinanceEmiStatus = "active" | "paused" | "closed";
+export type FinanceCommitmentType = "loan" | "insurance" | "sip";
 
 export type FinanceCategoryRow = {
   id: string;
@@ -477,10 +478,12 @@ export type FinanceExpenseRow = {
 export type FinanceEmiRow = {
   id: string;
   scope: FinanceScope;
+  type: FinanceCommitmentType;
   name: string;
   lender: string;
   category_id: string | null;
   principal: number;
+  current_value: number;
   emi_amount: number;
   interest_rate: number;
   total_installments: number;

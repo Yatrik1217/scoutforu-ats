@@ -167,22 +167,43 @@ function dateOnDay(year: number, month: number, day: number): Date {
   return new Date(year, month, Math.min(day, lastDay));
 }
 
-// Compute the next due date for an EMI given how many installments are paid.
-// The first due date is on `due_day` of the start month (or the next month if
-// the start day is already past the due day).
+// The next calendar occurrence of `dueDay` on or after `fromISO`.
+export function nextDueOnOrAfter(fromISO: string, dueDay: number): string {
+  const from = new Date(fromISO + "T00:00:00");
+  let d = dateOnDay(from.getFullYear(), from.getMonth(), dueDay);
+  if (d < from) d = dateOnDay(from.getFullYear(), from.getMonth() + 1, dueDay);
+  return toISODate(d);
+}
+
+// Next due date = the next occurrence of due_day on/after today (never in the
+// past for an active commitment), but not before it has started. This is
+// calendar-anchored — it does NOT drift with how many installments are paid,
+// which is what users expect ("show me next month's date"). Returns null once a
+// finite loan is fully paid or the commitment is closed.
 export function computeNextDue(
   emi: Pick<FinanceEmiRow, "start_date" | "due_day" | "paid_installments" | "total_installments" | "status">,
+  today = new Date(),
 ): string | null {
   if (emi.status === "closed") return null;
   if (emi.total_installments > 0 && emi.paid_installments >= emi.total_installments)
     return null;
-  const start = new Date(emi.start_date + "T00:00:00");
-  const first = dateOnDay(start.getFullYear(), start.getMonth(), emi.due_day);
-  // if the loan started after the due day of its first month, first EMI is next month
-  const baseMonthOffset = start.getDate() > emi.due_day ? 1 : 0;
-  const idx = baseMonthOffset + emi.paid_installments;
-  const due = dateOnDay(first.getFullYear(), first.getMonth() + idx, emi.due_day);
-  return toISODate(due);
+  const todayISO = toISODate(startOfDay(today));
+  const anchor = emi.start_date > todayISO ? emi.start_date : todayISO;
+  return nextDueOnOrAfter(anchor, emi.due_day);
+}
+
+// After a payment, move the due date forward by one cycle: to the next
+// occurrence of due_day strictly after the later of (current due, today).
+export function advanceAfterPayment(
+  currentNextDue: string | null,
+  dueDay: number,
+  today = new Date(),
+): string {
+  const todayISO = toISODate(startOfDay(today));
+  const base = !currentNextDue || currentNextDue < todayISO ? todayISO : currentNextDue;
+  const next = new Date(base + "T00:00:00");
+  next.setDate(next.getDate() + 1);
+  return nextDueOnOrAfter(toISODate(next), dueDay);
 }
 
 export function emiRemainingCount(emi: Pick<FinanceEmiRow, "total_installments" | "paid_installments">): number {
@@ -201,6 +222,49 @@ export function emiProgress(emi: Pick<FinanceEmiRow, "total_installments" | "pai
   return Math.min(1, emi.paid_installments / emi.total_installments);
 }
 
+// ---- investments (type = 'sip') ----------------------------------------------
+// Amount put in so far: an optional starting lump (principal) plus every monthly
+// contribution recorded (paid_installments × contribution).
+export function investedAmount(
+  emi: Pick<FinanceEmiRow, "principal" | "paid_installments" | "emi_amount">,
+): number {
+  return round2((emi.principal || 0) + emi.paid_installments * (emi.emi_amount || 0));
+}
+
+// Gain/loss of an investment = current value − amount invested.
+export function investmentGain(
+  emi: Pick<FinanceEmiRow, "principal" | "paid_installments" | "emi_amount" | "current_value">,
+): { invested: number; value: number; gain: number; pct: number } {
+  const invested = investedAmount(emi);
+  const value = round2(emi.current_value || 0);
+  const gain = round2(value - invested);
+  return { invested, value, gain, pct: invested > 0 ? gain / invested : 0 };
+}
+
+// Roll up a set of investments into one portfolio summary.
+export function portfolioSummary(emis: FinanceEmiRow[]): {
+  invested: number;
+  value: number;
+  gain: number;
+  pct: number;
+  monthly: number;
+} {
+  const sips = emis.filter((e) => e.type === "sip");
+  let invested = 0;
+  let value = 0;
+  let monthly = 0;
+  for (const e of sips) {
+    const g = investmentGain(e);
+    invested += g.invested;
+    value += g.value;
+    if (e.status === "active") monthly += e.emi_amount || 0;
+  }
+  invested = round2(invested);
+  value = round2(value);
+  const gain = round2(value - invested);
+  return { invested, value, gain, pct: invested > 0 ? gain / invested : 0, monthly: round2(monthly) };
+}
+
 export function daysUntil(dateISO: string | null, today = new Date()): number | null {
   if (!dateISO) return null;
   return Math.round((+new Date(dateISO + "T00:00:00") - +startOfDay(today)) / 86_400_000);
@@ -210,11 +274,12 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// Total of EMIs due within the next `days` (active loans only).
+// Loans & insurance premiums due within the next `days` (money going OUT).
+// SIPs are investments, not bills, so they're excluded here.
 export function emisDueSoon(emis: FinanceEmiRow[], days = 30, today = new Date()): FinanceEmiRow[] {
   return emis
     .filter((e) => {
-      if (e.status !== "active" || !e.next_due_date) return false;
+      if (e.type === "sip" || e.status !== "active" || !e.next_due_date) return false;
       const d = daysUntil(e.next_due_date, today);
       return d !== null && d <= days;
     })
