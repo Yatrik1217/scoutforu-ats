@@ -22,6 +22,7 @@ import {
   CalendarDays,
   CalendarCheck,
   BadgeIndianRupee,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor, ROLE_LABEL } from "@/lib/domain";
@@ -76,6 +77,7 @@ export function AppSidebar({
           { href: "/attendance", label: "Attendance", icon: CalendarCheck } as NavItem,
           { href: "/leaves", label: "Leave Requests", icon: CalendarDays } as NavItem,
           { href: "/payroll", label: "Payroll", icon: BadgeIndianRupee } as NavItem,
+          { href: "/finance", label: "Finance", icon: Wallet } as NavItem,
           { href: "/admin", label: "Admin", icon: SlidersHorizontal } as NavItem,
         ]
       : []),

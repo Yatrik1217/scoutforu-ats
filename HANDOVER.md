@@ -34,6 +34,11 @@ open but show "run migration 0019" when you try to save.
 Then `0022_placement_tds.sql` + `0023_tds_on_base_fee.sql` (TDS tracking) and
 `0024_incentives.sql` (recruiter incentive scheme). Note there are two files
 numbered `0021` — `0021_job_publish.sql` is a separate careers change; run both.
+**Pending: `0033_finance.sql`** — switches on the **Finance** module (expense &
+P&L tracker at `/finance`). Paste it into the SQL Editor once. It creates
+`finance_categories`, `finance_expenses`, `finance_emis` (all Master-Admin-only
+via RLS) and seeds default personal + company categories. Until it's run, the
+`/finance` pages open but stay empty and saving an entry errors.
 
 ## 3. Environment variables
 
@@ -103,6 +108,25 @@ and Admin → General Settings → Email shows "Configured ✓".
   duplicate, void, write off · **Recurring** profiles auto-draft retainer invoices
   when their date arrives. Numbering/GSTIN/PAN/bank details come from General
   Settings → Invoice Setting.
+- **Finance (Finance in the sidebar, or `/finance`, Master Admin only)**: a
+  **separate product surface** with its own green-accented shell, sitting beside
+  the ATS but owner-only (personal money lives here, so no recruiter/client can
+  see it). Two separate books tracked side by side:
+  - **Personal** — home, petrol, groceries, EMIs and everyday spend/income.
+  - **Company (ScoutforU)** — operating expenses, with a real **P&L and EBITDA**.
+    Company **revenue is pulled automatically** from placement receipts
+    (`placement_payments`) for the chosen period — no double entry. EBITDA =
+    revenue − operating expenses; categories flagged *"below EBITDA"* (Interest,
+    Taxes, Depreciation) are excluded so the figure is correct, and Net Profit
+    subtracts them. Toggle **This FY / This month** on the dashboard & company page.
+  - **EMIs & Loans** — record each loan (monthly EMI, total installments, due day,
+    start date); the tracker shows the **next due date, days-to-due, outstanding
+    balance and repayment progress**. **Pay EMI** advances the schedule and drops a
+    matching expense line into the ledger so the P&L reflects it automatically.
+  - **Categories** — manage the expense heads for both books; mark company
+    Interest/Tax/Depreciation as *below EBITDA*.
+  Needs migration `0033_finance.sql` (§2). Built as a route group so it shares your
+  one login and Vercel deploy but is its own dashboard — `/finance`.
 
 ## 6. Troubleshooting
 

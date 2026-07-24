@@ -432,6 +432,69 @@ export type PlacementEventRow = {
   created_at: string;
 };
 
+// ---- Finance (expense & P&L tracker, /finance) -------------------------------
+export type FinanceScope = "personal" | "company";
+export type FinanceCategoryKind = "expense" | "income";
+export type FinancePaymentMethod =
+  | "bank_transfer"
+  | "upi"
+  | "cheque"
+  | "cash"
+  | "card"
+  | "auto_debit"
+  | "other";
+export type FinanceEmiStatus = "active" | "paused" | "closed";
+
+export type FinanceCategoryRow = {
+  id: string;
+  scope: FinanceScope;
+  name: string;
+  kind: FinanceCategoryKind;
+  color: string;
+  ebitda_addback: boolean;
+  sort: number;
+  archived: boolean;
+  created_at: string;
+};
+
+export type FinanceExpenseRow = {
+  id: string;
+  scope: FinanceScope;
+  category_id: string | null;
+  is_income: boolean;
+  title: string;
+  amount: number;
+  txn_date: string;
+  payment_method: FinancePaymentMethod;
+  payee: string;
+  notes: string;
+  emi_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinanceEmiRow = {
+  id: string;
+  scope: FinanceScope;
+  name: string;
+  lender: string;
+  category_id: string | null;
+  principal: number;
+  emi_amount: number;
+  interest_rate: number;
+  total_installments: number;
+  paid_installments: number;
+  start_date: string;
+  due_day: number;
+  next_due_date: string | null;
+  status: FinanceEmiStatus;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type IncentiveBasis = "booked" | "collected";
 export type IncentiveMode = "flat" | "slab" | "closure";
 export type IncentiveSlab = { upto: number | null; percent: number };
@@ -638,6 +701,9 @@ export type Database = {
       attendance: Table<AttendanceRow>;
       attendance_settings: Table<AttendanceSettingsRow>;
       app_settings: Table<AppSettingsRow>;
+      finance_categories: Table<FinanceCategoryRow>;
+      finance_expenses: Table<FinanceExpenseRow>;
+      finance_emis: Table<FinanceEmiRow>;
     };
     Views: Record<string, never>;
     Functions: {
