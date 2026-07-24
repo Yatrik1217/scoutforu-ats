@@ -11,6 +11,8 @@ import {
   breakMinutes,
   grossMinutes,
   netMinutes,
+  firstIn,
+  lastOut,
 } from "@/lib/hr";
 import { CheckInCard, AttendancePill } from "@/components/attendance-widgets";
 import type { AttendanceRow, EmployeeRow } from "@/lib/database.types";
@@ -100,8 +102,8 @@ export default async function MyAttendancePage() {
             <div className="text-[12.5px] font-bold text-[#16203a]">
               {format(new Date(r.on_date + "T00:00:00"), "EEE, dd MMM")}
             </div>
-            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(r.check_in_at)}</div>
-            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(r.check_out_at)}</div>
+            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(firstIn(r))}</div>
+            <div className="tf-num text-[12px] text-[#42506b]">{formatClock(lastOut(r))}</div>
             <div className="tf-num text-center text-[12px] text-[#e8833a]">
               {r.check_in_at ? formatDuration(breakMinutes(r)) : "—"}
             </div>

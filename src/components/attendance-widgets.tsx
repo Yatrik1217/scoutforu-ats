@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut, Coffee, Play } from "lucide-react";
+import { LogIn, Coffee } from "lucide-react";
 import { toast } from "sonner";
-import { checkIn, checkOut, setAttendance, startBreak, endBreak } from "@/lib/actions/hr";
+import { checkIn, checkOut, setAttendance } from "@/lib/actions/hr";
 import {
   ATTENDANCE_META,
   ATTENDANCE_CYCLE,
-  openBreak,
+  openSession,
+  sessionsOf,
+  firstIn,
+  lastOut,
   elapsedMinutes,
   formatClock,
   formatDuration,
@@ -31,9 +34,9 @@ export function CheckInCard({ today }: { today: AttendanceRow | null }) {
       } else toast.error(res.error || "Failed");
     });
 
-  const checkedIn = !!today?.check_in_at;
-  const checkedOut = !!today?.check_out_at;
-  const onBreak = today ? !!openBreak(today) : false;
+  const sessions = today ? sessionsOf(today) : [];
+  const isIn = today ? !!openSession(today) : false;
+  const steppedOut = sessions.length > 0 && !isIn;
   const live = today ? elapsedMinutes(today) : null;
 
   const stat = (label: string, value: string, color = "#16203a") => (
@@ -57,72 +60,62 @@ export function CheckInCard({ today }: { today: AttendanceRow | null }) {
                 month: "long",
               })}
             </span>
-            {onBreak && (
-              <span className="rounded-full bg-[#fff7ed] px-2.5 py-1 text-[11px] font-bold text-[#e8833a]">
-                On break
+            {isIn ? (
+              <span className="rounded-full bg-[#e9f9ef] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">
+                Clocked in
               </span>
-            )}
+            ) : steppedOut ? (
+              <span className="rounded-full bg-[#fff7ed] px-2.5 py-1 text-[11px] font-bold text-[#e8833a]">
+                On a break
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-3 flex flex-wrap items-start gap-x-8 gap-y-3">
-            {stat("Check in", formatClock(today?.check_in_at))}
-            {stat("Check out", formatClock(today?.check_out_at))}
+            {stat("First in", formatClock(firstIn(today ?? { sessions: [], check_in_at: null, check_out_at: null })))}
+            {stat("Last out", isIn ? "—" : formatClock(lastOut(today ?? { sessions: [], check_in_at: null, check_out_at: null })))}
             {stat("Break", live ? formatDuration(live.brk) : "—", "#e8833a")}
             {stat("Gross", live ? formatDuration(live.gross) : "—", "#2a6fdb")}
-            {stat("Net", live ? formatDuration(live.net) : "—", "#16a34a")}
+            {stat("Net worked", live ? formatDuration(live.net) : "—", "#16a34a")}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!checkedIn ? (
+          {isIn ? (
+            <button
+              onClick={() => run(checkOut)}
+              disabled={pending}
+              className="flex items-center gap-2 rounded-[10px] bg-[#e8833a] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(232,131,58,.3)] hover:bg-[#d4762f] disabled:opacity-60"
+            >
+              <Coffee size={16} /> {pending ? "…" : "Step out"}
+            </button>
+          ) : (
             <button
               onClick={() => run(checkIn)}
               disabled={pending}
               className="flex items-center gap-2 rounded-[10px] bg-[#16a34a] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(22,163,74,.3)] hover:bg-[#15803d] disabled:opacity-60"
             >
-              <LogIn size={16} /> {pending ? "…" : "Check in"}
+              <LogIn size={16} />{" "}
+              {pending ? "…" : steppedOut ? "Check in again" : "Check in"}
             </button>
-          ) : checkedOut ? (
-            <span className="rounded-[10px] bg-[#f1f4f9] px-5 py-3 text-[13px] font-bold text-[#7a8696]">
-              Day complete ✓
-            </span>
-          ) : (
-            <>
-              {onBreak ? (
-                <button
-                  onClick={() => run(endBreak)}
-                  disabled={pending}
-                  className="flex items-center gap-2 rounded-[10px] bg-[#e8833a] px-5 py-3 text-[13.5px] font-bold text-white hover:bg-[#d4762f] disabled:opacity-60"
-                >
-                  <Play size={15} /> {pending ? "…" : "End break"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => run(startBreak)}
-                  disabled={pending}
-                  className="flex items-center gap-2 rounded-[10px] border border-[#e6eaf1] bg-white px-5 py-3 text-[13.5px] font-bold text-[#42506b] hover:bg-[#f6f8fb] disabled:opacity-60"
-                >
-                  <Coffee size={15} /> Lunch / break
-                </button>
-              )}
-              <button
-                onClick={() => run(checkOut)}
-                disabled={pending}
-                className="flex items-center gap-2 rounded-[10px] bg-[#2a6fdb] px-6 py-3 text-[14px] font-bold text-white shadow-[0_4px_14px_rgba(42,111,219,.3)] hover:bg-[#245fc0] disabled:opacity-60"
-              >
-                <LogOut size={16} /> {pending ? "…" : "Check out"}
-              </button>
-            </>
           )}
         </div>
       </div>
 
-      {checkedIn && !checkedOut && (today?.breaks ?? []).length > 0 && (
-        <div className="mt-4 border-t border-[#f0f3f8] pt-3 text-[11.5px] text-[#8a94a6]">
-          Breaks today:{" "}
-          {(today?.breaks ?? [])
-            .map((b) => `${formatClock(b.start)} – ${b.end ? formatClock(b.end) : "running"}`)
-            .join(" · ")}
+      {sessions.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-[#f0f3f8] pt-3 text-[11.5px] text-[#8a94a6]">
+          <span className="font-bold text-[#42506b]">Today:</span>
+          {sessions.map((s, i) => (
+            <span
+              key={i}
+              className="rounded-[6px] bg-[#f6f8fb] px-2 py-1 font-semibold text-[#42506b]"
+            >
+              {formatClock(s.in)} – {s.out ? formatClock(s.out) : "now"}
+            </span>
+          ))}
+          <span className="text-[#a3acbd]">
+            · gaps between these count as break time, not worked time
+          </span>
         </div>
       )}
     </div>

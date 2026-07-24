@@ -2,7 +2,7 @@
 // Safe for both server and client components.
 import { round2, toISODate } from "@/lib/invoice";
 import type {
-  AttendanceBreak,
+  AttendanceSession,
   AttendanceRow,
   AttendanceStatus,
   EmployeeRow,
@@ -240,66 +240,88 @@ export function formatDuration(minutes: number | null): string {
   return rem ? `${h}h ${rem}m` : `${h}h`;
 }
 
-const minutesBetween = (a: string, b: string) =>
-  (+new Date(b) - +new Date(a)) / 60_000;
+// ---- work sessions --------------------------------------------------------------
+//
+// A day is a list of in/out sessions. Stepping out for tea and coming back is
+// simply a new session — the gap between them is the break. Rows created before
+// sessions existed fall back to their single check-in/check-out pair.
+type TimeRow = Pick<AttendanceRow, "sessions" | "check_in_at" | "check_out_at">;
 
-// The break currently running, if any.
-export function openBreak(row: Pick<AttendanceRow, "breaks">): AttendanceBreak | null {
-  const list = row.breaks ?? [];
-  const last = list[list.length - 1];
-  return last && !last.end ? last : null;
+export function sessionsOf(row: TimeRow): AttendanceSession[] {
+  const list = (row.sessions ?? []).filter((s) => s?.in);
+  if (list.length) return list;
+  return row.check_in_at ? [{ in: row.check_in_at, out: row.check_out_at }] : [];
 }
 
-// Total break minutes, clamped to the work window so a mis-entered break can
-// never make net hours negative or exceed the day.
-export function breakMinutes(
-  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
-  now = new Date(),
-): number {
-  if (!row.check_in_at) return 0;
-  const start = +new Date(row.check_in_at);
-  const end = row.check_out_at ? +new Date(row.check_out_at) : +now;
-  if (end <= start) return 0;
+// The session the person is currently inside, if any.
+export function openSession(row: TimeRow): AttendanceSession | null {
+  const list = sessionsOf(row);
+  const last = list[list.length - 1];
+  return last && !last.out ? last : null;
+}
 
+export const firstIn = (row: TimeRow): string | null => sessionsOf(row)[0]?.in ?? null;
+export const lastOut = (row: TimeRow): string | null => {
+  const list = sessionsOf(row);
+  const last = list[list.length - 1];
+  return last?.out ?? null;
+};
+
+// Time actually worked — the sessions added up. An open session counts to now.
+export function workedMinutes(row: TimeRow, now = new Date()): number | null {
+  const list = sessionsOf(row);
+  if (!list.length) return null;
   let total = 0;
-  for (const b of row.breaks ?? []) {
-    if (!b.start) continue;
-    // A break left open is counted up to check-out (or now).
-    const bStart = Math.max(start, Math.min(+new Date(b.start), end));
-    const bEnd = Math.min(end, b.end ? +new Date(b.end) : end);
-    if (bEnd > bStart) total += (bEnd - bStart) / 60_000;
+  for (const s of list) {
+    const start = +new Date(s.in);
+    const end = s.out ? +new Date(s.out) : +now;
+    if (end > start) total += (end - start) / 60_000;
   }
   return Math.round(total);
 }
 
-// Check-in to check-out. Works across midnight because both are timestamps.
-export function grossMinutes(
-  row: Pick<AttendanceRow, "check_in_at" | "check_out_at">,
-): number | null {
-  if (!row.check_in_at || !row.check_out_at) return null;
-  const m = minutesBetween(row.check_in_at, row.check_out_at);
+// Arrival to departure, breaks included. Open day measures to now.
+export function spanMinutes(row: TimeRow, now = new Date()): number | null {
+  const start = firstIn(row);
+  if (!start) return null;
+  const end = openSession(row) ? +now : +new Date(lastOut(row) ?? start);
+  const m = (end - +new Date(start)) / 60_000;
   return m > 0 ? Math.round(m) : 0;
 }
 
-// Gross minus break time, never below zero.
-export function netMinutes(
-  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
-): number | null {
-  const gross = grossMinutes(row);
-  if (gross == null) return null;
-  return Math.max(0, gross - breakMinutes(row));
+// The gaps between sessions.
+export function breakMinutes(row: TimeRow, now = new Date()): number {
+  const span = spanMinutes(row, now);
+  const worked = workedMinutes(row, now);
+  if (span == null || worked == null) return 0;
+  return Math.max(0, span - worked);
 }
 
-// Live elapsed time for a day still in progress (used on the check-in card).
+// Gross = arrival to departure. Only final once the day has ended.
+export function grossMinutes(row: TimeRow): number | null {
+  if (!firstIn(row)) return null;
+  if (openSession(row)) return null;
+  return spanMinutes(row);
+}
+
+// Net = time actually worked.
+export function netMinutes(row: TimeRow): number | null {
+  if (!firstIn(row)) return null;
+  if (openSession(row)) return null;
+  return workedMinutes(row);
+}
+
+// Live figures for the card while the day is still running.
 export function elapsedMinutes(
-  row: Pick<AttendanceRow, "breaks" | "check_in_at" | "check_out_at">,
+  row: TimeRow,
   now = new Date(),
 ): { gross: number; brk: number; net: number } | null {
-  if (!row.check_in_at) return null;
-  const end = row.check_out_at ? +new Date(row.check_out_at) : +now;
-  const gross = Math.max(0, Math.round((end - +new Date(row.check_in_at)) / 60_000));
-  const brk = breakMinutes(row, now);
-  return { gross, brk, net: Math.max(0, gross - brk) };
+  if (!firstIn(row)) return null;
+  return {
+    gross: spanMinutes(row, now) ?? 0,
+    brk: breakMinutes(row, now),
+    net: workedMinutes(row, now) ?? 0,
+  };
 }
 
 export const sumLines = (rows: PayLine[] | null | undefined) =>

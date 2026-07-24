@@ -483,6 +483,8 @@ export type AttendanceStatus =
 
 // A break still in progress has end === null.
 export type AttendanceBreak = { start: string; end: string | null };
+// One stretch at work. `out` is null while the person is currently in.
+export type AttendanceSession = { in: string; out: string | null };
 
 export type AttendanceRow = {
   id: string;
@@ -492,6 +494,7 @@ export type AttendanceRow = {
   check_in_at: string | null;
   check_out_at: string | null;
   breaks: AttendanceBreak[];
+  sessions: AttendanceSession[];
   note: string;
   marked_by: string | null;
   created_at: string;

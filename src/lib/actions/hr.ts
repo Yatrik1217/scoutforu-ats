@@ -12,7 +12,9 @@ import {
   incentiveDue,
   onProbation,
   probationEndsOn,
-  openBreak,
+  openSession,
+  sessionsOf,
+  workedMinutes,
   formatDuration,
 } from "@/lib/hr";
 import { buildClosureStatement, buildRecruiterStats, fyStartYear, fyRange } from "@/lib/incentive";
@@ -284,6 +286,7 @@ async function myEmployee(sb: Awaited<ReturnType<typeof createClient>>, userId: 
 
 // Self check-in for today. Creates today's row (or fills in the time if the
 // admin already marked the day).
+// Check in, or come back after stepping out. Each arrival is a new session.
 export async function checkIn(): Promise<Result> {
   const { sb, userId } = await currentUser();
   if (!userId) return { ok: false, error: "Not signed in." };
@@ -294,28 +297,41 @@ export async function checkIn(): Promise<Result> {
   const today = toISODate(new Date());
   const { data: existing } = await sb
     .from("attendance")
-    .select("id,check_in_at")
+    .select("*")
     .eq("employee_id", me.id)
     .eq("on_date", today)
     .maybeSingle();
+  const row = existing as AttendanceRow | null;
 
-  if (existing?.check_in_at) return { ok: false, error: "You've already checked in today." };
+  if (row && openSession(row)) return { ok: false, error: "You're already checked in." };
 
   const now = new Date().toISOString();
-  const { error } = existing
+  const sessions = [...(row ? sessionsOf(row) : []), { in: now, out: null }];
+  const resuming = sessions.length > 1;
+
+  const { error } = row
     ? await sb
         .from("attendance")
-        .update({ status: "present", check_in_at: now })
-        .eq("id", existing.id)
+        .update({
+          status: "present",
+          sessions,
+          check_in_at: row.check_in_at ?? now,
+          check_out_at: null, // the day is running again
+        })
+        .eq("id", row.id)
     : await sb.from("attendance").insert({
         employee_id: me.id,
         on_date: today,
         status: "present",
+        sessions,
         check_in_at: now,
       });
   if (error) return { ok: false, error: error.message };
   refresh();
-  return { ok: true, message: "Checked in — have a good day" };
+  return {
+    ok: true,
+    message: resuming ? "Welcome back — clock running again" : "Checked in — have a good day",
+  };
 }
 
 // The shift still running: today's row, or yesterday's if someone checked in
@@ -339,6 +355,8 @@ async function openShift(
   return data as AttendanceRow | null;
 }
 
+// Step out — closes the current session. Coming back is just another check-in,
+// so this is used for lunch, tea and leaving for the day alike.
 export async function checkOut(): Promise<Result> {
   const { sb, userId } = await currentUser();
   if (!userId) return { ok: false, error: "Not signed in." };
@@ -346,74 +364,21 @@ export async function checkOut(): Promise<Result> {
   if (!me) return { ok: false, error: "No employee record is linked to your login." };
 
   const shift = await openShift(sb, me.id);
-  if (!shift) {
-    const { data: done } = await sb
-      .from("attendance")
-      .select("check_out_at")
-      .eq("employee_id", me.id)
-      .eq("on_date", toISODate(new Date()))
-      .maybeSingle();
-    return {
-      ok: false,
-      error: done?.check_out_at ? "You've already checked out today." : "Check in first.",
-    };
-  }
+  if (!shift) return { ok: false, error: "You're not checked in." };
 
   const now = new Date().toISOString();
-  // Close any break still running, so net hours can't be overstated.
-  const breaks = (shift.breaks ?? []).map((b, i, arr) =>
-    i === arr.length - 1 && !b.end ? { ...b, end: now } : b,
+  const sessions = sessionsOf(shift).map((s, i, arr) =>
+    i === arr.length - 1 && !s.out ? { ...s, out: now } : s,
   );
 
   const { error } = await sb
     .from("attendance")
-    .update({ check_out_at: now, breaks })
+    .update({ check_out_at: now, sessions })
     .eq("id", shift.id);
   if (error) return { ok: false, error: error.message };
   refresh();
-  const closed = openBreak(shift) ? " (your open break was closed)" : "";
-  return { ok: true, message: `Checked out${closed}` };
-}
-
-// ---- breaks --------------------------------------------------------------------
-
-export async function startBreak(): Promise<Result> {
-  const { sb, userId } = await currentUser();
-  if (!userId) return { ok: false, error: "Not signed in." };
-  const me = await myEmployee(sb, userId);
-  if (!me) return { ok: false, error: "No employee record is linked to your login." };
-
-  const shift = await openShift(sb, me.id);
-  if (!shift) return { ok: false, error: "Check in before starting a break." };
-  if (openBreak(shift)) return { ok: false, error: "You're already on a break." };
-
-  const breaks = [...(shift.breaks ?? []), { start: new Date().toISOString(), end: null }];
-  const { error } = await sb.from("attendance").update({ breaks }).eq("id", shift.id);
-  if (error) return { ok: false, error: error.message };
-  refresh();
-  return { ok: true, message: "Break started" };
-}
-
-export async function endBreak(): Promise<Result> {
-  const { sb, userId } = await currentUser();
-  if (!userId) return { ok: false, error: "Not signed in." };
-  const me = await myEmployee(sb, userId);
-  if (!me) return { ok: false, error: "No employee record is linked to your login." };
-
-  const shift = await openShift(sb, me.id);
-  if (!shift) return { ok: false, error: "No shift is running." };
-  const open = openBreak(shift);
-  if (!open) return { ok: false, error: "You're not on a break." };
-
-  const now = new Date().toISOString();
-  const breaks = (shift.breaks ?? []).map((b, i, arr) =>
-    i === arr.length - 1 && !b.end ? { ...b, end: now } : b,
-  );
-  const { error } = await sb.from("attendance").update({ breaks }).eq("id", shift.id);
-  if (error) return { ok: false, error: error.message };
-  refresh();
-  const mins = Math.max(0, Math.round((+new Date(now) - +new Date(open.start)) / 60_000));
-  return { ok: true, message: `Break ended — ${formatDuration(mins)}` };
+  const worked = workedMinutes({ ...shift, sessions, check_out_at: now });
+  return { ok: true, message: `Stepped out — ${formatDuration(worked)} worked so far` };
 }
 
 // Admin marking a day on the register (also used to clear it).
