@@ -8,9 +8,13 @@ import type { EmployeeRow, PayrollLineRow, PayrollRunRow } from "@/lib/database.
 export const dynamic = "force-dynamic";
 
 export default async function MyPayslipsPage() {
-  await requireProfile();
+  const me = await requireProfile();
   const sb = await createClient();
-  const { data: emp } = await sb.from("employees").select("*").maybeSingle();
+  const { data: emp } = await sb
+    .from("employees")
+    .select("*")
+    .eq("profile_id", me.id)
+    .maybeSingle();
   const employee = emp as EmployeeRow | null;
 
   // RLS returns only this employee's lines, and only for non-draft runs.

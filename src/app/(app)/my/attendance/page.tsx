@@ -22,10 +22,12 @@ import type { AttendanceRow, AttendanceSettingsRow, EmployeeRow } from "@/lib/da
 export const dynamic = "force-dynamic";
 
 export default async function MyAttendancePage() {
-  await requireProfile();
+  const me = await requireProfile();
   const sb = await createClient();
+  // Filter by our own profile — an admin can see every employee row via RLS,
+  // so an unfiltered maybeSingle() would fail on more than one row.
   const [{ data: emp }, { data: shiftData }] = await Promise.all([
-    sb.from("employees").select("*").maybeSingle(),
+    sb.from("employees").select("*").eq("profile_id", me.id).maybeSingle(),
     sb.from("attendance_settings").select("*").maybeSingle(),
   ]);
   const employee = emp as EmployeeRow | null;

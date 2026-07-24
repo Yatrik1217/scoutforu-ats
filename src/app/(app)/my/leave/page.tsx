@@ -17,9 +17,13 @@ export const dynamic = "force-dynamic";
 const fmtD = (d: string) => format(new Date(d + "T00:00:00"), "dd MMM yy");
 
 export default async function MyLeavePage() {
-  await requireProfile();
+  const me = await requireProfile();
   const sb = await createClient();
-  const { data: emp } = await sb.from("employees").select("*").maybeSingle();
+  const { data: emp } = await sb
+    .from("employees")
+    .select("*")
+    .eq("profile_id", me.id)
+    .maybeSingle();
   const employee = emp as EmployeeRow | null;
 
   const [{ data: typeData }, { data: reqData }] = await Promise.all([
