@@ -91,9 +91,9 @@ export function AppSidebar({
   const showAdmin = role !== "client";
 
   return (
-    <aside className="flex w-[248px] shrink-0 flex-col gap-1.5 bg-[#0e1320] p-[20px_14px]">
+    <aside className="flex h-screen w-[248px] shrink-0 flex-col bg-[#0e1320] p-[20px_14px]">
       {/* logo */}
-      <div className="flex items-center gap-[11px] px-2 pt-1.5 pb-[18px]">
+      <div className="flex shrink-0 items-center gap-[11px] px-2 pt-1.5 pb-[18px]">
         <div
           className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] shadow-[0_4px_14px_rgba(42,111,219,.45)]"
           style={{ background: "linear-gradient(135deg,#2A6FDB,#5b96f0)" }}
@@ -122,26 +122,29 @@ export function AppSidebar({
         </div>
       </div>
 
-      <SectionLabel>Workspace</SectionLabel>
-      {workspace.map((item) => (
-        <NavLink key={item.href} item={item} pathname={pathname} />
-      ))}
+      {/* scrollable nav — the item list can exceed the viewport once HR is on */}
+      <nav className="sc-scroll -mr-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-2">
+        <SectionLabel>Workspace</SectionLabel>
+        {workspace.map((item) => (
+          <NavLink key={item.href} item={item} pathname={pathname} />
+        ))}
 
-      {showAdmin && (
-        <>
-          <SectionLabel className="pt-3.5">Me</SectionLabel>
-          {mine.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
-          ))}
-          <SectionLabel className="pt-3.5">Administration</SectionLabel>
-          {admin.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
-          ))}
-        </>
-      )}
+        {showAdmin && (
+          <>
+            <SectionLabel className="pt-3.5">Me</SectionLabel>
+            {mine.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
+            <SectionLabel className="pt-3.5">Administration</SectionLabel>
+            {admin.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </>
+        )}
+      </nav>
 
       {/* user card */}
-      <div className="mt-auto flex items-center gap-2.5 rounded-xl bg-[#171d2e] p-[11px_10px]">
+      <div className="mt-1.5 flex shrink-0 items-center gap-2.5 rounded-xl bg-[#171d2e] p-[11px_10px]">
         <div
           className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-[13px] font-bold text-white"
           style={{ background: avatarColor(name) }}
