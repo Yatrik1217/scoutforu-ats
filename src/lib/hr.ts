@@ -3,6 +3,7 @@
 import { round2, toISODate } from "@/lib/invoice";
 import type {
   AttendanceSession,
+  AttendanceSettingsRow,
   AttendanceRow,
   AttendanceStatus,
   EmployeeRow,
@@ -309,6 +310,86 @@ export function netMinutes(row: TimeRow): number | null {
   if (!firstIn(row)) return null;
   if (openSession(row)) return null;
   return workedMinutes(row);
+}
+
+// ---- standard shift (10–7) assessment ------------------------------------------
+//
+// Shift times are wall-clock IST. IST is a fixed +05:30 with no DST, so a
+// date + "HH:MM" maps to one UTC instant without a timezone library.
+const IST_OFFSET_MIN = 5 * 60 + 30;
+
+export function istWallClockToUtcMs(dateISO: string, hhmm: string): number {
+  const [y, mo, d] = dateISO.split("-").map(Number);
+  const [h, mi] = (hhmm || "00:00").split(":").map(Number);
+  return Date.UTC(y, mo - 1, d, h, mi) - IST_OFFSET_MIN * 60_000;
+}
+
+export type ShiftSettings = Pick<
+  AttendanceSettingsRow,
+  "shift_start" | "shift_end" | "grace_minutes" | "full_day_hours" | "half_day_hours"
+>;
+
+export const DEFAULT_SHIFT: ShiftSettings = {
+  shift_start: "10:00",
+  shift_end: "19:00",
+  grace_minutes: 10,
+  full_day_hours: 8,
+  half_day_hours: 4,
+};
+
+// Format a stored 'HH:MM' as e.g. "10:00 AM".
+export function formatShiftTime(hhmm: string): string {
+  const [h, m] = (hhmm || "00:00").split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+export type DayAssessment = {
+  expectedMin: number; // shift window length
+  lateMin: number; // arrival after start + grace
+  earlyLeaveMin: number; // left before shift end (0 while still in)
+  shortMin: number; // net worked below full-day target
+  isFullDay: boolean;
+  isHalfDay: boolean; // worked but under the full-day target
+};
+
+// Assess one day's sessions against the standard shift.
+export function assessDay(
+  row: TimeRow,
+  settings: ShiftSettings = DEFAULT_SHIFT,
+  now = new Date(),
+): DayAssessment | null {
+  const start = firstIn(row);
+  if (!start) return null;
+  const onDate = new Date(start).toISOString().slice(0, 10);
+  const shiftStart = istWallClockToUtcMs(onDate, settings.shift_start);
+  const shiftEnd = istWallClockToUtcMs(onDate, settings.shift_end);
+  const expectedMin = Math.max(0, Math.round((shiftEnd - shiftStart) / 60_000));
+
+  const lateMin = Math.max(
+    0,
+    Math.round((+new Date(start) - (shiftStart + settings.grace_minutes * 60_000)) / 60_000),
+  );
+
+  const out = lastOut(row);
+  const stillIn = !!openSession(row);
+  const earlyLeaveMin =
+    stillIn || !out ? 0 : Math.max(0, Math.round((shiftEnd - +new Date(out)) / 60_000));
+
+  const net = workedMinutes(row, now) ?? 0;
+  const fullTarget = settings.full_day_hours * 60;
+  const halfTarget = settings.half_day_hours * 60;
+  const shortMin = stillIn ? 0 : Math.max(0, Math.round(fullTarget - net));
+
+  return {
+    expectedMin,
+    lateMin,
+    earlyLeaveMin,
+    shortMin,
+    isFullDay: net >= fullTarget,
+    isHalfDay: net > 0 && net < fullTarget && net >= halfTarget,
+  };
 }
 
 // Live figures for the card while the day is still running.

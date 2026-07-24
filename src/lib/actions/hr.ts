@@ -273,6 +273,39 @@ export async function withdrawLeave(id: string): Promise<Result> {
   return { ok: true, message: "Request withdrawn" };
 }
 
+// ---- attendance settings (standard shift) -------------------------------------
+
+export async function updateAttendanceSettings(input: {
+  shiftStart: string;
+  shiftEnd: string;
+  graceMinutes: number;
+  fullDayHours: number;
+  halfDayHours: number;
+}): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can change work hours." };
+  const hhmm = /^([01]?\d|2[0-3]):[0-5]\d$/;
+  if (!hhmm.test(input.shiftStart) || !hhmm.test(input.shiftEnd))
+    return { ok: false, error: "Enter times as HH:MM (24-hour), e.g. 10:00 and 19:00." };
+  if (input.shiftEnd <= input.shiftStart)
+    return { ok: false, error: "Shift end must be after the start." };
+
+  const { error } = await sb
+    .from("attendance_settings")
+    .update({
+      shift_start: input.shiftStart,
+      shift_end: input.shiftEnd,
+      grace_minutes: Math.max(0, Number(input.graceMinutes) || 0),
+      full_day_hours: Math.max(0, Number(input.fullDayHours) || 0),
+      half_day_hours: Math.max(0, Number(input.halfDayHours) || 0),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Work hours saved" };
+}
+
 // ---- attendance ----------------------------------------------------------------
 
 async function myEmployee(sb: Awaited<ReturnType<typeof createClient>>, userId: string) {

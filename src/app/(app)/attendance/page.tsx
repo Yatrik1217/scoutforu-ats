@@ -11,11 +11,15 @@ import {
   grossMinutes,
   netMinutes,
   formatDuration,
+  formatShiftTime,
+  assessDay,
+  DEFAULT_SHIFT,
 } from "@/lib/hr";
 import { AttendanceGrid } from "@/components/attendance-widgets";
 import { Avatar } from "@/components/bits";
 import type {
   AttendanceRow,
+  AttendanceSettingsRow,
   EmployeeRow,
   LeaveRequestRow,
   LeaveTypeRow,
@@ -42,18 +46,20 @@ export default async function AttendancePage({
   );
 
   const sb = await createClient();
-  const [{ data: empData }, { data: attData }, { data: leaveData }, { data: typeData }] =
+  const [{ data: empData }, { data: attData }, { data: leaveData }, { data: typeData }, { data: shiftData }] =
     await Promise.all([
       sb.from("employees").select("*").eq("status", "active").order("name"),
       sb.from("attendance").select("*").gte("on_date", period).lte("on_date", monthEnd),
       sb.from("leave_requests").select("*").eq("status", "approved"),
       sb.from("leave_types").select("*"),
+      sb.from("attendance_settings").select("*").maybeSingle(),
     ]);
 
   const employees = (empData ?? []) as EmployeeRow[];
   const rows = (attData ?? []) as AttendanceRow[];
   const leaves = (leaveData ?? []) as LeaveRequestRow[];
   const types = (typeData ?? []) as LeaveTypeRow[];
+  const shift = (shiftData as AttendanceSettingsRow) ?? DEFAULT_SHIFT;
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
@@ -63,7 +69,11 @@ export default async function AttendancePage({
             Attendance
           </h1>
           <p className="text-[13px] text-[#8a94a6]">
-            {monthLabel(period)} · staff check in themselves; you can correct any day here
+            {monthLabel(period)} · shift{" "}
+            <b className="text-[#42506b]">
+              {formatShiftTime(shift.shift_start)} – {formatShiftTime(shift.shift_end)}
+            </b>{" "}
+            · staff check in themselves; you can correct any day here
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -96,12 +106,13 @@ export default async function AttendancePage({
 
       {/* per-employee summary + the LOP payroll will use */}
       <div className="mt-[18px] overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
-        <div className="grid grid-cols-[1.3fr_80px_70px_70px_70px_100px_100px_120px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+        <div className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
           <div>Employee</div>
           <div className="text-center">Present</div>
           <div className="text-center">Half</div>
           <div className="text-center">Leave</div>
           <div className="text-center">Absent</div>
+          <div className="text-center">Late</div>
           <div className="text-right">Gross hrs</div>
           <div className="text-right">Net hrs</div>
           <div className="text-right">Loss of pay</div>
@@ -117,10 +128,14 @@ export default async function AttendancePage({
           );
           const gross = mine.reduce((s, r) => s + (grossMinutes(r) ?? 0), 0);
           const net = mine.reduce((s, r) => s + (netMinutes(r) ?? 0), 0);
+          const lateDays = mine.filter((r) => {
+            const a = assessDay(r, shift);
+            return a && a.lateMin > 0;
+          }).length;
           return (
             <div
               key={e.id}
-              className="grid grid-cols-[1.3fr_80px_70px_70px_70px_100px_100px_120px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0"
+              className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0"
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar name={e.name} size={30} />
@@ -137,6 +152,9 @@ export default async function AttendancePage({
               </div>
               <div className="tf-num text-center text-[13px] font-bold text-[#dc2626]">
                 {s.absent || "—"}
+              </div>
+              <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
+                {lateDays || "—"}
               </div>
               <div className="tf-num text-right text-[12.5px] font-bold text-[#2a6fdb]">
                 {gross ? formatDuration(gross) : "—"}

@@ -486,6 +486,16 @@ export type AttendanceBreak = { start: string; end: string | null };
 // One stretch at work. `out` is null while the person is currently in.
 export type AttendanceSession = { in: string; out: string | null };
 
+export type AttendanceSettingsRow = {
+  id: boolean;
+  shift_start: string; // 'HH:MM' IST
+  shift_end: string; // 'HH:MM' IST
+  grace_minutes: number;
+  full_day_hours: number;
+  half_day_hours: number;
+  updated_at: string;
+};
+
 export type AttendanceRow = {
   id: string;
   employee_id: string;
@@ -626,6 +636,7 @@ export type Database = {
       payroll_runs: Table<PayrollRunRow>;
       payroll_lines: Table<PayrollLineRow>;
       attendance: Table<AttendanceRow>;
+      attendance_settings: Table<AttendanceSettingsRow>;
       app_settings: Table<AppSettingsRow>;
     };
     Views: Record<string, never>;

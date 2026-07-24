@@ -13,15 +13,25 @@ import {
   firstIn,
   lastOut,
   elapsedMinutes,
+  assessDay,
   formatClock,
   formatDuration,
+  formatShiftTime,
+  type ShiftSettings,
 } from "@/lib/hr";
 import { hexA } from "@/lib/domain";
 import type { AttendanceRow, AttendanceStatus, EmployeeRow } from "@/lib/database.types";
 
 // ---- self check-in / check-out -------------------------------------------------
 
-export function CheckInCard({ today }: { today: AttendanceRow | null }) {
+export function CheckInCard({
+  today,
+  shift,
+}: {
+  today: AttendanceRow | null;
+  shift: ShiftSettings;
+}) {
+  const assess = today ? assessDay(today, shift) : null;
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -69,6 +79,14 @@ export function CheckInCard({ today }: { today: AttendanceRow | null }) {
                 On a break
               </span>
             ) : null}
+            {assess && assess.lateMin > 0 && (
+              <span className="rounded-full bg-[#fef2f2] px-2.5 py-1 text-[11px] font-bold text-[#dc2626]">
+                Late by {formatDuration(assess.lateMin)}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 text-[11.5px] font-semibold text-[#8a94a6]">
+            Shift {formatShiftTime(shift.shift_start)} – {formatShiftTime(shift.shift_end)}
           </div>
 
           <div className="mt-3 flex flex-wrap items-start gap-x-8 gap-y-3">
