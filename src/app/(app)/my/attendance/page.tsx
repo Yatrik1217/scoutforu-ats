@@ -37,10 +37,13 @@ export default async function MyAttendancePage() {
   const monthEnd = toISODate(
     new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0),
   );
+  // Filter to MY rows. As admin, RLS returns everyone's attendance, so an
+  // unfiltered query would show whoever's day matches — a cross-user leak.
   const { data: attData } = employee
     ? await sb
         .from("attendance")
         .select("*")
+        .eq("employee_id", employee.id)
         .gte("on_date", period)
         .lte("on_date", monthEnd)
         .order("on_date", { ascending: false })

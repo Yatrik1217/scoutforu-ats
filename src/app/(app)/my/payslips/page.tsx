@@ -17,11 +17,14 @@ export default async function MyPayslipsPage() {
     .maybeSingle();
   const employee = emp as EmployeeRow | null;
 
-  // RLS returns only this employee's lines, and only for non-draft runs.
-  const [{ data: lineData }, { data: runData }] = await Promise.all([
-    sb.from("payroll_lines").select("*"),
-    sb.from("payroll_runs").select("*").order("period_month", { ascending: false }),
-  ]);
+  // Only MY lines. As admin, RLS returns every employee's payroll lines, so
+  // this must filter explicitly or the page would show the whole team's pay.
+  const [{ data: lineData }, { data: runData }] = employee
+    ? await Promise.all([
+        sb.from("payroll_lines").select("*").eq("employee_id", employee.id),
+        sb.from("payroll_runs").select("*").order("period_month", { ascending: false }),
+      ])
+    : [{ data: [] as PayrollLineRow[] }, { data: [] as PayrollRunRow[] }];
   const runs = (runData ?? []) as PayrollRunRow[];
   const runById = new Map(runs.map((r) => [r.id, r]));
   const lines = ((lineData ?? []) as PayrollLineRow[])
