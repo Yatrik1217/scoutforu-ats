@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { round2 } from "@/lib/invoice";
-import { computeNextDue } from "@/lib/finance";
+import { computeNextDue, advanceAfterPayment } from "@/lib/finance";
 import type {
   FinanceScope,
   FinanceCategoryKind,
   FinancePaymentMethod,
   FinanceEmiStatus,
+  FinanceCommitmentType,
   FinanceEmiRow,
 } from "@/lib/database.types";
 
@@ -168,10 +169,12 @@ export async function archiveCategory(id: string, archived: boolean): Promise<Re
 // ---- EMIs / loans ------------------------------------------------------------
 export type EmiForm = {
   scope: FinanceScope;
+  type: FinanceCommitmentType;
   name: string;
   lender: string;
   categoryId: string | null;
   principal: number;
+  currentValue: number;
   emiAmount: number;
   interestRate: number;
   totalInstallments: number;
@@ -182,23 +185,42 @@ export type EmiForm = {
   notes: string;
 };
 
+const TYPE_NOUN: Record<FinanceCommitmentType, string> = {
+  loan: "Loan",
+  insurance: "Insurance",
+  sip: "Investment",
+};
+
 export async function saveEmi(id: string | null, form: EmiForm): Promise<Result> {
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
-  if (!form.name.trim()) return { ok: false, error: "Loan / EMI name is required." };
-  if (!(form.emiAmount > 0)) return { ok: false, error: "Enter the monthly installment amount." };
+  const noun = TYPE_NOUN[form.type] ?? "Entry";
+  if (!form.name.trim()) return { ok: false, error: `${noun} name is required.` };
+  if (!(form.emiAmount > 0))
+    return {
+      ok: false,
+      error:
+        form.type === "sip"
+          ? "Enter the monthly investment amount."
+          : "Enter the monthly amount.",
+    };
   if (!form.startDate) return { ok: false, error: "Pick a start date." };
   const dueDay = Math.min(31, Math.max(1, Math.round(form.dueDay || 1)));
+  // Insurance premiums are open-ended (no payoff), so they never carry a
+  // finite installment count.
+  const total = form.type === "insurance" ? 0 : Math.max(0, Math.round(form.totalInstallments || 0));
 
   const base = {
     scope: form.scope,
+    type: form.type,
     name: form.name.trim(),
     lender: form.lender.trim(),
     category_id: form.categoryId,
     principal: round2(form.principal || 0),
+    current_value: form.type === "sip" ? round2(form.currentValue || 0) : 0,
     emi_amount: round2(form.emiAmount),
     interest_rate: form.interestRate || 0,
-    total_installments: Math.max(0, Math.round(form.totalInstallments || 0)),
+    total_installments: total,
     paid_installments: Math.max(0, Math.round(form.paidInstallments || 0)),
     start_date: form.startDate,
     due_day: dueDay,
@@ -212,16 +234,16 @@ export async function saveEmi(id: string | null, form: EmiForm): Promise<Result>
     const { error } = await sb.from("finance_emis").update(payload).eq("id", id);
     if (error) return { ok: false, error: error.message };
     refresh();
-    return { ok: true, id, message: "Loan updated" };
+    return { ok: true, id, message: `${noun} updated` };
   }
   const { data, error } = await sb
     .from("finance_emis")
     .insert({ ...payload, created_by: me.id })
     .select("id")
     .single();
-  if (error || !data) return { ok: false, error: error?.message || "Failed to save loan." };
+  if (error || !data) return { ok: false, error: error?.message || `Failed to save ${noun.toLowerCase()}.` };
   refresh();
-  return { ok: true, id: data.id, message: "Loan added" };
+  return { ok: true, id: data.id, message: `${noun} added` };
 }
 
 export async function deleteEmi(id: string): Promise<Result> {
@@ -233,8 +255,10 @@ export async function deleteEmi(id: string): Promise<Result> {
   return { ok: true, message: "Loan deleted" };
 }
 
-// Mark this month's installment paid: advances the schedule and drops a mirror
-// expense line into the ledger so the P&L reflects it.
+// Record one installment/contribution as paid, advance the schedule by a month.
+//  * loan / insurance → posts an expense line (money spent), so the P&L reflects it.
+//  * sip (investment)  → does NOT post an expense; it just adds a contribution
+//    (invested = contributions × amount), because it builds an asset, not a cost.
 export async function payEmiInstallment(
   id: string,
   paidOn?: string,
@@ -243,47 +267,55 @@ export async function payEmiInstallment(
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
   const { data: emi } = await sb.from("finance_emis").select("*").eq("id", id).maybeSingle();
-  if (!emi) return { ok: false, error: "Loan not found." };
+  if (!emi) return { ok: false, error: "Not found." };
   const e = emi as FinanceEmiRow;
   if (e.total_installments > 0 && e.paid_installments >= e.total_installments)
-    return { ok: false, error: "This loan is already fully paid." };
+    return { ok: false, error: "This is already fully paid." };
 
   const when = paidOn || e.next_due_date || new Date().toISOString().slice(0, 10);
   const paid = e.paid_installments + 1;
   const closed = e.total_installments > 0 && paid >= e.total_installments;
-  const nextEmi = {
-    ...e,
-    paid_installments: paid,
-    status: closed ? ("closed" as FinanceEmiStatus) : e.status,
-  };
-  const next_due_date = computeNextDue(nextEmi);
+  const next_due_date = closed ? null : advanceAfterPayment(e.next_due_date, e.due_day);
+  const isInvestment = e.type === "sip";
 
-  // mirror expense line
-  const { error: expErr } = await sb.from("finance_expenses").insert({
-    scope: e.scope,
-    category_id: e.category_id,
-    is_income: false,
-    title: `EMI — ${e.name}${e.total_installments > 0 ? ` (${paid}/${e.total_installments})` : ""}`,
-    amount: round2(e.emi_amount),
-    txn_date: when,
-    payment_method: method,
-    payee: e.lender,
-    notes: "Auto-logged from EMI tracker",
-    emi_id: e.id,
-    created_by: me.id,
-  });
-  if (expErr) return { ok: false, error: expErr.message };
+  // Loans & insurance premiums are money spent → mirror an expense line so the
+  // ledger and P&L pick it up. SIPs are investments → no expense line.
+  if (!isInvestment) {
+    const prefix = e.type === "insurance" ? "Premium" : "EMI";
+    const { error: expErr } = await sb.from("finance_expenses").insert({
+      scope: e.scope,
+      category_id: e.category_id,
+      is_income: false,
+      title: `${prefix} — ${e.name}${e.total_installments > 0 ? ` (${paid}/${e.total_installments})` : ""}`,
+      amount: round2(e.emi_amount),
+      txn_date: when,
+      payment_method: method,
+      payee: e.lender,
+      notes: "Auto-logged from the commitments tracker",
+      emi_id: e.id,
+      created_by: me.id,
+    });
+    if (expErr) return { ok: false, error: expErr.message };
+  }
 
   const { error } = await sb
     .from("finance_emis")
     .update({
       paid_installments: paid,
-      status: nextEmi.status,
+      status: closed ? "closed" : e.status,
       next_due_date,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
-  return { ok: true, message: closed ? "Final installment paid — loan closed" : "Installment paid" };
+  const label =
+    e.type === "sip"
+      ? "Contribution recorded"
+      : closed
+        ? "Final payment made — closed"
+        : e.type === "insurance"
+          ? "Premium paid"
+          : "Installment paid";
+  return { ok: true, message: label };
 }

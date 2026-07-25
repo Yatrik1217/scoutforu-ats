@@ -2,19 +2,13 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { EmiModal } from "@/components/finance/emi-modal";
+import { InvestmentModal } from "@/components/finance/investment-modal";
 import { payEmiInstallment, deleteEmi } from "@/lib/actions/finance";
-import type { FinanceCategoryRow, FinanceEmiRow } from "@/lib/database.types";
+import type { FinanceEmiRow } from "@/lib/database.types";
 
-export function EmiActions({
-  emi,
-  categories,
-}: {
-  emi: FinanceEmiRow;
-  categories: FinanceCategoryRow[];
-}) {
+export function InvestmentActions({ emi }: { emi: FinanceEmiRow }) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -29,27 +23,24 @@ export function EmiActions({
       }
     });
 
-  const fullyPaid = emi.total_installments > 0 && emi.paid_installments >= emi.total_installments;
-
   return (
     <div className="flex items-center gap-1.5">
-      {emi.status === "active" && !fullyPaid && (
+      {emi.status === "active" && (
         <button
           onClick={() => run(() => payEmiInstallment(emi.id))}
           disabled={pending}
           className="flex items-center gap-1.5 rounded-[8px] bg-[#eafaf0] px-2.5 py-1.5 text-[12px] font-bold text-[#128a3e] hover:bg-[#d7f5e3] disabled:opacity-50"
-          title="Record this month's payment"
+          title="Record this month's contribution"
         >
-          <CheckCircle2 size={14} />
-          {emi.type === "insurance" ? "Pay premium" : "Pay EMI"}
+          <Plus size={14} />
+          Contribution
         </button>
       )}
-      <EmiModal
+      <InvestmentModal
         scope={emi.scope}
-        categories={categories}
         emi={emi}
         trigger={
-          <button className="rounded-[7px] p-1.5 text-[#8a94a6] hover:bg-[#f1f4f9] hover:text-[#2a6fdb]" title="Edit">
+          <button className="rounded-[7px] p-1.5 text-[#8a94a6] hover:bg-[#f1f4f9] hover:text-[#2a6fdb]" title="Edit / update value">
             <Pencil size={15} />
           </button>
         }
@@ -58,7 +49,7 @@ export function EmiActions({
         onClick={() => run(() => deleteEmi(emi.id))}
         disabled={pending}
         className="rounded-[7px] p-1.5 text-[#8a94a6] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:opacity-40"
-        title="Delete loan"
+        title="Delete investment"
       >
         <Trash2 size={15} />
       </button>

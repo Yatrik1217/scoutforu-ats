@@ -117,6 +117,7 @@ select * from (values
   -- personal
   ('personal','Home',                 'expense','#2a6fdb', false, 10),
   ('personal','Petrol / Fuel',        'expense','#f59e0b', false, 20),
+  ('personal','Credit Card',          'expense','#0ea5e9', false, 25),
   ('personal','EMIs',                 'expense','#8b5cf6', false, 30),
   ('personal','Groceries',            'expense','#16a34a', false, 40),
   ('personal','Utilities',            'expense','#06b6d4', false, 50),
@@ -136,6 +137,7 @@ select * from (values
   ('company','Utilities & Internet',  'expense','#10b981', false, 70),
   ('company','Professional Fees',     'expense','#e8833a', false, 80),
   ('company','Bank Charges',          'expense','#94a3b8', false, 90),
+  ('company','Credit Card',           'expense','#0ea5e9', false, 95),
   ('company','Other Operating',       'expense','#64748b', false, 100),
   ('company','Other Income',          'income', '#16a34a', false, 110),
   -- company — below-the-EBITDA-line (added back for EBITDA)

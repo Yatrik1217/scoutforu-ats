@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Landmark, CalendarClock, CheckCircle2, Wallet } from "lucide-react";
+import { Landmark, CalendarClock, CheckCircle2, Wallet, ShieldCheck } from "lucide-react";
 import { loadFinance } from "@/lib/finance-data";
 import {
   emiOutstanding,
@@ -11,7 +11,7 @@ import { money, moneyShort } from "@/lib/invoice";
 import { StatCard, Card } from "@/components/finance/pieces";
 import { EmiModal } from "@/components/finance/emi-modal";
 import { EmiActions } from "@/components/finance/emi-actions";
-import type { FinanceEmiRow } from "@/lib/database.types";
+import type { FinanceEmiRow, FinanceCategoryRow } from "@/lib/database.types";
 
 export default async function EmisPage() {
   const { categories, emis } = await loadFinance();
@@ -19,9 +19,14 @@ export default async function EmisPage() {
   const personalCats = categories.filter((c) => c.scope === "personal");
   const companyCats = categories.filter((c) => c.scope === "company");
 
-  const active = emis.filter((e) => e.status === "active");
+  // SIPs live on the Investments page; here we only show money going OUT.
+  const commitments = emis.filter((e) => e.type !== "sip");
+  const loans = commitments.filter((e) => e.type === "loan");
+  const insurance = commitments.filter((e) => e.type === "insurance");
+
+  const active = commitments.filter((e) => e.status === "active");
   const monthlyOutgo = active.reduce((s, e) => s + e.emi_amount, 0);
-  const totalOutstanding = emis.reduce((s, e) => s + emiOutstanding(e), 0);
+  const totalOutstanding = loans.reduce((s, e) => s + emiOutstanding(e), 0);
   const dueThisMonth = active.filter((e) => {
     const d = daysUntil(e.next_due_date);
     return d !== null && d >= 0 && d <= 31;
@@ -37,7 +42,7 @@ export default async function EmisPage() {
           categories={companyCats}
           trigger={
             <button className="rounded-[9px] border border-[#e3e8f0] bg-white px-3.5 py-2 text-[12.5px] font-bold text-[#42506b] hover:border-[#16a34a] hover:text-[#16a34a]">
-              + Company loan
+              + Company
             </button>
           }
         />
@@ -46,36 +51,59 @@ export default async function EmisPage() {
           categories={personalCats}
           trigger={
             <button className="rounded-[9px] bg-[#16a34a] px-3.5 py-2 text-[12.5px] font-bold text-white hover:bg-[#128a3e]">
-              + Personal loan
+              + Personal
             </button>
           }
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Monthly Outgo" value={moneyShort(monthlyOutgo)} sub={`${active.length} active loans`} icon={Wallet} color="#8b5cf6" />
-        <StatCard label="Due This Month" value={moneyShort(dueThisMonthTotal)} sub={`${dueThisMonth.length} installments`} icon={CalendarClock} color="#b45309" />
-        <StatCard label="Total Outstanding" value={moneyShort(totalOutstanding)} sub="Across tracked loans" icon={Landmark} color="#2a6fdb" />
-        <StatCard label="Closed" value={String(emis.filter((e) => e.status === "closed").length)} sub="Fully repaid" icon={CheckCircle2} color="#16a34a" />
+        <StatCard label="Monthly Outgo" value={moneyShort(monthlyOutgo)} sub={`${active.length} active`} icon={Wallet} color="#8b5cf6" />
+        <StatCard label="Due This Month" value={moneyShort(dueThisMonthTotal)} sub={`${dueThisMonth.length} payments`} icon={CalendarClock} color="#b45309" />
+        <StatCard label="Loan Outstanding" value={moneyShort(totalOutstanding)} sub={`${loans.length} loans`} icon={Landmark} color="#2a6fdb" />
+        <StatCard label="Closed" value={String(commitments.filter((e) => e.status === "closed").length)} sub="Fully repaid" icon={CheckCircle2} color="#16a34a" />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {emis.length === 0 && (
+      {/* Loans */}
+      <Section title="Loans & EMIs" icon={Landmark} count={loans.length} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {loans.length === 0 && (
           <Card className="lg:col-span-2">
-            <div className="py-10 text-center text-[13px] text-[#8a94a6]">
-              No loans or EMIs yet. Add your home loan, car loan or any monthly installment above —
-              we&apos;ll track the due dates and outstanding balance.
+            <div className="py-8 text-center text-[13px] text-[#8a94a6]">
+              No loans yet. Add a home loan, car loan or any EMI with the <b>+ Personal / + Company</b> button.
             </div>
           </Card>
         )}
-        {emis.map((e) => (
-          <EmiCard
-            key={e.id}
-            emi={e}
-            categories={e.scope === "company" ? companyCats : personalCats}
-          />
+        {loans.map((e) => (
+          <EmiCard key={e.id} emi={e} categories={e.scope === "company" ? companyCats : personalCats} />
         ))}
       </div>
+
+      {/* Insurance */}
+      <Section title="Insurance & Premiums" icon={ShieldCheck} count={insurance.length} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {insurance.length === 0 && (
+          <Card className="lg:col-span-2">
+            <div className="py-8 text-center text-[13px] text-[#8a94a6]">
+              No premiums yet. Add term/health insurance via <b>+ Personal / + Company</b> → choose <b>Insurance</b>.
+              These are recurring expenses (not loans), so paying one posts an expense.
+            </div>
+          </Card>
+        )}
+        {insurance.map((e) => (
+          <EmiCard key={e.id} emi={e} categories={e.scope === "company" ? companyCats : personalCats} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, icon: Icon, count }: { title: string; icon: typeof Landmark; count: number }) {
+  return (
+    <div className="mb-3 mt-7 flex items-center gap-2">
+      <Icon size={17} className="text-[#42506b]" />
+      <h2 className="text-[15px] font-extrabold">{title}</h2>
+      <span className="rounded-full bg-[#f1f4f9] px-2 py-0.5 text-[11px] font-bold text-[#8a94a6]">{count}</span>
     </div>
   );
 }
@@ -85,13 +113,14 @@ function EmiCard({
   categories,
 }: {
   emi: FinanceEmiRow;
-  categories: import("@/lib/database.types").FinanceCategoryRow[];
+  categories: FinanceCategoryRow[];
 }) {
   const remaining = emiRemainingCount(emi);
   const outstanding = emiOutstanding(emi);
   const progress = emiProgress(emi);
   const d = daysUntil(emi.next_due_date);
   const tracked = emi.total_installments > 0;
+  const isInsurance = emi.type === "insurance";
 
   const statusMeta =
     emi.status === "closed"
@@ -104,21 +133,23 @@ function EmiCard({
     <div className="rounded-[14px] border border-[#e9edf3] bg-white p-[18px_20px]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-[15px] font-extrabold">{emi.name}</span>
-            <span
-              className="rounded-full px-2 py-0.5 text-[10.5px] font-bold"
-              style={{ background: statusMeta.bg, color: statusMeta.color }}
-            >
+            <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: statusMeta.bg, color: statusMeta.color }}>
               {statusMeta.label}
             </span>
             <span className="rounded-full bg-[#f1f4f9] px-2 py-0.5 text-[10.5px] font-bold capitalize text-[#8a94a6]">
               {emi.scope}
             </span>
+            {isInsurance && (
+              <span className="rounded-full bg-[#fff7ed] px-2 py-0.5 text-[10.5px] font-bold text-[#b45309]">
+                Premium · expense
+              </span>
+            )}
           </div>
           <div className="mt-0.5 text-[12px] font-semibold text-[#8a94a6]">
             {emi.lender || "—"}
-            {emi.interest_rate > 0 && ` · ${emi.interest_rate}% p.a.`}
+            {!isInsurance && emi.interest_rate > 0 && ` · ${emi.interest_rate}% p.a.`}
           </div>
         </div>
         <div className="text-right">
@@ -142,13 +173,15 @@ function EmiCard({
             "—"
           )}
         </Mini>
-        <Mini label="Remaining">
-          {tracked ? `${remaining} EMIs` : "—"}
+        <Mini label={isInsurance ? "Type" : "Remaining"}>
+          {isInsurance ? "Recurring" : tracked ? `${remaining} EMIs` : "—"}
         </Mini>
-        <Mini label="Outstanding">{tracked ? moneyShort(outstanding) : "—"}</Mini>
+        <Mini label={isInsurance ? "Cover" : "Outstanding"}>
+          {isInsurance ? (emi.principal > 0 ? moneyShort(emi.principal) : "—") : tracked ? moneyShort(outstanding) : "—"}
+        </Mini>
       </div>
 
-      {tracked && (
+      {tracked && !isInsurance && (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-[11px] font-bold text-[#8a94a6]">
             <span>
@@ -164,7 +197,7 @@ function EmiCard({
 
       <div className="mt-3 flex items-center justify-between border-t border-[#f1f4f9] pt-3">
         <span className="text-[11.5px] font-medium text-[#9aa4b6]">
-          Due on the {ordinal(emi.due_day)} each month
+          {isInsurance ? "Premium" : "Due"} on the {ordinal(emi.due_day)} each month
         </span>
         <EmiActions emi={emi} categories={categories} />
       </div>

@@ -7,6 +7,7 @@ import {
   Building2,
   Wallet,
   Landmark,
+  TrendingUp,
   Tags,
   ArrowLeft,
   type LucideIcon,
@@ -20,6 +21,7 @@ const NAV: NavItem[] = [
   { href: "/finance/company", label: "Company P&L", icon: Building2 },
   { href: "/finance/personal", label: "Personal", icon: Wallet },
   { href: "/finance/emis", label: "EMIs & Loans", icon: Landmark },
+  { href: "/finance/investments", label: "Investments", icon: TrendingUp },
   { href: "/finance/categories", label: "Categories", icon: Tags },
 ];
 
