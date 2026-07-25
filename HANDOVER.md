@@ -39,6 +39,12 @@ P&L tracker at `/finance`). Paste it into the SQL Editor once. It creates
 `finance_categories`, `finance_expenses`, `finance_emis` (all Master-Admin-only
 via RLS) and seeds default personal + company categories. Until it's run, the
 `/finance` pages open but stay empty and saving an entry errors.
+**Pending: `0034_finance_investments.sql`** — adds a `type` (loan / insurance /
+sip) and `current_value` to `finance_emis`, and repairs due dates. Run it after
+`0033`. **Must** be applied before deploying the investments/insurance update, or
+saving a loan/EMI errors with "column type does not exist". After it, optionally
+reclassify any insurance you entered as a loan:
+`update public.finance_emis set type='insurance', total_installments=0, paid_installments=0 where name ilike '%insurance%' or name ilike '%eterm%';`
 
 ## 3. Environment variables
 

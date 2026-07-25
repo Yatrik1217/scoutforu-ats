@@ -38,10 +38,10 @@ export function EmiActions({
           onClick={() => run(() => payEmiInstallment(emi.id))}
           disabled={pending}
           className="flex items-center gap-1.5 rounded-[8px] bg-[#eafaf0] px-2.5 py-1.5 text-[12px] font-bold text-[#128a3e] hover:bg-[#d7f5e3] disabled:opacity-50"
-          title="Mark this month's installment paid"
+          title="Record this month's payment"
         >
           <CheckCircle2 size={14} />
-          Pay EMI
+          {emi.type === "insurance" ? "Pay premium" : "Pay EMI"}
         </button>
       )}
       <EmiModal

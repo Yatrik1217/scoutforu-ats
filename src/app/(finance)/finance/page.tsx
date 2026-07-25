@@ -16,6 +16,7 @@ import {
   computeProfitAndLoss,
   categoryTotals,
   emisDueSoon,
+  portfolioSummary,
   daysUntil,
   type Period,
 } from "@/lib/finance";
@@ -48,6 +49,7 @@ export default async function FinanceDashboard({
   const personal = categoryTotals(personalExp, personalCats);
   const upcoming = emisDueSoon(emis, 45);
   const upcomingTotal = upcoming.reduce((s, e) => s + e.emi_amount, 0);
+  const portfolio = portfolioSummary(emis);
 
   const recent = expenses.slice(0, 8);
 
@@ -113,6 +115,28 @@ export default async function FinanceDashboard({
           href="/finance/personal"
         />
       </div>
+
+      {/* Investments strip — assets, tracked apart from expenses */}
+      {(portfolio.invested > 0 || portfolio.value > 0) && (
+        <Link
+          href="/finance/investments"
+          className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3 rounded-[14px] border border-[#e9edf3] bg-white p-[16px_20px] transition hover:border-[#d6deea]"
+        >
+          <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-[#16a34a]">
+            <TrendingUp size={16} /> Investments
+          </div>
+          <StripStat label="Invested" value={moneyShort(portfolio.invested)} />
+          <StripStat label="Current value" value={moneyShort(portfolio.value)} />
+          <StripStat
+            label="Gain / loss"
+            value={`${portfolio.gain >= 0 ? "+" : "−"}${moneyShort(Math.abs(portfolio.gain))}`}
+            accent={portfolio.gain >= 0 ? "#16a34a" : "#ef4444"}
+            sub={portfolio.invested > 0 ? `${portfolio.gain >= 0 ? "+" : "−"}${pct(Math.abs(portfolio.pct))}` : undefined}
+          />
+          <StripStat label="Monthly SIP" value={moneyShort(portfolio.monthly)} />
+          <span className="ml-auto text-[12px] font-bold text-[#2a6fdb]">View all →</span>
+        </Link>
+      )}
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Company P&L */}
@@ -232,6 +256,28 @@ export default async function FinanceDashboard({
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+function StripStat({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div>
+      <div className="text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">{label}</div>
+      <div className="text-[17px] font-extrabold tabular-nums" style={accent ? { color: accent } : undefined}>
+        {value}
+        {sub && <span className="ml-1 text-[12px] font-bold">{sub}</span>}
+      </div>
     </div>
   );
 }
