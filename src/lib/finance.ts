@@ -59,6 +59,30 @@ export function inPeriod(dateISO: string, p: Period): boolean {
   return dateISO >= p.from && dateISO <= p.to;
 }
 
+// Enumerate calendar months overlapping [fromISO, toISO] as {key,label,from,to}.
+// Used for the month-by-month P&L table across a financial year.
+export function monthsInRange(
+  fromISO: string,
+  toISO: string,
+): { key: string; label: string; from: string; to: string }[] {
+  const out: { key: string; label: string; from: string; to: string }[] = [];
+  const end = new Date(toISO + "T00:00:00");
+  let d = new Date(fromISO + "T00:00:00");
+  d = new Date(d.getFullYear(), d.getMonth(), 1);
+  while (d <= end) {
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    out.push({
+      key: `${y}-${String(m + 1).padStart(2, "0")}`,
+      label: new Date(y, m, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
+      from: toISODate(new Date(y, m, 1)),
+      to: toISODate(new Date(y, m + 1, 0)),
+    });
+    d = new Date(y, m + 1, 1);
+  }
+  return out;
+}
+
 // ---- P&L / EBITDA ------------------------------------------------------------
 export type CategoryTotal = {
   categoryId: string | null;

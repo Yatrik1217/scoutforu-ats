@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { CircleDollarSign, TrendingUp, PiggyBank, Receipt } from "lucide-react";
-import { loadFinance, loadPlacementRevenue } from "@/lib/finance-data";
+import { loadFinance, loadPlacementRevenue, loadPlacementRevenueByMonth } from "@/lib/finance-data";
 import {
   monthPeriod,
   financialYearPeriod,
   computeProfitAndLoss,
+  monthsInRange,
+  inPeriod,
   type Period,
 } from "@/lib/finance";
 import { money, moneyShort } from "@/lib/invoice";
@@ -21,11 +23,14 @@ export default async function CompanyFinancePage({
 }) {
   const sp = await searchParams;
   const isFY = sp.period !== "month";
-  const period: Period = isFY ? financialYearPeriod() : monthPeriod();
+  const fy = financialYearPeriod();
+  const period: Period = isFY ? fy : monthPeriod();
 
-  const [{ categories, expenses }, rev] = await Promise.all([
+  const [{ categories, expenses }, rev, fyBundle, revByMonth] = await Promise.all([
     loadFinance("company", period),
     loadPlacementRevenue(period),
+    isFY ? Promise.resolve(null) : loadFinance("company", fy),
+    loadPlacementRevenueByMonth(fy),
   ]);
 
   // Revenue = professional fees earned (ex-GST). TDS is advance tax, shown below
@@ -33,6 +38,34 @@ export default async function CompanyFinancePage({
   const pl = computeProfitAndLoss(expenses, categories, rev.grossFee);
   const totalExp = pl.operatingExpenses + pl.addBacks;
   const profitAfterTds = pl.netProfit; // TDS is a prepaid tax credit, not a P&L cost
+
+  // Month-by-month P&L across FY 26-27, from April up to the current month.
+  const fyExpenses = isFY ? expenses : fyBundle!.expenses;
+  const todayMonthEnd = monthPeriod().to;
+  const monthCap = todayMonthEnd < fy.to ? todayMonthEnd : fy.to;
+  const monthRows = monthsInRange(fy.from, monthCap).map((mo) => {
+    const mExp = fyExpenses.filter((e) => inPeriod(e.txn_date, mo));
+    const mRev = revByMonth.get(mo.key) ?? { grossFee: 0, gst: 0, tds: 0, collected: 0 };
+    const mpl = computeProfitAndLoss(mExp, categories, mRev.grossFee);
+    return {
+      label: mo.label,
+      revenue: mpl.revenue,
+      expenses: mpl.operatingExpenses + mpl.addBacks,
+      ebitda: mpl.ebitda,
+      net: mpl.netProfit,
+      tds: mRev.tds,
+    };
+  });
+  const fyTotals = monthRows.reduce(
+    (a, r) => ({
+      revenue: a.revenue + r.revenue,
+      expenses: a.expenses + r.expenses,
+      ebitda: a.ebitda + r.ebitda,
+      net: a.net + r.net,
+      tds: a.tds + r.tds,
+    }),
+    { revenue: 0, expenses: 0, ebitda: 0, net: 0, tds: 0 },
+  );
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
@@ -87,6 +120,52 @@ export default async function CompanyFinancePage({
 
       <Card title="Expenses by category" className="mt-4">
         <CategoryBars rows={pl.byCategory} total={totalExp} />
+      </Card>
+
+      {/* Month-by-month across the financial year */}
+      <Card title={`Month-by-month · ${fy.label}`} className="mt-4">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-[13px]">
+            <thead>
+              <tr className="border-b border-[#e9edf3] text-[11px] font-bold uppercase tracking-wide text-[#8a94a6]">
+                <th className="py-2 text-left">Month</th>
+                <th className="py-2 text-right">Revenue</th>
+                <th className="py-2 text-right">Expenses</th>
+                <th className="py-2 text-right">EBITDA</th>
+                <th className="py-2 text-right">Net Profit</th>
+                <th className="py-2 text-right">TDS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthRows.map((r) => (
+                <tr key={r.label} className="border-b border-[#f1f4f9]">
+                  <td className="py-2 font-bold">{r.label}</td>
+                  <td className="py-2 text-right tabular-nums">{money(r.revenue)}</td>
+                  <td className="py-2 text-right tabular-nums text-[#ef4444]">{r.expenses > 0 ? `(${money(r.expenses)})` : money(0)}</td>
+                  <td className="py-2 text-right tabular-nums">{money(r.ebitda)}</td>
+                  <td className="py-2 text-right font-bold tabular-nums" style={{ color: r.net >= 0 ? "#16a34a" : "#ef4444" }}>
+                    {r.net < 0 ? `(${money(Math.abs(r.net))})` : money(r.net)}
+                  </td>
+                  <td className="py-2 text-right tabular-nums text-[#b45309]">{money(r.tds)}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-[#e9edf3] font-extrabold">
+                <td className="py-2.5">FY total</td>
+                <td className="py-2.5 text-right tabular-nums">{money(fyTotals.revenue)}</td>
+                <td className="py-2.5 text-right tabular-nums text-[#ef4444]">({money(fyTotals.expenses)})</td>
+                <td className="py-2.5 text-right tabular-nums">{money(fyTotals.ebitda)}</td>
+                <td className="py-2.5 text-right tabular-nums" style={{ color: fyTotals.net >= 0 ? "#16a34a" : "#ef4444" }}>
+                  {fyTotals.net < 0 ? `(${money(Math.abs(fyTotals.net))})` : money(fyTotals.net)}
+                </td>
+                <td className="py-2.5 text-right tabular-nums text-[#b45309]">{money(fyTotals.tds)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2 text-[11.5px] font-medium text-[#8a94a6]">
+          Revenue = fees earned (ex-GST) from placement receipts that month; expenses = company entries dated that month.
+          EBITDA excludes interest/tax/depreciation; TDS is advance tax shown for reference (outside the P&L).
+        </div>
       </Card>
 
       <Card title="Company ledger" className="mt-4">

@@ -54,18 +54,50 @@ export default async function FinanceDashboard({
   const personal = categoryTotals(personalExp, personalCats);
   const portfolio = portfolioSummary(emis);
 
-  // "What do I need to pay?" — all active commitments (EMIs, premiums AND SIPs,
-  // since that cash leaves the account too) due in the next 60 days, with the
-  // subtotal payable by the upcoming 10th of the month called out.
+  // "What do I need to pay?" — everything with cash going out in the next 60
+  // days: active commitments (EMIs, premiums AND SIPs) plus any future-dated
+  // one-off bills you've entered (e.g. a company credit-card / software payment
+  // due in August). Subtotal payable by the upcoming 10th is called out.
   const todayISO = new Date().toISOString().slice(0, 10);
   const horizon = new Date();
   horizon.setDate(horizon.getDate() + 60);
   const horizonISO = horizon.toISOString().slice(0, 10);
   const cutoff10 = nextDueOnOrAfter(todayISO, 10);
-  const dues = commitmentsDueBetween(emis, todayISO, horizonISO);
-  const dueBy10 = dues.filter((e) => (e.next_due_date ?? "") <= cutoff10);
-  const dueBy10Total = dueBy10.reduce((s, e) => s + e.emi_amount, 0);
-  const duesTotal = dues.reduce((s, e) => s + e.emi_amount, 0);
+
+  const catById = new Map(categories.map((c) => [c.id, c]));
+  // future-dated expense entries in the window (exclude income + EMI mirror lines)
+  const futureBills = expenses.filter(
+    (e) => !e.is_income && !e.emi_id && e.txn_date >= todayISO && e.txn_date <= horizonISO,
+  );
+
+  type DueItem = { id: string; label: string; date: string; amount: number; tag: string; color: string; scope: string };
+  const dueItems: DueItem[] = [
+    ...commitmentsDueBetween(emis, todayISO, horizonISO).map((e) => ({
+      id: `emi-${e.id}`,
+      label: e.name,
+      date: e.next_due_date as string,
+      amount: e.emi_amount,
+      tag: COMMITMENT_LABEL[e.type],
+      color: COMMITMENT_COLOR[e.type],
+      scope: e.scope,
+    })),
+    ...futureBills.map((e) => {
+      const c = e.category_id ? catById.get(e.category_id) : undefined;
+      return {
+        id: `exp-${e.id}`,
+        label: e.title,
+        date: e.txn_date,
+        amount: e.amount,
+        tag: c?.name ?? "Bill",
+        color: c?.color ?? "#8b5cf6",
+        scope: e.scope,
+      };
+    }),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+
+  const dueBy10 = dueItems.filter((i) => i.date <= cutoff10);
+  const dueBy10Total = dueBy10.reduce((s, i) => s + i.amount, 0);
+  const duesTotal = dueItems.reduce((s, i) => s + i.amount, 0);
   const sipMonthly = monthlySipOutflow(emis);
 
   const recent = expenses.slice(0, 8);
@@ -197,43 +229,43 @@ export default async function FinanceDashboard({
               {sipMonthly > 0 && ` · incl. SIP`}
             </div>
           </div>
-          {dues.length === 0 ? (
+          {dueItems.length === 0 ? (
             <div className="py-4 text-center text-[13px] text-[#8a94a6]">Nothing due in the next 60 days.</div>
           ) : (
             <>
               <div className="flex flex-col divide-y divide-[#f1f4f9]">
-                {dues.slice(0, 7).map((e) => {
-                  const d = daysUntil(e.next_due_date);
+                {dueItems.slice(0, 7).map((it) => {
+                  const d = daysUntil(it.date);
                   return (
-                    <div key={e.id} className="flex items-center gap-3 py-2.5">
+                    <div key={it.id} className="flex items-center gap-3 py-2.5">
                       <span
                         className="flex h-8 w-8 items-center justify-center rounded-[9px]"
-                        style={{ background: `${COMMITMENT_COLOR[e.type]}18`, color: COMMITMENT_COLOR[e.type] }}
+                        style={{ background: `${it.color}18`, color: it.color }}
                       >
                         <CalendarClock size={16} />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[13px] font-bold">
-                          {e.name}
+                          {it.label}
                           <span
                             className="ml-1.5 rounded-full px-1.5 py-px text-[9.5px] font-bold align-middle"
-                            style={{ background: `${COMMITMENT_COLOR[e.type]}18`, color: COMMITMENT_COLOR[e.type] }}
+                            style={{ background: `${it.color}18`, color: it.color }}
                           >
-                            {COMMITMENT_LABEL[e.type]}
+                            {it.tag}
                           </span>
                         </div>
                         <div className="text-[11.5px] font-semibold text-[#8a94a6]">
-                          {e.next_due_date ? format(new Date(e.next_due_date + "T00:00:00"), "d MMM") : "—"}
+                          {format(new Date(it.date + "T00:00:00"), "d MMM")}
                           {d !== null && (
                             <span className={d < 0 ? "text-[#dc2626]" : d <= 7 ? "text-[#b45309]" : ""}>
                               {" · "}
                               {d < 0 ? `${Math.abs(d)}d overdue` : d === 0 ? "today" : `in ${d}d`}
                             </span>
                           )}
-                          <span className="ml-1 capitalize">· {e.scope}</span>
+                          <span className="ml-1 capitalize">· {it.scope}</span>
                         </div>
                       </div>
-                      <div className="text-[13px] font-bold tabular-nums">{moneyShort(e.emi_amount)}</div>
+                      <div className="text-[13px] font-bold tabular-nums">{moneyShort(it.amount)}</div>
                     </div>
                   );
                 })}

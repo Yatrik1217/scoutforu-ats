@@ -116,3 +116,52 @@ export async function loadPlacementRevenue(period: Period): Promise<PlacementRev
     collected: round2(collected),
   };
 }
+
+// Same apportioning as loadPlacementRevenue, but bucketed by the YYYY-MM of each
+// payment date — powers the month-by-month P&L table. Returns a map keyed
+// "YYYY-MM".
+export async function loadPlacementRevenueByMonth(
+  period: Period,
+): Promise<Map<string, PlacementRevenue>> {
+  const sb = await createClient();
+  const out = new Map<string, PlacementRevenue>();
+  const { data: pays } = await sb
+    .from("placement_payments")
+    .select("amount,paid_on,placement_id")
+    .gte("paid_on", period.from)
+    .lte("paid_on", period.to);
+  if (!pays || pays.length === 0) return out;
+
+  const ids = [...new Set(pays.map((p) => p.placement_id).filter(Boolean))];
+  const { data: places } = await sb
+    .from("placements")
+    .select("id,fee_amount,gst_amount,tds_amount,net_payable,total_fee")
+    .in("id", ids);
+  const byId = new Map((places ?? []).map((p) => [p.id, p]));
+
+  for (const pay of pays) {
+    const key = (pay.paid_on || "").slice(0, 7);
+    if (!key) continue;
+    const amt = pay.amount || 0;
+    const cur = out.get(key) ?? { grossFee: 0, gst: 0, tds: 0, collected: 0 };
+    cur.collected += amt;
+    const p = pay.placement_id ? byId.get(pay.placement_id) : undefined;
+    if (p) {
+      const base = p.net_payable && p.net_payable > 0 ? p.net_payable : p.total_fee || 0;
+      const frac = base > 0 ? Math.min(1, amt / base) : 0;
+      cur.grossFee += frac * (p.fee_amount || 0);
+      cur.gst += frac * (p.gst_amount || 0);
+      cur.tds += frac * (p.tds_amount || 0);
+    }
+    out.set(key, cur);
+  }
+  for (const [k, v] of out) {
+    out.set(k, {
+      grossFee: round2(v.grossFee),
+      gst: round2(v.gst),
+      tds: round2(v.tds),
+      collected: round2(v.collected),
+    });
+  }
+  return out;
+}
