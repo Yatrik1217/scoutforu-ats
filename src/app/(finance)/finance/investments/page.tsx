@@ -17,9 +17,10 @@ export default async function InvestmentsPage() {
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <p className="mb-4 max-w-2xl text-[13px] font-medium leading-relaxed text-[#8a94a6]">
-        SIPs and recurring investments are tracked here — <b>separately from expenses</b>. Contributions
-        build an asset, so they never count against your spend or the company P&L. Update the current
-        value anytime to see your returns.
+        SIPs and recurring investments are tracked here as <b>assets</b> — update the current value
+        anytime to see your gain/loss. They also appear under <b>Upcoming payments</b> on the dashboard
+        (the cash does leave your account), but they&apos;re not counted as a business expense, so they
+        don&apos;t dent your EBITDA.
       </p>
 
       <div className="mb-5 flex items-center gap-2">

@@ -6,7 +6,21 @@ import type {
   FinanceCategoryRow,
   FinanceEmiRow,
   FinancePaymentMethod,
+  FinanceCommitmentType,
 } from "@/lib/database.types";
+
+// Short label for each commitment kind, used in the "money out" / dues lists.
+export const COMMITMENT_LABEL: Record<FinanceCommitmentType, string> = {
+  loan: "EMI",
+  insurance: "Premium",
+  sip: "SIP",
+};
+
+export const COMMITMENT_COLOR: Record<FinanceCommitmentType, string> = {
+  loan: "#2a6fdb",
+  insurance: "#b45309",
+  sip: "#16a34a",
+};
 
 export const PAYMENT_METHOD_LABEL: Record<FinancePaymentMethod, string> = {
   bank_transfer: "Bank Transfer",
@@ -284,4 +298,32 @@ export function emisDueSoon(emis: FinanceEmiRow[], days = 30, today = new Date()
       return d !== null && d <= days;
     })
     .sort((a, b) => (a.next_due_date ?? "").localeCompare(b.next_due_date ?? ""));
+}
+
+// Every active commitment — loans, insurance premiums AND SIPs — with a due
+// date in [fromISO, toISO]. This is the "cash leaving the account" view, so it
+// deliberately INCLUDES SIPs (the money does go out, even if it buys an asset).
+export function commitmentsDueBetween(
+  emis: FinanceEmiRow[],
+  fromISO: string,
+  toISO: string,
+): FinanceEmiRow[] {
+  return emis
+    .filter(
+      (e) =>
+        e.status === "active" &&
+        !!e.next_due_date &&
+        e.next_due_date >= fromISO &&
+        e.next_due_date <= toISO,
+    )
+    .sort((a, b) => (a.next_due_date ?? "").localeCompare(b.next_due_date ?? ""));
+}
+
+// This month's SIP outflow (each active SIP contributes once a month).
+export function monthlySipOutflow(emis: FinanceEmiRow[]): number {
+  return round2(
+    emis
+      .filter((e) => e.type === "sip" && e.status === "active")
+      .reduce((s, e) => s + (e.emi_amount || 0), 0),
+  );
 }

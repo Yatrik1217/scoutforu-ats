@@ -15,9 +15,13 @@ import {
   financialYearPeriod,
   computeProfitAndLoss,
   categoryTotals,
-  emisDueSoon,
+  commitmentsDueBetween,
+  monthlySipOutflow,
+  nextDueOnOrAfter,
   portfolioSummary,
   daysUntil,
+  COMMITMENT_LABEL,
+  COMMITMENT_COLOR,
   type Period,
 } from "@/lib/finance";
 import { money, moneyShort } from "@/lib/invoice";
@@ -47,9 +51,21 @@ export default async function FinanceDashboard({
 
   const pl = computeProfitAndLoss(companyExp, companyCats, revenue);
   const personal = categoryTotals(personalExp, personalCats);
-  const upcoming = emisDueSoon(emis, 45);
-  const upcomingTotal = upcoming.reduce((s, e) => s + e.emi_amount, 0);
   const portfolio = portfolioSummary(emis);
+
+  // "What do I need to pay?" — all active commitments (EMIs, premiums AND SIPs,
+  // since that cash leaves the account too) due in the next 60 days, with the
+  // subtotal payable by the upcoming 10th of the month called out.
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 60);
+  const horizonISO = horizon.toISOString().slice(0, 10);
+  const cutoff10 = nextDueOnOrAfter(todayISO, 10);
+  const dues = commitmentsDueBetween(emis, todayISO, horizonISO);
+  const dueBy10 = dues.filter((e) => (e.next_due_date ?? "") <= cutoff10);
+  const dueBy10Total = dueBy10.reduce((s, e) => s + e.emi_amount, 0);
+  const duesTotal = dues.reduce((s, e) => s + e.emi_amount, 0);
+  const sipMonthly = monthlySipOutflow(emis);
 
   const recent = expenses.slice(0, 8);
 
@@ -162,48 +178,69 @@ export default async function FinanceDashboard({
           </div>
         </Card>
 
-        {/* Upcoming EMIs */}
+        {/* Upcoming payments — what leaves the account, incl. SIPs */}
         <Card
-          title="Upcoming EMIs"
-          action={<Link href="/finance/emis" className="text-[12px] font-bold text-[#2a6fdb]">View all</Link>}
+          title="Upcoming payments"
+          action={<Link href="/finance/emis" className="text-[12px] font-bold text-[#2a6fdb]">Manage</Link>}
         >
           <div className="mb-3 rounded-[10px] bg-[#fef3e2] p-3">
             <div className="text-[11px] font-bold uppercase tracking-wide text-[#b45309]">
-              Due in next 45 days
+              Due by {format(new Date(cutoff10 + "T00:00:00"), "d MMM")}
             </div>
             <div className="mt-0.5 text-[20px] font-extrabold tabular-nums text-[#92400e]">
-              {money(upcomingTotal)}
+              {money(dueBy10Total)}
+            </div>
+            <div className="text-[11px] font-semibold text-[#b45309]">
+              {dueBy10.length} payment{dueBy10.length === 1 ? "" : "s"}
+              {sipMonthly > 0 && ` · incl. SIP`}
             </div>
           </div>
-          {upcoming.length === 0 ? (
-            <div className="py-4 text-center text-[13px] text-[#8a94a6]">Nothing due soon.</div>
+          {dues.length === 0 ? (
+            <div className="py-4 text-center text-[13px] text-[#8a94a6]">Nothing due in the next 60 days.</div>
           ) : (
-            <div className="flex flex-col divide-y divide-[#f1f4f9]">
-              {upcoming.slice(0, 6).map((e) => {
-                const d = daysUntil(e.next_due_date);
-                return (
-                  <div key={e.id} className="flex items-center gap-3 py-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[#f1f4f9] text-[#8a94a6]">
-                      <CalendarClock size={16} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-bold">{e.name}</div>
-                      <div className="text-[11.5px] font-semibold text-[#8a94a6]">
-                        {e.next_due_date ? format(new Date(e.next_due_date + "T00:00:00"), "d MMM") : "—"}
-                        {d !== null && (
-                          <span className={d < 0 ? "text-[#dc2626]" : d <= 7 ? "text-[#b45309]" : ""}>
-                            {" · "}
-                            {d < 0 ? `${Math.abs(d)}d overdue` : d === 0 ? "today" : `in ${d}d`}
+            <>
+              <div className="flex flex-col divide-y divide-[#f1f4f9]">
+                {dues.slice(0, 7).map((e) => {
+                  const d = daysUntil(e.next_due_date);
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 py-2.5">
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-[9px]"
+                        style={{ background: `${COMMITMENT_COLOR[e.type]}18`, color: COMMITMENT_COLOR[e.type] }}
+                      >
+                        <CalendarClock size={16} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-bold">
+                          {e.name}
+                          <span
+                            className="ml-1.5 rounded-full px-1.5 py-px text-[9.5px] font-bold align-middle"
+                            style={{ background: `${COMMITMENT_COLOR[e.type]}18`, color: COMMITMENT_COLOR[e.type] }}
+                          >
+                            {COMMITMENT_LABEL[e.type]}
                           </span>
-                        )}
-                        <span className="ml-1 capitalize">· {e.scope}</span>
+                        </div>
+                        <div className="text-[11.5px] font-semibold text-[#8a94a6]">
+                          {e.next_due_date ? format(new Date(e.next_due_date + "T00:00:00"), "d MMM") : "—"}
+                          {d !== null && (
+                            <span className={d < 0 ? "text-[#dc2626]" : d <= 7 ? "text-[#b45309]" : ""}>
+                              {" · "}
+                              {d < 0 ? `${Math.abs(d)}d overdue` : d === 0 ? "today" : `in ${d}d`}
+                            </span>
+                          )}
+                          <span className="ml-1 capitalize">· {e.scope}</span>
+                        </div>
                       </div>
+                      <div className="text-[13px] font-bold tabular-nums">{moneyShort(e.emi_amount)}</div>
                     </div>
-                    <div className="text-[13px] font-bold tabular-nums">{moneyShort(e.emi_amount)}</div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-[#e9edf3] pt-3 text-[12.5px]">
+                <span className="font-semibold text-[#8a94a6]">Total next 60 days</span>
+                <span className="font-extrabold tabular-nums">{money(duesTotal)}</span>
+              </div>
+            </>
           )}
         </Card>
       </div>
