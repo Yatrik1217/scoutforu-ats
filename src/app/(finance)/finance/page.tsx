@@ -9,7 +9,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
-import { loadFinance, loadCollectedRevenue } from "@/lib/finance-data";
+import { loadFinance, loadPlacementRevenue } from "@/lib/finance-data";
 import {
   monthPeriod,
   financialYearPeriod,
@@ -39,10 +39,11 @@ export default async function FinanceDashboard({
   const isFY = sp.period !== "month";
   const period: Period = isFY ? financialYearPeriod() : monthPeriod();
 
-  const [{ categories, expenses, emis }, revenue] = await Promise.all([
+  const [{ categories, expenses, emis }, rev] = await Promise.all([
     loadFinance(undefined, period),
-    loadCollectedRevenue(period),
+    loadPlacementRevenue(period),
   ]);
+  const revenue = rev.grossFee; // fees earned, ex-GST; TDS/GST handled on the company page
 
   const companyCats = categories.filter((c) => c.scope === "company");
   const personalCats = categories.filter((c) => c.scope === "personal");
@@ -101,7 +102,7 @@ export default async function FinanceDashboard({
         <StatCard
           label="ScoutforU Revenue"
           value={moneyShort(pl.revenue)}
-          sub="Collected from placements"
+          sub="Fees earned, ex-GST"
           icon={CircleDollarSign}
           color="#2a6fdb"
           href="/finance/company"
@@ -160,7 +161,7 @@ export default async function FinanceDashboard({
           <div className="mb-1 text-[11.5px] font-semibold text-[#8a94a6]">
             {period.label}
           </div>
-          <PLLine label="Revenue (collected)" value={pl.revenue} accent="#16a34a" />
+          <PLLine label="Revenue (fees, ex-GST)" value={pl.revenue} accent="#16a34a" />
           <PLLine label="Operating expenses" value={-pl.operatingExpenses} />
           <PLLine label="EBITDA" value={pl.ebitda} strong accent="#16a34a" hint={pl.revenue > 0 ? `${pct(pl.ebitdaMargin)} margin` : undefined} />
           <PLLine label="Interest, tax & depreciation" value={-pl.addBacks} />
@@ -172,9 +173,10 @@ export default async function FinanceDashboard({
             hint={pl.revenue > 0 ? `${pct(pl.netMargin)} margin` : undefined}
           />
           <div className="mt-3 rounded-[10px] bg-[#f6f8fb] p-3 text-[11.5px] font-medium leading-relaxed text-[#8a94a6]">
-            Revenue is pulled automatically from ScoutforU placement receipts in {period.label}.
-            EBITDA excludes interest, taxes and depreciation — mark those categories as
-            &ldquo;below EBITDA&rdquo; so the split stays correct.
+            Revenue = professional fees earned (ex-GST) from ScoutforU placements in {period.label}.
+            EBITDA excludes interest, taxes and depreciation. Client TDS is advance tax (not an
+            expense) — see the <Link href="/finance/company" className="font-bold text-[#2a6fdb]">Company P&amp;L</Link> for
+            the TDS credit and cash-received breakdown.
           </div>
         </Card>
 

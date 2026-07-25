@@ -3,6 +3,7 @@
 // placement_payments so the company P&L needs no manual revenue entry.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { round2 } from "@/lib/invoice";
 import type {
   FinanceCategoryRow,
   FinanceExpenseRow,
@@ -61,4 +62,57 @@ export async function loadCollectedRevenue(period: Period): Promise<number> {
     .gte("paid_on", period.from)
     .lte("paid_on", period.to);
   return (data ?? []).reduce((sum, p) => sum + (p.amount || 0), 0);
+}
+
+export type PlacementRevenue = {
+  grossFee: number; // professional fee earned, EXCLUDING GST — the P&L revenue line
+  gst: number; // GST collected (a liability, not revenue)
+  tds: number; // TDS the client deducted — advance tax, NOT an expense; below EBITDA
+  collected: number; // cash actually recorded as received in the period
+};
+
+// Revenue for the company P&L, derived from PLACEMENT fields rather than from
+// how a payment amount was typed — so it's correct whether you recorded the
+// gross fee or the net-of-TDS receipt. Each payment is apportioned against the
+// placement's net payable, then split into fee / GST / TDS using the placement's
+// own figures. Attribution is by payment date, so it works month-wise and FY.
+export async function loadPlacementRevenue(period: Period): Promise<PlacementRevenue> {
+  const sb = await createClient();
+  const { data: pays } = await sb
+    .from("placement_payments")
+    .select("amount,paid_on,placement_id")
+    .gte("paid_on", period.from)
+    .lte("paid_on", period.to);
+  if (!pays || pays.length === 0) return { grossFee: 0, gst: 0, tds: 0, collected: 0 };
+
+  const ids = [...new Set(pays.map((p) => p.placement_id).filter(Boolean))];
+  const { data: places } = await sb
+    .from("placements")
+    .select("id,fee_amount,gst_amount,tds_amount,net_payable,total_fee")
+    .in("id", ids);
+  const byId = new Map((places ?? []).map((p) => [p.id, p]));
+
+  let grossFee = 0;
+  let gst = 0;
+  let tds = 0;
+  let collected = 0;
+  for (const pay of pays) {
+    const amt = pay.amount || 0;
+    collected += amt;
+    const p = pay.placement_id ? byId.get(pay.placement_id) : undefined;
+    if (!p) continue;
+    // net_payable is what the client actually remits (total − TDS). Apportion this
+    // payment against it, then split by the placement's fee/GST/TDS proportions.
+    const base = p.net_payable && p.net_payable > 0 ? p.net_payable : p.total_fee || 0;
+    const frac = base > 0 ? Math.min(1, amt / base) : 0;
+    grossFee += frac * (p.fee_amount || 0);
+    gst += frac * (p.gst_amount || 0);
+    tds += frac * (p.tds_amount || 0);
+  }
+  return {
+    grossFee: round2(grossFee),
+    gst: round2(gst),
+    tds: round2(tds),
+    collected: round2(collected),
+  };
 }
