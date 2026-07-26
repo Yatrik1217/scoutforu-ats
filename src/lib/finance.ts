@@ -99,11 +99,14 @@ export function duePaymentDates(
 ): string[] {
   const anchor = c.start_date > fromISO ? c.start_date : fromISO;
   if (anchor > toISO) return [];
-  return monthsInRange(anchor, toISO).map((mo) => {
-    const [y, m] = mo.key.split("-").map(Number);
-    const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last of this
-    return toISODate(new Date(y, m - 1, Math.min(c.due_day, lastDay)));
-  });
+  return monthsInRange(anchor, toISO)
+    .map((mo) => {
+      const [y, m] = mo.key.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last of this
+      return toISODate(new Date(y, m - 1, Math.min(c.due_day, lastDay)));
+    })
+    // never emit a due date before the commitment actually started
+    .filter((d) => d >= anchor);
 }
 
 // ---- P&L / EBITDA ------------------------------------------------------------

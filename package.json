@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "test": "node --import ./test/finance/register.mjs test/finance/finance.test.mts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
