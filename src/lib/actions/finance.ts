@@ -35,6 +35,37 @@ async function requireAdmin() {
   return { sb, me };
 }
 
+// Pick a sensible default category for a commitment that was saved without one,
+// so its posted payments are never "Uncategorised". Matches by name within the
+// same book; returns null only if nothing suitable exists.
+async function resolveCategoryId(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  scope: FinanceScope,
+  type: FinanceCommitmentType,
+  chosen: string | null,
+): Promise<string | null> {
+  if (chosen) return chosen;
+  const needles =
+    type === "loan"
+      ? ["emi", "loan"]
+      : type === "sip"
+        ? ["sip", "invest"]
+        : type === "insurance"
+          ? ["insurance", "term"]
+          : ["other operating", "other"]; // bill
+  const { data } = await sb
+    .from("finance_categories")
+    .select("id,name")
+    .eq("scope", scope)
+    .eq("kind", "expense")
+    .eq("archived", false);
+  for (const n of needles) {
+    const hit = (data ?? []).find((c) => c.name.toLowerCase().includes(n));
+    if (hit) return hit.id;
+  }
+  return null;
+}
+
 // ---- expenses / income lines -------------------------------------------------
 export type ExpenseForm = {
   scope: FinanceScope;
@@ -209,13 +240,14 @@ export async function saveEmi(id: string | null, form: EmiForm): Promise<Result>
   const dueDay = Math.min(31, Math.max(1, Math.round(form.dueDay || 1)));
   // Only loans have a finite payoff; insurance, bills and SIPs are open-ended.
   const total = form.type === "loan" ? Math.max(0, Math.round(form.totalInstallments || 0)) : 0;
+  const categoryId = await resolveCategoryId(sb, form.scope, form.type, form.categoryId);
 
   const base = {
     scope: form.scope,
     type: form.type,
     name: form.name.trim(),
     lender: form.lender.trim(),
-    category_id: form.categoryId,
+    category_id: categoryId,
     principal: round2(form.principal || 0),
     current_value: form.type === "sip" ? round2(form.currentValue || 0) : 0,
     emi_amount: round2(form.emiAmount),
