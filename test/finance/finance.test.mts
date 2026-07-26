@@ -164,6 +164,22 @@ test("buildDueItems: merges commitments + future one-off bills, sorted by date",
   assert.equal(items[1].tag, "EMI");
   assert.equal(items[2].tag, "SIP");
 });
+test("buildDueItems: suppresses a one-off that duplicates a commitment", () => {
+  const emis = [
+    { id: "l1", type: "loan", status: "active", next_due_date: "2026-08-07", emi_amount: 21428, scope: "personal", name: "Vananta Home Loan" },
+  ];
+  const expenses = [
+    // duplicate of the home loan (same scope+amount, 3 days apart) → suppressed
+    { id: "d1", is_income: false, emi_id: null, txn_date: "2026-08-10", amount: 21428, category_id: null, title: "EMI - Vananta", scope: "personal" },
+    // a genuine, different bill → kept
+    { id: "k1", is_income: false, emi_id: null, txn_date: "2026-08-02", amount: 13000, category_id: null, title: "Salary", scope: "company" },
+  ];
+  const items = buildDueItems(emis as never, expenses as never, [] as never, "2026-07-26", "2026-08-25");
+  const ids = items.map((i) => i.id);
+  assert.ok(!ids.includes("exp-d1"), "duplicate one-off should be suppressed");
+  assert.ok(ids.includes("emi-l1") && ids.includes("exp-k1"), "commitment + genuine bill kept");
+  assert.equal(items.length, 2);
+});
 test("buildDueItems: excludes income + EMI-mirror expense lines", () => {
   const emis: unknown[] = [];
   const expenses = [

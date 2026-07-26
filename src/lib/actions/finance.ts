@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { round2 } from "@/lib/invoice";
-import { computeNextDue, advanceAfterPayment, duePaymentDates } from "@/lib/finance";
+import { computeNextDue, advanceAfterPayment, duePaymentDates, nextDueOnOrAfter } from "@/lib/finance";
 import type {
   FinanceScope,
   FinanceCategoryKind,
@@ -376,21 +376,24 @@ export async function postDuePayments(): Promise<Result> {
     if (error) return { ok: false, error: error.message };
     posted += rowsToInsert.length;
 
-    // keep the loan's paid counter & next due in step (loans only; open-ended
-    // types don't track a payoff)
-    if (e.type === "loan" && e.total_installments > 0) {
-      const paid = Math.min(e.total_installments, e.paid_installments + rowsToInsert.length);
-      const closed = paid >= e.total_installments;
-      await sb
-        .from("finance_emis")
-        .update({
-          paid_installments: paid,
-          status: closed ? "closed" : e.status,
-          next_due_date: computeNextDue({ ...e, paid_installments: paid }),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", e.id);
-    }
+    // Advance the schedule for EVERY type so a just-posted month no longer shows
+    // as due. We've caught up through this month, so the next due is next month.
+    const nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthFirstISO = `${nm.getFullYear()}-${String(nm.getMonth() + 1).padStart(2, "0")}-01`;
+    const isLoan = e.type === "loan" && e.total_installments > 0;
+    const paid = isLoan
+      ? Math.min(e.total_installments, e.paid_installments + rowsToInsert.length)
+      : e.paid_installments + rowsToInsert.length;
+    const closed = isLoan && paid >= e.total_installments;
+    await sb
+      .from("finance_emis")
+      .update({
+        paid_installments: paid,
+        status: closed ? "closed" : e.status,
+        next_due_date: closed ? null : nextDueOnOrAfter(nextMonthFirstISO, e.due_day),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", e.id);
   }
 
   refresh();

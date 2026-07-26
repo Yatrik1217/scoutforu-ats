@@ -393,7 +393,8 @@ export function buildDueItems(
   toISO: string,
 ): DueItem[] {
   const catById = new Map(categories.map((c) => [c.id, c]));
-  const commitments: DueItem[] = commitmentsDueBetween(emis, fromISO, toISO).map((e) => ({
+  const dueCommitments = commitmentsDueBetween(emis, fromISO, toISO);
+  const commitments: DueItem[] = dueCommitments.map((e) => ({
     id: `emi-${e.id}`,
     label: e.name,
     date: e.next_due_date as string,
@@ -402,8 +403,26 @@ export function buildDueItems(
     color: COMMITMENT_COLOR[e.type],
     scope: e.scope,
   }));
+  // Safety net: a one-off expense that looks like a commitment's payment (same
+  // book, same amount, due within a few days of it) is a duplicate of the
+  // commitment already listed — don't show it twice.
+  const looksLikeCommitment = (e: FinanceExpenseRow) =>
+    dueCommitments.some(
+      (c) =>
+        c.scope === e.scope &&
+        c.emi_amount === e.amount &&
+        !!c.next_due_date &&
+        Math.abs((+new Date(e.txn_date) - +new Date(c.next_due_date)) / 86_400_000) <= 5,
+    );
   const bills: DueItem[] = expenses
-    .filter((e) => !e.is_income && !e.emi_id && e.txn_date >= fromISO && e.txn_date <= toISO)
+    .filter(
+      (e) =>
+        !e.is_income &&
+        !e.emi_id &&
+        e.txn_date >= fromISO &&
+        e.txn_date <= toISO &&
+        !looksLikeCommitment(e),
+    )
     .map((e) => {
       const c = e.category_id ? catById.get(e.category_id) : undefined;
       return {
