@@ -43,7 +43,7 @@ export default async function FinanceDashboard({
   // so future one-off bills always show, whichever period you're viewing.
   const todayISO = new Date().toISOString().slice(0, 10);
   const horizon = new Date();
-  horizon.setDate(horizon.getDate() + 60);
+  horizon.setDate(horizon.getDate() + 30);
   const horizonISO = horizon.toISOString().slice(0, 10);
 
   const [{ categories, expenses, emis }, rev, upcomingBundle] = await Promise.all([
@@ -62,10 +62,10 @@ export default async function FinanceDashboard({
   const personal = categoryTotals(personalExp, personalCats);
   const portfolio = portfolioSummary(emis);
 
-  // "What do I need to pay?" — everything with cash going out in the next 60
-  // days: active commitments (EMIs, premiums AND SIPs) plus any future-dated
-  // one-off bills you've entered (e.g. a company credit-card / software payment
-  // due in August). Subtotal payable by the upcoming 10th is called out.
+  // "What do I need to pay?" — everything with cash going out in the next 30
+  // days (one month): active commitments (EMIs, premiums AND SIPs) plus any
+  // future-dated one-off bills you've entered (e.g. a company credit-card /
+  // software payment). Subtotal payable by the upcoming 10th is called out.
   const cutoff10 = nextDueOnOrAfter(todayISO, 10);
 
   const catById = new Map(categories.map((c) => [c.id, c]));
@@ -234,7 +234,7 @@ export default async function FinanceDashboard({
             </div>
           </div>
           {dueItems.length === 0 ? (
-            <div className="py-4 text-center text-[13px] text-[#8a94a6]">Nothing due in the next 60 days.</div>
+            <div className="py-4 text-center text-[13px] text-[#8a94a6]">Nothing due in the next 30 days.</div>
           ) : (
             <>
               <div className="flex flex-col divide-y divide-[#f1f4f9]">
@@ -275,7 +275,7 @@ export default async function FinanceDashboard({
                 })}
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-[#e9edf3] pt-3 text-[12.5px]">
-                <span className="font-semibold text-[#8a94a6]">Total next 60 days</span>
+                <span className="font-semibold text-[#8a94a6]">Total next 30 days</span>
                 <span className="font-extrabold tabular-nums">{money(duesTotal)}</span>
               </div>
             </>
