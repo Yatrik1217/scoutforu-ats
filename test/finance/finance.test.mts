@@ -12,6 +12,7 @@ import {
   portfolioSummary,
   investmentGain,
   commitmentsDueBetween,
+  buildDueItems,
   monthlySipOutflow,
   emiOutstanding,
   emiRemainingCount,
@@ -144,6 +145,35 @@ test("commitmentsDueBetween: includes all active types in range, excludes paused
   ];
   const due = commitmentsDueBetween(emis as never, "2026-07-26", "2026-09-24").map((x) => x.id);
   assert.deepEqual(due, ["c", "a", "b"]); // sorted by date, paused + far-future excluded
+});
+test("buildDueItems: merges commitments + future one-off bills, sorted by date", () => {
+  const cats = [{ id: "c1", name: "Software", color: "#111", ebitda_addback: false }];
+  const emis = [
+    { id: "l1", type: "loan", status: "active", next_due_date: "2026-08-05", emi_amount: 8046, scope: "personal", name: "Car Loan" },
+    { id: "s1", type: "sip", status: "active", next_due_date: "2026-08-07", emi_amount: 2500, scope: "personal", name: "SIP" },
+  ];
+  const expenses = [
+    { id: "e1", is_income: false, emi_id: null, txn_date: "2026-08-01", amount: 1500, category_id: "c1", title: "Claude", scope: "company" },
+    { id: "e2", is_income: true, emi_id: null, txn_date: "2026-08-02", amount: 999, category_id: null, title: "income", scope: "company" }, // income excluded
+    { id: "e3", is_income: false, emi_id: "l1", txn_date: "2026-08-03", amount: 8046, category_id: null, title: "mirror", scope: "personal" }, // emi mirror excluded
+  ];
+  const items = buildDueItems(emis as never, expenses as never, cats as never, "2026-07-26", "2026-08-25");
+  // sorted by date: Claude bill (1 Aug), Car Loan (5 Aug), SIP (7 Aug)
+  assert.deepEqual(items.map((i) => i.id), ["exp-e1", "emi-l1", "emi-s1"]);
+  assert.equal(items[0].tag, "Software"); // one-off bill uses its category name
+  assert.equal(items[1].tag, "EMI");
+  assert.equal(items[2].tag, "SIP");
+});
+test("buildDueItems: excludes income + EMI-mirror expense lines", () => {
+  const emis: unknown[] = [];
+  const expenses = [
+    { id: "e1", is_income: false, emi_id: null, txn_date: "2026-08-01", amount: 100, category_id: null, title: "Bill", scope: "company" },
+    { id: "e2", is_income: true, emi_id: null, txn_date: "2026-08-02", amount: 999, category_id: null, title: "income", scope: "company" },
+    { id: "e3", is_income: false, emi_id: "x", txn_date: "2026-08-03", amount: 999, category_id: null, title: "mirror", scope: "company" },
+  ];
+  const items = buildDueItems(emis as never, expenses as never, [] as never, "2026-07-26", "2026-08-25");
+  assert.deepEqual(items.map((i) => i.id), ["exp-e1"]);
+  assert.equal(items[0].tag, "Bill");
 });
 test("monthlySipOutflow: sums only active SIPs", () => {
   const emis = [

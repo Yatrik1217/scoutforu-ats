@@ -9,6 +9,7 @@ import {
   Landmark,
   TrendingUp,
   Tags,
+  CalendarClock,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const NAV: NavItem[] = [
   { href: "/finance", label: "Dashboard", icon: LayoutGrid },
   { href: "/finance/company", label: "Company P&L", icon: Building2 },
   { href: "/finance/personal", label: "Personal", icon: Wallet },
+  { href: "/finance/upcoming", label: "Upcoming", icon: CalendarClock },
   { href: "/finance/emis", label: "EMIs & Loans", icon: Landmark },
   { href: "/finance/investments", label: "Investments", icon: TrendingUp },
   { href: "/finance/categories", label: "Categories", icon: Tags },

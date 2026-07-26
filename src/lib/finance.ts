@@ -7,6 +7,7 @@ import type {
   FinanceEmiRow,
   FinancePaymentMethod,
   FinanceCommitmentType,
+  FinanceScope,
 } from "@/lib/database.types";
 
 // Short label for each commitment kind, used in the "money out" / dues lists.
@@ -367,6 +368,55 @@ export function commitmentsDueBetween(
         e.next_due_date <= toISO,
     )
     .sort((a, b) => (a.next_due_date ?? "").localeCompare(b.next_due_date ?? ""));
+}
+
+// One normalised "money going out" line, whatever its source.
+export type DueItem = {
+  id: string;
+  label: string;
+  date: string;
+  amount: number;
+  tag: string;
+  color: string;
+  scope: FinanceScope;
+};
+
+// Everything due in [fromISO, toISO], from ALL sources in one list: active
+// commitments (loans, insurance, bills, SIPs) plus future-dated one-off expense
+// entries (e.g. a company credit-card bill). Sorted by date. This is the single
+// source the dashboard card and the Upcoming page both render.
+export function buildDueItems(
+  emis: FinanceEmiRow[],
+  expenses: FinanceExpenseRow[],
+  categories: FinanceCategoryRow[],
+  fromISO: string,
+  toISO: string,
+): DueItem[] {
+  const catById = new Map(categories.map((c) => [c.id, c]));
+  const commitments: DueItem[] = commitmentsDueBetween(emis, fromISO, toISO).map((e) => ({
+    id: `emi-${e.id}`,
+    label: e.name,
+    date: e.next_due_date as string,
+    amount: e.emi_amount,
+    tag: COMMITMENT_LABEL[e.type],
+    color: COMMITMENT_COLOR[e.type],
+    scope: e.scope,
+  }));
+  const bills: DueItem[] = expenses
+    .filter((e) => !e.is_income && !e.emi_id && e.txn_date >= fromISO && e.txn_date <= toISO)
+    .map((e) => {
+      const c = e.category_id ? catById.get(e.category_id) : undefined;
+      return {
+        id: `exp-${e.id}`,
+        label: e.title,
+        date: e.txn_date,
+        amount: e.amount,
+        tag: c?.name ?? "Bill",
+        color: c?.color ?? "#8b5cf6",
+        scope: e.scope,
+      };
+    });
+  return [...commitments, ...bills].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // This month's SIP outflow (each active SIP contributes once a month).

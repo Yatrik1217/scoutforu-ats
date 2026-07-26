@@ -15,13 +15,11 @@ import {
   financialYearPeriod,
   computeProfitAndLoss,
   categoryTotals,
-  commitmentsDueBetween,
+  buildDueItems,
   monthlySipOutflow,
   nextDueOnOrAfter,
   portfolioSummary,
   daysUntil,
-  COMMITMENT_LABEL,
-  COMMITMENT_COLOR,
   type Period,
 } from "@/lib/finance";
 import { money, moneyShort } from "@/lib/invoice";
@@ -68,37 +66,7 @@ export default async function FinanceDashboard({
   // software payment). Subtotal payable by the upcoming 10th is called out.
   const cutoff10 = nextDueOnOrAfter(todayISO, 10);
 
-  const catById = new Map(categories.map((c) => [c.id, c]));
-  // future-dated expense entries in the window (exclude income + EMI mirror lines)
-  const futureBills = upcomingBundle.expenses.filter(
-    (e) => !e.is_income && !e.emi_id && e.txn_date >= todayISO && e.txn_date <= horizonISO,
-  );
-
-  type DueItem = { id: string; label: string; date: string; amount: number; tag: string; color: string; scope: string };
-  const dueItems: DueItem[] = [
-    ...commitmentsDueBetween(emis, todayISO, horizonISO).map((e) => ({
-      id: `emi-${e.id}`,
-      label: e.name,
-      date: e.next_due_date as string,
-      amount: e.emi_amount,
-      tag: COMMITMENT_LABEL[e.type],
-      color: COMMITMENT_COLOR[e.type],
-      scope: e.scope,
-    })),
-    ...futureBills.map((e) => {
-      const c = e.category_id ? catById.get(e.category_id) : undefined;
-      return {
-        id: `exp-${e.id}`,
-        label: e.title,
-        date: e.txn_date,
-        amount: e.amount,
-        tag: c?.name ?? "Bill",
-        color: c?.color ?? "#8b5cf6",
-        scope: e.scope,
-      };
-    }),
-  ].sort((a, b) => a.date.localeCompare(b.date));
-
+  const dueItems = buildDueItems(emis, upcomingBundle.expenses, categories, todayISO, horizonISO);
   const dueBy10 = dueItems.filter((i) => i.date <= cutoff10);
   const dueBy10Total = dueBy10.reduce((s, i) => s + i.amount, 0);
   const duesTotal = dueItems.reduce((s, i) => s + i.amount, 0);
@@ -219,7 +187,7 @@ export default async function FinanceDashboard({
         {/* Upcoming payments — what leaves the account, incl. SIPs */}
         <Card
           title="Upcoming payments"
-          action={<Link href="/finance/emis" className="text-[12px] font-bold text-[#2a6fdb]">Manage</Link>}
+          action={<Link href="/finance/upcoming" className="text-[12px] font-bold text-[#2a6fdb]">View all</Link>}
         >
           <div className="mb-3 rounded-[10px] bg-[#fef3e2] p-3">
             <div className="text-[11px] font-bold uppercase tracking-wide text-[#b45309]">

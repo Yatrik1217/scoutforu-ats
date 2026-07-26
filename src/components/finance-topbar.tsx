@@ -8,6 +8,7 @@ const TITLES: Record<string, [string, string]> = {
   "/finance": ["Finance Dashboard", "Personal & company money at a glance"],
   "/finance/company": ["Company P&L", "ScoutforU revenue, expenses & EBITDA"],
   "/finance/personal": ["Personal", "Home, fuel, EMIs & everyday spend"],
+  "/finance/upcoming": ["Upcoming payments", "Everything due in the next 30 days"],
   "/finance/emis": ["EMIs & Loans", "Loans & insurance premiums — what's due"],
   "/finance/investments": ["Investments", "SIPs & assets — tracked apart from expenses"],
   "/finance/categories": ["Categories", "Organise your expense heads"],
