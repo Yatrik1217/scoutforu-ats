@@ -39,9 +39,17 @@ export default async function FinanceDashboard({
   const isFY = sp.period !== "month";
   const period: Period = isFY ? financialYearPeriod() : monthPeriod();
 
-  const [{ categories, expenses, emis }, rev] = await Promise.all([
+  // window for "upcoming payments" — loaded independently of the FY/month toggle
+  // so future one-off bills always show, whichever period you're viewing.
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 60);
+  const horizonISO = horizon.toISOString().slice(0, 10);
+
+  const [{ categories, expenses, emis }, rev, upcomingBundle] = await Promise.all([
     loadFinance(undefined, period),
     loadPlacementRevenue(period),
+    loadFinance(undefined, { from: todayISO, to: horizonISO, label: "" }),
   ]);
   const revenue = rev.grossFee; // fees earned, ex-GST; TDS/GST handled on the company page
 
@@ -58,15 +66,11 @@ export default async function FinanceDashboard({
   // days: active commitments (EMIs, premiums AND SIPs) plus any future-dated
   // one-off bills you've entered (e.g. a company credit-card / software payment
   // due in August). Subtotal payable by the upcoming 10th is called out.
-  const todayISO = new Date().toISOString().slice(0, 10);
-  const horizon = new Date();
-  horizon.setDate(horizon.getDate() + 60);
-  const horizonISO = horizon.toISOString().slice(0, 10);
   const cutoff10 = nextDueOnOrAfter(todayISO, 10);
 
   const catById = new Map(categories.map((c) => [c.id, c]));
   // future-dated expense entries in the window (exclude income + EMI mirror lines)
-  const futureBills = expenses.filter(
+  const futureBills = upcomingBundle.expenses.filter(
     (e) => !e.is_income && !e.emi_id && e.txn_date >= todayISO && e.txn_date <= horizonISO,
   );
 

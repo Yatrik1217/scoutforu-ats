@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { round2 } from "@/lib/invoice";
-import { computeNextDue, advanceAfterPayment } from "@/lib/finance";
+import { computeNextDue, advanceAfterPayment, duePaymentDates } from "@/lib/finance";
 import type {
   FinanceScope,
   FinanceCategoryKind,
@@ -189,6 +189,7 @@ const TYPE_NOUN: Record<FinanceCommitmentType, string> = {
   loan: "Loan",
   insurance: "Insurance",
   sip: "Investment",
+  bill: "Bill",
 };
 
 export async function saveEmi(id: string | null, form: EmiForm): Promise<Result> {
@@ -206,9 +207,8 @@ export async function saveEmi(id: string | null, form: EmiForm): Promise<Result>
     };
   if (!form.startDate) return { ok: false, error: "Pick a start date." };
   const dueDay = Math.min(31, Math.max(1, Math.round(form.dueDay || 1)));
-  // Insurance premiums are open-ended (no payoff), so they never carry a
-  // finite installment count.
-  const total = form.type === "insurance" ? 0 : Math.max(0, Math.round(form.totalInstallments || 0));
+  // Only loans have a finite payoff; insurance, bills and SIPs are open-ended.
+  const total = form.type === "loan" ? Math.max(0, Math.round(form.totalInstallments || 0)) : 0;
 
   const base = {
     scope: form.scope,
@@ -281,7 +281,7 @@ export async function payEmiInstallment(
   // Loans & insurance premiums are money spent → mirror an expense line so the
   // ledger and P&L pick it up. SIPs are investments → no expense line.
   if (!isInvestment) {
-    const prefix = e.type === "insurance" ? "Premium" : "EMI";
+    const prefix = e.type === "insurance" ? "Premium" : e.type === "bill" ? "Bill" : "EMI";
     const { error: expErr } = await sb.from("finance_expenses").insert({
       scope: e.scope,
       category_id: e.category_id,
@@ -316,6 +316,86 @@ export async function payEmiInstallment(
         ? "Final payment made — closed"
         : e.type === "insurance"
           ? "Premium paid"
-          : "Installment paid";
+          : e.type === "bill"
+            ? "Bill paid"
+            : "Installment paid";
   return { ok: true, message: label };
+}
+
+// Catch-up: for every active recurring EXPENSE commitment (loan / insurance /
+// bill), post any missing monthly payment from the start of the current
+// financial year up to this month — idempotent, so re-running only adds what's
+// missing. This is the one-click "auto-fill each month" the EMI backfill SQL did.
+export async function postDuePayments(): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+
+  const { data: rows } = await sb.from("finance_emis").select("*").eq("status", "active");
+  const commitments = ((rows ?? []) as FinanceEmiRow[]).filter((e) =>
+    ["loan", "insurance", "bill"].includes(e.type),
+  );
+  if (commitments.length === 0) return { ok: true, message: "No active recurring payments to post." };
+
+  // financial year start (1 Apr) and the end of the current month
+  const now = new Date();
+  const fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const fyStart = `${fyStartYear}-04-01`;
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const monthEndISO = monthEnd.toISOString().slice(0, 10);
+
+  let posted = 0;
+  for (const e of commitments) {
+    const dates = duePaymentDates({ start_date: e.start_date, due_day: e.due_day }, fyStart, monthEndISO);
+    if (dates.length === 0) continue;
+
+    // which months already have a posted line for this commitment?
+    const { data: existing } = await sb
+      .from("finance_expenses")
+      .select("txn_date")
+      .eq("emi_id", e.id);
+    const haveMonths = new Set((existing ?? []).map((x) => (x.txn_date || "").slice(0, 7)));
+
+    const toInsert = dates.filter((d) => !haveMonths.has(d.slice(0, 7)));
+    if (toInsert.length === 0) continue;
+
+    const prefix = e.type === "insurance" ? "Premium" : e.type === "bill" ? "Bill" : "EMI";
+    const rowsToInsert = toInsert.map((d) => ({
+      scope: e.scope,
+      category_id: e.category_id,
+      is_income: false,
+      title: `${prefix} — ${e.name}`,
+      amount: round2(e.emi_amount),
+      txn_date: d,
+      payment_method: "auto_debit" as FinancePaymentMethod,
+      payee: e.lender,
+      notes: "Auto-posted recurring payment",
+      emi_id: e.id,
+      created_by: me.id,
+    }));
+    const { error } = await sb.from("finance_expenses").insert(rowsToInsert);
+    if (error) return { ok: false, error: error.message };
+    posted += rowsToInsert.length;
+
+    // keep the loan's paid counter & next due in step (loans only; open-ended
+    // types don't track a payoff)
+    if (e.type === "loan" && e.total_installments > 0) {
+      const paid = Math.min(e.total_installments, e.paid_installments + rowsToInsert.length);
+      const closed = paid >= e.total_installments;
+      await sb
+        .from("finance_emis")
+        .update({
+          paid_installments: paid,
+          status: closed ? "closed" : e.status,
+          next_due_date: computeNextDue({ ...e, paid_installments: paid }),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", e.id);
+    }
+  }
+
+  refresh();
+  return {
+    ok: true,
+    message: posted === 0 ? "Everything's already up to date." : `Posted ${posted} payment${posted === 1 ? "" : "s"}.`,
+  };
 }

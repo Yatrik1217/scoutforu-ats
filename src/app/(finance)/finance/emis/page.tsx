@@ -8,9 +8,11 @@ import {
   daysUntil,
 } from "@/lib/finance";
 import { money, moneyShort } from "@/lib/invoice";
+import { Repeat } from "lucide-react";
 import { StatCard, Card } from "@/components/finance/pieces";
 import { EmiModal } from "@/components/finance/emi-modal";
 import { EmiActions } from "@/components/finance/emi-actions";
+import { PostDueButton } from "@/components/finance/post-due-button";
 import type { FinanceEmiRow, FinanceCategoryRow } from "@/lib/database.types";
 
 export default async function EmisPage() {
@@ -23,6 +25,7 @@ export default async function EmisPage() {
   const commitments = emis.filter((e) => e.type !== "sip");
   const loans = commitments.filter((e) => e.type === "loan");
   const insurance = commitments.filter((e) => e.type === "insurance");
+  const bills = commitments.filter((e) => e.type === "bill");
 
   const active = commitments.filter((e) => e.status === "active");
   const monthlyOutgo = active.reduce((s, e) => s + e.emi_amount, 0);
@@ -37,6 +40,7 @@ export default async function EmisPage() {
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <div className="mb-5 flex items-center gap-2">
         <div className="flex-1" />
+        <PostDueButton />
         <EmiModal
           scope="company"
           categories={companyCats}
@@ -94,6 +98,22 @@ export default async function EmisPage() {
           <EmiCard key={e.id} emi={e} categories={e.scope === "company" ? companyCats : personalCats} />
         ))}
       </div>
+
+      {/* Recurring bills */}
+      <Section title="Recurring bills" icon={Repeat} count={bills.length} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {bills.length === 0 && (
+          <Card className="lg:col-span-2">
+            <div className="py-8 text-center text-[13px] text-[#8a94a6]">
+              No recurring bills yet. Add monthly costs like <b>office rent, software subscriptions or salaries</b> via
+              <b> + Personal / + Company</b> → choose <b>Recurring bill</b>. Use <b>Post due payments</b> to auto-fill each month.
+            </div>
+          </Card>
+        )}
+        {bills.map((e) => (
+          <EmiCard key={e.id} emi={e} categories={e.scope === "company" ? companyCats : personalCats} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -121,6 +141,8 @@ function EmiCard({
   const d = daysUntil(emi.next_due_date);
   const tracked = emi.total_installments > 0;
   const isInsurance = emi.type === "insurance";
+  const isBill = emi.type === "bill";
+  const openEnded = isInsurance || isBill; // no payoff / outstanding
 
   const statusMeta =
     emi.status === "closed"
@@ -146,10 +168,15 @@ function EmiCard({
                 Premium · expense
               </span>
             )}
+            {isBill && (
+              <span className="rounded-full bg-[#f3effe] px-2 py-0.5 text-[10.5px] font-bold text-[#6d28d9]">
+                Recurring · expense
+              </span>
+            )}
           </div>
           <div className="mt-0.5 text-[12px] font-semibold text-[#8a94a6]">
             {emi.lender || "—"}
-            {!isInsurance && emi.interest_rate > 0 && ` · ${emi.interest_rate}% p.a.`}
+            {!openEnded && emi.interest_rate > 0 && ` · ${emi.interest_rate}% p.a.`}
           </div>
         </div>
         <div className="text-right">
@@ -173,15 +200,15 @@ function EmiCard({
             "—"
           )}
         </Mini>
-        <Mini label={isInsurance ? "Type" : "Remaining"}>
-          {isInsurance ? "Recurring" : tracked ? `${remaining} EMIs` : "—"}
+        <Mini label={openEnded ? "Type" : "Remaining"}>
+          {openEnded ? "Recurring" : tracked ? `${remaining} EMIs` : "—"}
         </Mini>
         <Mini label={isInsurance ? "Cover" : "Outstanding"}>
-          {isInsurance ? (emi.principal > 0 ? moneyShort(emi.principal) : "—") : tracked ? moneyShort(outstanding) : "—"}
+          {isInsurance ? (emi.principal > 0 ? moneyShort(emi.principal) : "—") : openEnded ? "—" : tracked ? moneyShort(outstanding) : "—"}
         </Mini>
       </div>
 
-      {tracked && !isInsurance && (
+      {tracked && !openEnded && (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-[11px] font-bold text-[#8a94a6]">
             <span>
@@ -197,7 +224,7 @@ function EmiCard({
 
       <div className="mt-3 flex items-center justify-between border-t border-[#f1f4f9] pt-3">
         <span className="text-[11.5px] font-medium text-[#9aa4b6]">
-          {isInsurance ? "Premium" : "Due"} on the {ordinal(emi.due_day)} each month
+          {isInsurance ? "Premium" : isBill ? "Bill" : "Due"} on the {ordinal(emi.due_day)} each month
         </span>
         <EmiActions emi={emi} categories={categories} />
       </div>

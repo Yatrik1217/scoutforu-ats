@@ -444,7 +444,7 @@ export type FinancePaymentMethod =
   | "auto_debit"
   | "other";
 export type FinanceEmiStatus = "active" | "paused" | "closed";
-export type FinanceCommitmentType = "loan" | "insurance" | "sip";
+export type FinanceCommitmentType = "loan" | "insurance" | "sip" | "bill";
 
 export type FinanceCategoryRow = {
   id: string;

@@ -14,13 +14,19 @@ export const COMMITMENT_LABEL: Record<FinanceCommitmentType, string> = {
   loan: "EMI",
   insurance: "Premium",
   sip: "SIP",
+  bill: "Bill",
 };
 
 export const COMMITMENT_COLOR: Record<FinanceCommitmentType, string> = {
   loan: "#2a6fdb",
   insurance: "#b45309",
   sip: "#16a34a",
+  bill: "#8b5cf6",
 };
+
+// Commitments that are recurring EXPENSES (paying them posts an expense line):
+// loans, insurance premiums and general bills. SIPs are investments, not here.
+export const EXPENSE_COMMITMENT_TYPES: FinanceCommitmentType[] = ["loan", "insurance", "bill"];
 
 export const PAYMENT_METHOD_LABEL: Record<FinancePaymentMethod, string> = {
   bank_transfer: "Bank Transfer",
@@ -81,6 +87,23 @@ export function monthsInRange(
     d = new Date(y, m + 1, 1);
   }
   return out;
+}
+
+// The due dates a recurring commitment should have between [fromISO, toISO] —
+// one per month, on due_day (clamped to the month length), starting no earlier
+// than the commitment's own start date. Powers "post all due payments".
+export function duePaymentDates(
+  c: { start_date: string; due_day: number },
+  fromISO: string,
+  toISO: string,
+): string[] {
+  const anchor = c.start_date > fromISO ? c.start_date : fromISO;
+  if (anchor > toISO) return [];
+  return monthsInRange(anchor, toISO).map((mo) => {
+    const [y, m] = mo.key.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last of this
+    return toISODate(new Date(y, m - 1, Math.min(c.due_day, lastDay)));
+  });
 }
 
 // ---- P&L / EBITDA ------------------------------------------------------------

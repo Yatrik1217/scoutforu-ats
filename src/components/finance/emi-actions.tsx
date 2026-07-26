@@ -41,7 +41,7 @@ export function EmiActions({
           title="Record this month's payment"
         >
           <CheckCircle2 size={14} />
-          {emi.type === "insurance" ? "Pay premium" : "Pay EMI"}
+          {emi.type === "insurance" ? "Pay premium" : emi.type === "bill" ? "Pay bill" : "Pay EMI"}
         </button>
       )}
       <EmiModal
