@@ -13,6 +13,8 @@ import {
   investmentGain,
   commitmentsDueBetween,
   buildDueItems,
+  scheduledForMonth,
+  monthPeriod,
   monthlySipOutflow,
   emiOutstanding,
   emiRemainingCount,
@@ -190,6 +192,23 @@ test("buildDueItems: excludes income + EMI-mirror expense lines", () => {
   const items = buildDueItems(emis as never, expenses as never, [] as never, "2026-07-26", "2026-08-25");
   assert.deepEqual(items.map((i) => i.id), ["exp-e1"]);
   assert.equal(items[0].tag, "Bill");
+});
+test("scheduledForMonth: projects unpaid recurring dues, excludes posted/pre-start/finished", () => {
+  const aug = monthPeriod(new Date("2026-08-15T00:00:00"));
+  const emis = [
+    { id: "l1", type: "loan", status: "active", scope: "personal", name: "Car Loan", emi_amount: 8046, due_day: 5, start_date: "2024-01-01", total_installments: 36, paid_installments: 10 },
+    { id: "h1", type: "loan", status: "active", scope: "personal", name: "Home Loan", emi_amount: 21428, due_day: 7, start_date: "2021-01-01", total_installments: 300, paid_installments: 57 },
+    { id: "p1", type: "insurance", status: "active", scope: "personal", name: "Kotak", emi_amount: 614, due_day: 5, start_date: "2025-01-01", total_installments: 0, paid_installments: 0 },
+    { id: "future", type: "bill", status: "active", scope: "personal", name: "New rent", emi_amount: 5000, due_day: 1, start_date: "2026-10-01", total_installments: 0, paid_installments: 0 }, // starts after Aug
+    { id: "done", type: "loan", status: "active", scope: "personal", name: "Old loan", emi_amount: 1000, due_day: 1, start_date: "2020-01-01", total_installments: 12, paid_installments: 12 }, // finished long ago
+  ];
+  // Car Loan already posted in Aug → should be excluded
+  const augExpenses = [{ emi_id: "l1", txn_date: "2026-08-05", amount: 8046, is_income: false }];
+  const items = scheduledForMonth(emis as never, augExpenses as never, aug);
+  const ids = items.map((i) => i.id);
+  assert.deepEqual(ids, ["sched-p1", "sched-h1"], "Kotak (5th) then Home Loan (7th); Car posted, rent not started, old loan finished");
+  assert.equal(items[1].date, "2026-08-07");
+  assert.equal(items[1].amount, 21428);
 });
 test("monthlySipOutflow: sums only active SIPs", () => {
   const emis = [

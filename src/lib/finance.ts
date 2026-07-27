@@ -438,6 +438,44 @@ export function buildDueItems(
   return [...commitments, ...bills].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Projected recurring payments for a given month that are NOT yet posted — so
+// you can look ahead (e.g. next month) and see what's due before paying. A
+// commitment is scheduled for the month when it's active, started on/before it,
+// (for loans) not yet fully paid by then, and has no posted payment that month.
+export function scheduledForMonth(
+  emis: FinanceEmiRow[],
+  monthExpenses: FinanceExpenseRow[],
+  month: Period,
+): DueItem[] {
+  const posted = new Set(monthExpenses.filter((e) => e.emi_id).map((e) => e.emi_id as string));
+  const monthKey = month.from.slice(0, 7);
+  const y = Number(monthKey.slice(0, 4));
+  const m = Number(monthKey.slice(5, 7));
+  const lastDay = new Date(y, m, 0).getDate();
+  const out: DueItem[] = [];
+  for (const e of emis) {
+    if (e.status !== "active" || posted.has(e.id)) continue;
+    const startKey = (e.start_date || "").slice(0, 7);
+    if (startKey && monthKey < startKey) continue; // not started yet
+    if (e.type === "loan" && e.total_installments > 0) {
+      const sy = Number(startKey.slice(0, 4));
+      const sm = Number(startKey.slice(5, 7));
+      if ((y - sy) * 12 + (m - sm) >= e.total_installments) continue; // loan finished
+    }
+    const day = Math.min(e.due_day, lastDay);
+    out.push({
+      id: `sched-${e.id}`,
+      label: e.name,
+      date: `${monthKey}-${String(day).padStart(2, "0")}`,
+      amount: e.emi_amount,
+      tag: COMMITMENT_LABEL[e.type],
+      color: COMMITMENT_COLOR[e.type],
+      scope: e.scope,
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // This month's SIP outflow (each active SIP contributes once a month).
 export function monthlySipOutflow(emis: FinanceEmiRow[]): number {
   return round2(
