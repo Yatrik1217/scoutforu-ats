@@ -74,7 +74,9 @@ export function FundPicker({
         <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-[9px] border border-[#e3e8f0] bg-white shadow-lg">
           {pending && <div className="px-3 py-2 text-[12px] text-[#8a94a6]">Searching…</div>}
           {!pending && hits.length === 0 && q.trim().length >= 3 && (
-            <div className="px-3 py-2 text-[12px] text-[#8a94a6]">No funds found — try the fund house + type.</div>
+            <div className="px-3 py-2 text-[12px] text-[#8a94a6]">
+              No funds found — try the fund house + type (e.g. &ldquo;Kotak Aggressive Hybrid&rdquo;), or paste the AMFI scheme code.
+            </div>
           )}
           {hits.map((h) => (
             <button

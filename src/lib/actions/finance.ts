@@ -153,21 +153,60 @@ export async function deleteExpense(id: string): Promise<Result> {
 // ---- mutual-fund NAV sync ----------------------------------------------------
 export type FundHit = { schemeCode: string; schemeName: string };
 
-// Search AMFI mutual funds by name (proxied server-side to avoid CORS). Used by
-// the fund picker when linking a SIP to its scheme for live NAV.
-export async function searchFunds(query: string): Promise<FundHit[]> {
-  const q = query.trim();
-  if (q.length < 3) return [];
+// Search AMFI mutual funds (proxied server-side to avoid CORS). Robust to
+// app-style names: strips "(Reg)"/"(G)" and punctuation, retries with fewer
+// words, ranks Growth/Regular plans first, and accepts a scheme code pasted
+// directly (all-digits).
+async function mfapiSearch(q: string): Promise<FundHit[]> {
   try {
     const res = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`, {
       next: { revalidate: 86400 },
     });
     if (!res.ok) return [];
     const data = (await res.json()) as { schemeCode: number; schemeName: string }[];
-    return (data ?? []).slice(0, 25).map((d) => ({ schemeCode: String(d.schemeCode), schemeName: d.schemeName }));
+    return (data ?? []).map((d) => ({ schemeCode: String(d.schemeCode), schemeName: d.schemeName }));
   } catch {
     return [];
   }
+}
+
+export async function searchFunds(query: string): Promise<FundHit[]> {
+  const raw = query.trim();
+  if (raw.length < 3) return [];
+
+  // pasted AMFI scheme code → look it up directly
+  if (/^\d{4,}$/.test(raw)) {
+    try {
+      const res = await fetch(`https://api.mfapi.in/mf/${raw}`, { next: { revalidate: 86400 } });
+      if (res.ok) {
+        const j = (await res.json()) as { meta?: { scheme_name?: string } };
+        if (j?.meta?.scheme_name) return [{ schemeCode: raw, schemeName: j.meta.scheme_name }];
+      }
+    } catch {
+      /* ignore */
+    }
+    return [];
+  }
+
+  // drop "(Reg)"/"(G)"/"(Direct)" etc + punctuation, then search on the words
+  const cleaned = raw.replace(/\([^)]*\)/g, " ").replace(/[^\w\s&]/g, " ").replace(/\s+/g, " ").trim();
+  const tokens = cleaned.split(" ").filter(Boolean);
+
+  let hits = await mfapiSearch(cleaned);
+  if (hits.length === 0 && tokens.length > 3) hits = await mfapiSearch(tokens.slice(0, 3).join(" "));
+  if (hits.length === 0 && tokens.length > 2) hits = await mfapiSearch(tokens.slice(0, 2).join(" "));
+
+  // surface Growth + Regular (typical SIP) plans first, IDCW/dividend last
+  const rank = (name: string) => {
+    const n = name.toLowerCase();
+    let s = 0;
+    if (n.includes("growth")) s -= 2;
+    if (n.includes("regular")) s -= 1;
+    if (n.includes("idcw") || n.includes("dividend") || n.includes("payout")) s += 3;
+    return s;
+  };
+  hits.sort((a, b) => rank(a.schemeName) - rank(b.schemeName));
+  return hits.slice(0, 25);
 }
 
 // Bust the cached NAVs so the Investments page pulls fresh quotes.
