@@ -2,10 +2,10 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { InvestmentModal } from "@/components/finance/investment-modal";
-import { payEmiInstallment, deleteEmi } from "@/lib/actions/finance";
+import { payEmiInstallment, reverseContribution, deleteEmi } from "@/lib/actions/finance";
 import type { FinanceEmiRow } from "@/lib/database.types";
 
 export function InvestmentActions({ emi }: { emi: FinanceEmiRow }) {
@@ -34,6 +34,16 @@ export function InvestmentActions({ emi }: { emi: FinanceEmiRow }) {
         >
           <Plus size={14} />
           Contribution
+        </button>
+      )}
+      {emi.paid_installments > 0 && (
+        <button
+          onClick={() => run(() => reverseContribution(emi.id))}
+          disabled={pending}
+          className="rounded-[7px] p-1.5 text-[#8a94a6] hover:bg-[#fef3e2] hover:text-[#b45309] disabled:opacity-40"
+          title="Undo last contribution"
+        >
+          <Undo2 size={15} />
         </button>
       )}
       <InvestmentModal

@@ -425,6 +425,40 @@ export async function payEmiInstallment(
   return { ok: true, message: label };
 }
 
+// Undo the last SIP contribution (e.g. clicked by mistake). SIP contributions
+// post no expense, so they can't be reversed from the ledger — this rolls the
+// count back one and moves the next-due back a month. (Loan/insurance/bill
+// payments are reversed instead by deleting their transaction in the ledger.)
+export async function reverseContribution(id: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+  const { data: emi } = await sb.from("finance_emis").select("*").eq("id", id).maybeSingle();
+  if (!emi) return { ok: false, error: "Not found." };
+  const e = emi as FinanceEmiRow;
+  if (e.type !== "sip")
+    return { ok: false, error: "Undo a loan/premium/bill payment by deleting its transaction in the ledger." };
+  if (e.paid_installments <= 0) return { ok: false, error: "No contribution to undo." };
+
+  const base = e.next_due_date ? new Date(e.next_due_date + "T00:00:00") : new Date();
+  const prev = new Date(base.getFullYear(), base.getMonth() - 1, 1);
+  const lastDay = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+  const day = Math.min(e.due_day, lastDay);
+  const prevDue = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  const { error } = await sb
+    .from("finance_emis")
+    .update({
+      paid_installments: e.paid_installments - 1,
+      status: e.status === "closed" ? "active" : e.status,
+      next_due_date: prevDue,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Contribution reversed" };
+}
+
 // Catch-up: for every active recurring EXPENSE commitment (loan / insurance /
 // bill), post any missing monthly payment from the start of the current
 // financial year up to this month — idempotent, so re-running only adds what's
