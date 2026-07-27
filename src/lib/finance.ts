@@ -454,13 +454,21 @@ export function scheduledForMonth(
   const lastDay = new Date(y, m, 0).getDate();
   const out: DueItem[] = [];
   for (const e of emis) {
-    if (e.status !== "active" || posted.has(e.id)) continue;
+    if (e.status !== "active") continue;
     const startKey = (e.start_date || "").slice(0, 7);
     if (startKey && monthKey < startKey) continue; // not started yet
     if (e.type === "loan" && e.total_installments > 0) {
       const sy = Number(startKey.slice(0, 4));
       const sm = Number(startKey.slice(5, 7));
       if ((y - sy) * 12 + (m - sm) >= e.total_installments) continue; // loan finished
+    }
+    // SIPs never create expense rows, so "already paid" is judged by their
+    // schedule: a SIP is still due if its next payment falls on/before month-end.
+    // Everything else is judged by whether an expense was posted that month.
+    if (e.type === "sip") {
+      if (e.next_due_date && e.next_due_date > month.to) continue; // already contributed past this month
+    } else if (posted.has(e.id)) {
+      continue; // expense already posted this month
     }
     const day = Math.min(e.due_day, lastDay);
     out.push({

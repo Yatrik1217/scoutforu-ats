@@ -364,7 +364,7 @@ export async function postDuePayments(): Promise<Result> {
 
   const { data: rows } = await sb.from("finance_emis").select("*").eq("status", "active");
   const commitments = ((rows ?? []) as FinanceEmiRow[]).filter((e) =>
-    ["loan", "insurance", "bill"].includes(e.type),
+    ["loan", "insurance", "bill", "sip"].includes(e.type),
   );
   if (commitments.length === 0) return { ok: true, message: "No active recurring payments to post." };
 
@@ -374,9 +374,30 @@ export async function postDuePayments(): Promise<Result> {
   const fyStart = `${fyStartYear}-04-01`;
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const monthEndISO = monthEnd.toISOString().slice(0, 10);
+  const nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthFirstISO = `${nm.getFullYear()}-${String(nm.getMonth() + 1).padStart(2, "0")}-01`;
 
   let posted = 0;
   for (const e of commitments) {
+    // SIPs are investments — recording a contribution advances the schedule but
+    // does NOT post an expense. Catch up any due months up to now.
+    if (e.type === "sip") {
+      if (!e.next_due_date || e.next_due_date > monthEndISO) continue;
+      const nd = new Date(e.next_due_date + "T00:00:00");
+      const months = (now.getFullYear() - nd.getFullYear()) * 12 + (now.getMonth() - nd.getMonth()) + 1;
+      if (months <= 0) continue;
+      await sb
+        .from("finance_emis")
+        .update({
+          paid_installments: e.paid_installments + months,
+          next_due_date: nextDueOnOrAfter(nextMonthFirstISO, e.due_day),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", e.id);
+      posted += months;
+      continue;
+    }
+
     const dates = duePaymentDates({ start_date: e.start_date, due_day: e.due_day }, fyStart, monthEndISO);
     if (dates.length === 0) continue;
 
@@ -408,10 +429,8 @@ export async function postDuePayments(): Promise<Result> {
     if (error) return { ok: false, error: error.message };
     posted += rowsToInsert.length;
 
-    // Advance the schedule for EVERY type so a just-posted month no longer shows
-    // as due. We've caught up through this month, so the next due is next month.
-    const nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const nextMonthFirstISO = `${nm.getFullYear()}-${String(nm.getMonth() + 1).padStart(2, "0")}-01`;
+    // Advance the schedule so a just-posted month no longer shows as due. We've
+    // caught up through this month, so the next due is next month.
     const isLoan = e.type === "loan" && e.total_installments > 0;
     const paid = isLoan
       ? Math.min(e.total_installments, e.paid_installments + rowsToInsert.length)

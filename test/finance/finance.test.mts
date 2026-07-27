@@ -210,6 +210,16 @@ test("scheduledForMonth: projects unpaid recurring dues, excludes posted/pre-sta
   assert.equal(items[1].date, "2026-08-07");
   assert.equal(items[1].amount, 21428);
 });
+test("scheduledForMonth: SIP judged by next_due, not by expense rows", () => {
+  const sip = { id: "s1", type: "sip", status: "active", scope: "personal", name: "HDFC SIP", emi_amount: 3000, due_day: 7, start_date: "2025-01-01", total_installments: 0, paid_installments: 6, next_due_date: "2026-08-07" };
+  // July: SIP already scheduled for Aug (next_due 7 Aug) → NOT due in July
+  const julyItems = scheduledForMonth([sip] as never, [] as never, monthPeriod(new Date("2026-07-20T00:00:00")));
+  assert.deepEqual(julyItems.map((i) => i.id), [], "SIP with next_due in Aug is not due in July");
+  // August: next_due 7 Aug falls in the month → scheduled
+  const augItems = scheduledForMonth([sip] as never, [] as never, monthPeriod(new Date("2026-08-20T00:00:00")));
+  assert.deepEqual(augItems.map((i) => i.id), ["sched-s1"]);
+  assert.equal(augItems[0].amount, 3000);
+});
 test("monthlySipOutflow: sums only active SIPs", () => {
   const emis = [
     { type: "sip", status: "active", emi_amount: 500 },
