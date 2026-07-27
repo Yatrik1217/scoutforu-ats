@@ -150,6 +150,34 @@ export async function deleteExpense(id: string): Promise<Result> {
   return { ok: true, message: "Entry deleted" };
 }
 
+// ---- mutual-fund NAV sync ----------------------------------------------------
+export type FundHit = { schemeCode: string; schemeName: string };
+
+// Search AMFI mutual funds by name (proxied server-side to avoid CORS). Used by
+// the fund picker when linking a SIP to its scheme for live NAV.
+export async function searchFunds(query: string): Promise<FundHit[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+  try {
+    const res = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`, {
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { schemeCode: number; schemeName: string }[];
+    return (data ?? []).slice(0, 25).map((d) => ({ schemeCode: String(d.schemeCode), schemeName: d.schemeName }));
+  } catch {
+    return [];
+  }
+}
+
+// Bust the cached NAVs so the Investments page pulls fresh quotes.
+export async function refreshNavs(): Promise<Result> {
+  const { me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+  revalidatePath("/finance/investments", "page");
+  return { ok: true, message: "NAVs refreshed" };
+}
+
 // ---- categories --------------------------------------------------------------
 export type CategoryForm = {
   scope: FinanceScope;
@@ -206,6 +234,8 @@ export type EmiForm = {
   categoryId: string | null;
   principal: number;
   currentValue: number;
+  schemeCode: string | null;
+  units: number;
   emiAmount: number;
   interestRate: number;
   totalInstallments: number;
@@ -250,6 +280,8 @@ export async function saveEmi(id: string | null, form: EmiForm): Promise<Result>
     category_id: categoryId,
     principal: round2(form.principal || 0),
     current_value: form.type === "sip" ? round2(form.currentValue || 0) : 0,
+    scheme_code: form.type === "sip" ? (form.schemeCode?.trim() || null) : null,
+    units: form.type === "sip" ? Math.max(0, form.units || 0) : 0,
     emi_amount: round2(form.emiAmount),
     interest_rate: form.interestRate || 0,
     total_installments: total,

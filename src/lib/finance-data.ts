@@ -51,6 +51,42 @@ export async function loadFinance(
   };
 }
 
+export type NavQuote = { nav: number; prevNav: number; navDate: string; name: string };
+
+// Latest + previous NAV for a set of AMFI scheme codes, from api.mfapi.in
+// (a free AMFI mirror). Cached 12h and tagged "navs" so a manual refresh can
+// bust it. Failures are skipped, never thrown — a fund without a quote falls
+// back to its stored value.
+export async function loadNavs(codes: string[]): Promise<Map<string, NavQuote>> {
+  const out = new Map<string, NavQuote>();
+  const unique = [...new Set(codes.filter(Boolean))];
+  await Promise.all(
+    unique.map(async (code) => {
+      try {
+        const res = await fetch(`https://api.mfapi.in/mf/${code}`, {
+          next: { revalidate: 43200 },
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          meta?: { scheme_name?: string };
+          data?: { date: string; nav: string }[];
+        };
+        const rows = json.data ?? [];
+        if (rows.length === 0) return;
+        out.set(code, {
+          nav: parseFloat(rows[0].nav) || 0,
+          prevNav: parseFloat(rows[1]?.nav ?? rows[0].nav) || 0,
+          navDate: rows[0].date, // DD-MM-YYYY
+          name: json.meta?.scheme_name ?? "",
+        });
+      } catch {
+        /* ignore — fall back to stored value */
+      }
+    }),
+  );
+  return out;
+}
+
 // ScoutforU cash actually collected within [from,to] — the revenue line for the
 // company P&L. Sums payments recorded against placements (the truth source for
 // received money; invoices are the billing layer generated from these).

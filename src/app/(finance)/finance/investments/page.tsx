@@ -1,29 +1,68 @@
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, PiggyBank, Wallet, CalendarClock } from "lucide-react";
-import { loadFinance } from "@/lib/finance-data";
-import { investmentGain, portfolioSummary, daysUntil } from "@/lib/finance";
-import { money, moneyShort } from "@/lib/invoice";
+import { loadFinance, loadNavs, type NavQuote } from "@/lib/finance-data";
+import { liveInvestment, daysUntil } from "@/lib/finance";
+import { money, moneyShort, round2 } from "@/lib/invoice";
 import { StatCard, Card, pct as pctFmt } from "@/components/finance/pieces";
 import { InvestmentModal } from "@/components/finance/investment-modal";
 import { InvestmentActions } from "@/components/finance/investment-actions";
+import { RefreshNavsButton } from "@/components/finance/refresh-navs-button";
 import type { FinanceEmiRow } from "@/lib/database.types";
+
+// DD-MM-YYYY (AMFI) → "24 Jul 26"
+function navDateLabel(d: string): string {
+  const [dd, mm, yyyy] = d.split("-");
+  if (!yyyy) return d;
+  return format(new Date(Number(yyyy), Number(mm) - 1, Number(dd)), "d MMM yy");
+}
 
 export default async function InvestmentsPage() {
   const { emis } = await loadFinance();
   const sips = emis.filter((e) => e.type === "sip");
-  const p = portfolioSummary(sips);
-  const up = p.gain >= 0;
+  const navs = await loadNavs(sips.map((e) => e.scheme_code ?? "").filter(Boolean));
+
+  // portfolio roll-up from live values (falls back to stored value per fund)
+  let invested = 0;
+  let value = 0;
+  let dayChange = 0;
+  let monthly = 0;
+  let anyLive = false;
+  let asOf = "";
+  for (const e of sips) {
+    const q = e.scheme_code ? navs.get(e.scheme_code) : undefined;
+    const li = liveInvestment(e, q);
+    invested += li.invested;
+    value += li.value;
+    dayChange += li.dayChange;
+    if (e.status === "active") monthly += e.emi_amount || 0;
+    if (li.live) anyLive = true;
+    if (q && (!asOf || q.navDate > asOf)) asOf = q.navDate;
+  }
+  invested = round2(invested);
+  value = round2(value);
+  dayChange = round2(dayChange);
+  const gain = round2(value - invested);
+  const gainPct = invested > 0 ? gain / invested : 0;
+  const prevValue = value - dayChange;
+  const dayPct = prevValue > 0 ? dayChange / prevValue : 0;
+  const up = gain >= 0;
+  const dayUp = dayChange >= 0;
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <p className="mb-4 max-w-2xl text-[13px] font-medium leading-relaxed text-[#8a94a6]">
-        SIPs and recurring investments are tracked here as <b>assets</b> — update the current value
-        anytime to see your gain/loss. They also appear under <b>Upcoming payments</b> on the dashboard
-        (the cash does leave your account), but they&apos;re not counted as a business expense, so they
-        don&apos;t dent your EBITDA.
+        Link each SIP to its fund to value it <b>live</b> — current value = units × latest NAV. Mutual-fund
+        NAVs are declared once a day by AMFI, so &ldquo;today&rsquo;s change&rdquo; is the latest NAV vs the
+        previous day. SIPs are assets (not a business expense), so they don&apos;t dent EBITDA.
       </p>
 
-      <div className="mb-5 flex items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        {anyLive && (
+          <span className="rounded-full bg-[#eafaf0] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">
+            Live · NAV as of {asOf ? navDateLabel(asOf) : "—"}
+          </span>
+        )}
+        <RefreshNavsButton />
         <div className="flex-1" />
         <InvestmentModal
           scope="company"
@@ -43,39 +82,47 @@ export default async function InvestmentsPage() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Invested" value={moneyShort(p.invested)} sub={`${sips.length} investments`} icon={Wallet} color="#8b5cf6" />
-        <StatCard label="Current Value" value={moneyShort(p.value)} sub="Latest you entered" icon={PiggyBank} color="#2a6fdb" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard label="Invested" value={moneyShort(invested)} sub={`${sips.length} investments`} icon={Wallet} color="#8b5cf6" />
+        <StatCard label="Current Value" value={moneyShort(value)} sub={anyLive ? "Live NAV" : "Manual"} icon={PiggyBank} color="#2a6fdb" />
+        <StatCard
+          label="Today's Change"
+          value={`${dayUp ? "+" : "−"}${moneyShort(Math.abs(dayChange))}`}
+          sub={prevValue > 0 ? `${dayUp ? "+" : "−"}${pctFmt(Math.abs(dayPct))} today` : "—"}
+          icon={dayUp ? TrendingUp : TrendingDown}
+          color={dayUp ? "#16a34a" : "#ef4444"}
+        />
         <StatCard
           label="Total Gain / Loss"
-          value={`${p.gain >= 0 ? "+" : "−"}${moneyShort(Math.abs(p.gain))}`}
-          sub={p.invested > 0 ? `${up ? "+" : "−"}${pctFmt(Math.abs(p.pct))} return` : "—"}
+          value={`${up ? "+" : "−"}${moneyShort(Math.abs(gain))}`}
+          sub={invested > 0 ? `${up ? "+" : "−"}${pctFmt(Math.abs(gainPct))} return` : "—"}
           icon={up ? TrendingUp : TrendingDown}
           color={up ? "#16a34a" : "#ef4444"}
         />
-        <StatCard label="Monthly SIP" value={moneyShort(p.monthly)} sub="Active contributions" icon={CalendarClock} color="#06b6d4" />
+        <StatCard label="Monthly SIP" value={moneyShort(monthly)} sub="Active contributions" icon={CalendarClock} color="#06b6d4" />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {sips.length === 0 && (
           <Card className="lg:col-span-2">
             <div className="py-10 text-center text-[13px] text-[#8a94a6]">
-              No investments yet. Add your SIPs, recurring deposits or mutual funds above — they&apos;ll be
-              tracked as assets, kept out of your expense totals.
+              No investments yet. Add your SIPs or mutual funds above, link the fund and enter your units to
+              value them live.
             </div>
           </Card>
         )}
         {sips.map((e) => (
-          <InvestmentCard key={e.id} emi={e} />
+          <InvestmentCard key={e.id} emi={e} quote={e.scheme_code ? navs.get(e.scheme_code) : undefined} />
         ))}
       </div>
     </div>
   );
 }
 
-function InvestmentCard({ emi }: { emi: FinanceEmiRow }) {
-  const g = investmentGain(emi);
+function InvestmentCard({ emi, quote }: { emi: FinanceEmiRow; quote?: NavQuote }) {
+  const g = liveInvestment(emi, quote);
   const up = g.gain >= 0;
+  const dayUp = g.dayChange >= 0;
   const d = daysUntil(emi.next_due_date);
 
   const statusMeta =
@@ -94,12 +141,14 @@ function InvestmentCard({ emi }: { emi: FinanceEmiRow }) {
             <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold" style={{ background: statusMeta.bg, color: statusMeta.color }}>
               {statusMeta.label}
             </span>
-            <span className="rounded-full bg-[#f1f4f9] px-2 py-0.5 text-[10.5px] font-bold capitalize text-[#8a94a6]">
-              {emi.scope}
-            </span>
+            {g.live && (
+              <span className="rounded-full bg-[#eafaf0] px-2 py-0.5 text-[10.5px] font-bold text-[#16a34a]">Live</span>
+            )}
           </div>
           <div className="mt-0.5 text-[12px] font-semibold text-[#8a94a6]">
-            {emi.lender || "—"} · {money(emi.emi_amount)}/mo · {emi.paid_installments} done
+            {emi.lender || "—"} · {money(emi.emi_amount)}/mo
+            {g.live && quote ? ` · NAV ₹${quote.nav.toFixed(2)}` : ""}
+            {emi.units > 0 ? ` · ${emi.units} units` : ""}
           </div>
         </div>
         <div className="text-right">
@@ -113,15 +162,20 @@ function InvestmentCard({ emi }: { emi: FinanceEmiRow }) {
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
         <Mini label="Invested">{moneyShort(g.invested)}</Mini>
-        <Mini label="Current value">{moneyShort(g.value)}</Mini>
+        <Mini label="Value">{moneyShort(g.value)}</Mini>
+        <Mini label="Today">
+          <span style={{ color: g.live ? (dayUp ? "#16a34a" : "#ef4444") : undefined }}>
+            {g.live ? `${dayUp ? "+" : "−"}${moneyShort(Math.abs(g.dayChange))}` : "—"}
+          </span>
+        </Mini>
         <Mini label="Next SIP">
           {emi.status === "active" && emi.next_due_date ? (
             <>
               {format(new Date(emi.next_due_date + "T00:00:00"), "d MMM")}
               {d !== null && (
-                <div className="text-[10.5px] font-bold text-[#8a94a6]">
+                <div className="text-[10px] font-bold text-[#8a94a6]">
                   {d < 0 ? `${Math.abs(d)}d ago` : d === 0 ? "today" : `in ${d}d`}
                 </div>
               )}
@@ -134,7 +188,7 @@ function InvestmentCard({ emi }: { emi: FinanceEmiRow }) {
 
       <div className="mt-3 flex items-center justify-between border-t border-[#f1f4f9] pt-3">
         <span className="text-[11.5px] font-medium text-[#9aa4b6]">
-          {emi.status === "active" ? `SIP on the ${ordinal(emi.due_day)} each month` : "Not contributing"}
+          {emi.scheme_code ? "Live from AMFI" : "Link a fund for live NAV"}
         </span>
         <InvestmentActions emi={emi} />
       </div>
@@ -149,10 +203,4 @@ function Mini({ label, children }: { label: string; children: React.ReactNode })
       <div className="mt-0.5 text-[12.5px] font-extrabold tabular-nums">{children}</div>
     </div>
   );
-}
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }

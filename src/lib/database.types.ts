@@ -484,6 +484,8 @@ export type FinanceEmiRow = {
   category_id: string | null;
   principal: number;
   current_value: number;
+  scheme_code: string | null;
+  units: number;
   emi_amount: number;
   interest_rate: number;
   total_installments: number;

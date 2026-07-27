@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { NumberInput } from "@/components/number-input";
+import { FundPicker } from "@/components/finance/fund-picker";
 import { saveEmi, type EmiForm } from "@/lib/actions/finance";
 import type {
   FinanceEmiRow,
@@ -37,6 +38,7 @@ export function InvestmentModal({
   const [pending, start] = useTransition();
   const today = new Date().toISOString().slice(0, 10);
 
+  const [schemeLabel, setSchemeLabel] = useState(emi?.scheme_code ? emi?.name ?? "" : "");
   const [f, setF] = useState<EmiForm>(() => ({
     scope,
     type: "sip",
@@ -45,6 +47,8 @@ export function InvestmentModal({
     categoryId: null,
     principal: emi?.principal ?? 0,
     currentValue: emi?.current_value ?? 0,
+    schemeCode: emi?.scheme_code ?? null,
+    units: emi?.units ?? 0,
     emiAmount: emi?.emi_amount ?? 0,
     interestRate: emi?.interest_rate ?? 0,
     totalInstallments: emi?.total_installments ?? 0,
@@ -141,7 +145,34 @@ export function InvestmentModal({
               </div>
             </div>
 
+            {/* live NAV link */}
+            <div>
+              <label className={label}>Live NAV — link this fund (optional)</label>
+              <FundPicker
+                schemeCode={f.schemeCode}
+                schemeLabel={schemeLabel}
+                onSelect={(code, name) => {
+                  set("schemeCode", code);
+                  setSchemeLabel(name);
+                  if (!f.name.trim()) set("name", name);
+                }}
+                onClear={() => {
+                  set("schemeCode", null);
+                  setSchemeLabel("");
+                }}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={label}>Units held</label>
+                <NumberInput
+                  className={field}
+                  value={f.units}
+                  onChange={(n) => set("units", n)}
+                  placeholder="from your MF statement"
+                />
+              </div>
               <div>
                 <label className={label}>Already invested (₹)</label>
                 <NumberInput
@@ -151,16 +182,19 @@ export function InvestmentModal({
                   placeholder="lump before tracking"
                 />
               </div>
+            </div>
+
+            {!f.schemeCode && (
               <div>
-                <label className={label}>Current value (₹)</label>
+                <label className={label}>Current value (₹) — manual</label>
                 <NumberInput
                   className={field}
                   value={f.currentValue}
                   onChange={(n) => set("currentValue", n)}
-                  placeholder="today's market value"
+                  placeholder="used only if no fund is linked"
                 />
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>

@@ -306,6 +306,30 @@ export function investmentGain(
   return { invested, value, gain, pct: invested > 0 ? gain / invested : 0 };
 }
 
+// Live valuation of a SIP from its units × latest NAV. Falls back to the
+// stored current_value when there's no scheme/units/NAV. Returns today's change
+// too (units × NAV move since the previous session).
+export function liveInvestment(
+  emi: Pick<FinanceEmiRow, "principal" | "paid_installments" | "emi_amount" | "current_value" | "units">,
+  quote?: { nav: number; prevNav: number },
+): { invested: number; value: number; gain: number; pct: number; dayChange: number; dayPct: number; live: boolean } {
+  const invested = investedAmount(emi);
+  const hasLive = !!quote && emi.units > 0 && quote.nav > 0;
+  const value = hasLive ? round2(emi.units * quote!.nav) : round2(emi.current_value || 0);
+  const dayChange = hasLive ? round2(emi.units * (quote!.nav - quote!.prevNav)) : 0;
+  const prevValue = value - dayChange;
+  const gain = round2(value - invested);
+  return {
+    invested,
+    value,
+    gain,
+    pct: invested > 0 ? gain / invested : 0,
+    dayChange,
+    dayPct: prevValue > 0 ? dayChange / prevValue : 0,
+    live: hasLive,
+  };
+}
+
 // Roll up a set of investments into one portfolio summary.
 export function portfolioSummary(emis: FinanceEmiRow[]): {
   invested: number;

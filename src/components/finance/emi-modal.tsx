@@ -52,6 +52,8 @@ export function EmiModal({
     categoryId: emi?.category_id ?? null,
     principal: emi?.principal ?? 0,
     currentValue: 0,
+    schemeCode: null,
+    units: 0,
     emiAmount: emi?.emi_amount ?? 0,
     interestRate: emi?.interest_rate ?? 0,
     totalInstallments: emi?.total_installments ?? 0,

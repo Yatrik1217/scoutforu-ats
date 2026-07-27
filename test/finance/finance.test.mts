@@ -11,6 +11,7 @@ import {
   categoryTotals,
   portfolioSummary,
   investmentGain,
+  liveInvestment,
   commitmentsDueBetween,
   buildDueItems,
   scheduledForMonth,
@@ -129,6 +130,24 @@ test("portfolioSummary: invested = lump + contributions, gain vs value", () => {
   assert.equal(p.value, 7000);
   assert.equal(p.gain, 1000);
   assert.equal(p.monthly, 500);
+});
+test("liveInvestment: values units × NAV with today's change", () => {
+  const g = liveInvestment(
+    { principal: 1000, paid_installments: 0, emi_amount: 0, current_value: 0, units: 100 },
+    { nav: 15.783, prevNav: 15.823 },
+  );
+  assert.equal(g.value, 1578.3);
+  assert.equal(g.dayChange, -4); // 100 × (15.783 − 15.823)
+  assert.equal(g.invested, 1000);
+  assert.equal(g.gain, 578.3);
+  assert.equal(g.live, true);
+});
+test("liveInvestment: falls back to stored value when no fund/units", () => {
+  const g = liveInvestment({ principal: 0, paid_installments: 2, emi_amount: 500, current_value: 1200, units: 0 });
+  assert.equal(g.value, 1200);
+  assert.equal(g.dayChange, 0);
+  assert.equal(g.invested, 1000);
+  assert.equal(g.live, false);
 });
 test("investmentGain: negative when value < invested", () => {
   const g = investmentGain({ principal: 0, paid_installments: 4, emi_amount: 1000, current_value: 3500 } as never);
