@@ -3,16 +3,10 @@
 import { useActionState, useState } from "react";
 import { signInAction } from "@/lib/actions/auth";
 
-const DEMO = [
-  { label: "Master Admin", email: "yatrik@scoutforu.com", color: "#2a6fdb" },
-  { label: "Recruiter", email: "yashashvi.shah@scoutforu.com", color: "#8b5cf6" },
-  { label: "Client", email: "hr@acme.com", color: "#f59e0b" },
-];
-
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signInAction, null);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("scoutforu123");
+  const [password, setPassword] = useState("");
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -58,36 +52,6 @@ export function LoginForm() {
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
-
-      <div className="mt-2 border-t border-[#f0f3f8] pt-4">
-        <div className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">
-          Demo accounts · password scoutforu123
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {DEMO.map((d) => (
-            <button
-              key={d.email}
-              type="button"
-              onClick={() => {
-                setEmail(d.email);
-                setPassword("scoutforu123");
-              }}
-              className="flex items-center gap-2.5 rounded-[9px] border border-[#e6eaf1] bg-white px-3 py-2 text-left transition hover:bg-[#f4f7fc]"
-            >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ background: d.color }}
-              />
-              <span className="flex-1 text-[13px] font-bold text-[#16203a]">
-                {d.label}
-              </span>
-              <span className="text-[11px] font-medium text-[#9aa4b6]">
-                {d.email}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
     </form>
   );
 }
