@@ -38,7 +38,6 @@ export default async function AppLayout({
             effectiveRole={scope.role}
             realRole={scope.realRole}
             scopeLabel={scope.scopeLabel}
-            clients={clients ?? []}
           />
           <div className="relative flex-1 overflow-auto">{children}</div>
         </ShellProvider>

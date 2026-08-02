@@ -13,7 +13,7 @@ import { useShell } from "@/components/shell-provider";
 import { signOutAction } from "@/lib/actions/auth";
 import { setPreviewAction } from "@/lib/actions/preview";
 import { ROLE_COLOR } from "@/lib/domain";
-import type { ClientRow, UserRole } from "@/lib/database.types";
+import type { UserRole } from "@/lib/database.types";
 
 const TITLES: Record<string, [string, string]> = {
   "/overview": ["Overview", "Recruitment at a glance"],
@@ -34,12 +34,10 @@ export function AppTopbar({
   effectiveRole,
   realRole,
   scopeLabel,
-  clients,
 }: {
   effectiveRole: UserRole;
   realRole: UserRole;
   scopeLabel: string;
-  clients: ClientRow[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -144,16 +142,8 @@ export function AppTopbar({
                 active={effectiveRole === "recruiter"}
                 onClick={() => setPreview("recruiter")}
               />
-              {clients.map((c) => (
-                <PreviewItem
-                  key={c.id}
-                  label="Client"
-                  scope={`Preview · ${c.name}`}
-                  color={ROLE_COLOR.client}
-                  active={false}
-                  onClick={() => setPreview(`client:${c.id}`)}
-                />
-              ))}
+              {/* Client preview removed — client access is granted from Admin,
+                  not switched into from a personal login. */}
             </>
           ) : (
             <div className="px-2 py-1.5 text-[12px] font-semibold text-[#42506b]">

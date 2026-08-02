@@ -333,18 +333,8 @@ function PipelineCard({
         </div>
         <RatingChip value={cand.rating} />
       </div>
-      {!dense && cand.tags.length > 0 && (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {cand.tags.map((t) => (
-            <span
-              key={t}
-              className="rounded-md bg-[#eef2f8] px-2 py-[3px] text-[10.5px] font-semibold text-[#556680]"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Skills intentionally omitted here — the board stays scannable by name.
+          Full skill tags live in the candidate drawer and the Talent view. */}
       <div className="mt-[11px] flex items-center justify-between border-t border-[#f0f3f8] pt-2.5">
         <div className="flex items-center gap-1.5">
           <RecBadge name={cand.recruiterName} color={cand.recruiterColor} />
