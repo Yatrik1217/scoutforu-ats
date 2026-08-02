@@ -470,6 +470,7 @@ export type FinanceExpenseRow = {
   payee: string;
   notes: string;
   emi_id: string | null;
+  paid_on: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

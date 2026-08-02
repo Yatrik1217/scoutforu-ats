@@ -82,7 +82,9 @@ export default async function UpcomingPage() {
                     </div>
                   </div>
                   <div className="text-[14px] font-extrabold tabular-nums">{money(it.amount)}</div>
-                  {it.emiId && <PayDueButton emiId={it.emiId} paidOn={it.date} />}
+                  {(it.emiId || it.expenseId) && (
+                    <PayDueButton emiId={it.emiId} expenseId={it.expenseId} paidOn={it.date} />
+                  )}
                 </div>
               );
             })}

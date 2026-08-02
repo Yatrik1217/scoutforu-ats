@@ -405,8 +405,9 @@ export type DueItem = {
   scope: FinanceScope;
   // Set when this line is backed by a recurring commitment (loan/insurance/bill/
   // sip) — lets the dues lists offer a per-item "Mark paid" that records just this
-  // one. One-off bills (a future-dated expense) leave it undefined.
+  // one. One-off bills (a future-dated expense) set expenseId instead.
   emiId?: string;
+  expenseId?: string;
 };
 
 // Everything due in [fromISO, toISO], from ALL sources in one list: active
@@ -448,6 +449,7 @@ export function buildDueItems(
       (e) =>
         !e.is_income &&
         !e.emi_id &&
+        !e.paid_on && // already ticked off as paid — no longer "due"
         e.txn_date >= fromISO &&
         e.txn_date <= toISO &&
         !looksLikeCommitment(e),
@@ -462,6 +464,7 @@ export function buildDueItems(
         tag: c?.name ?? "Bill",
         color: c?.color ?? "#8b5cf6",
         scope: e.scope,
+        expenseId: e.id,
       };
     });
   return [...commitments, ...bills].sort((a, b) => a.date.localeCompare(b.date));

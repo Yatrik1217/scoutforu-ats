@@ -425,6 +425,35 @@ export async function payEmiInstallment(
   return { ok: true, message: label };
 }
 
+// Tick a single one-off payment (a salary, a credit-card bill, an ad-hoc bill)
+// as paid. It's already a real expense in the ledger; this only drops it from the
+// "Upcoming payments" list. Undo by clearing paid_on (edit the transaction).
+export async function markExpensePaid(id: string, paidOn?: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+  const when = paidOn || new Date().toISOString().slice(0, 10);
+  const { error } = await sb
+    .from("finance_expenses")
+    .update({ paid_on: when, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Marked paid" };
+}
+
+// Reverse a "mark paid" — puts a one-off payment back on the Upcoming list.
+export async function unmarkExpensePaid(id: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+  const { error } = await sb
+    .from("finance_expenses")
+    .update({ paid_on: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Moved back to upcoming" };
+}
+
 // Undo the last SIP contribution (e.g. clicked by mistake). SIP contributions
 // post no expense, so they can't be reversed from the ledger — this rolls the
 // count back one and moves the next-due back a month. (Loan/insurance/bill
