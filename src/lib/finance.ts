@@ -403,6 +403,10 @@ export type DueItem = {
   tag: string;
   color: string;
   scope: FinanceScope;
+  // Set when this line is backed by a recurring commitment (loan/insurance/bill/
+  // sip) — lets the dues lists offer a per-item "Mark paid" that records just this
+  // one. One-off bills (a future-dated expense) leave it undefined.
+  emiId?: string;
 };
 
 // Everything due in [fromISO, toISO], from ALL sources in one list: active
@@ -426,6 +430,7 @@ export function buildDueItems(
     tag: COMMITMENT_LABEL[e.type],
     color: COMMITMENT_COLOR[e.type],
     scope: e.scope,
+    emiId: e.id,
   }));
   // Safety net: a one-off expense that looks like a commitment's payment (same
   // book, same amount, due within a few days of it) is a duplicate of the
@@ -503,6 +508,7 @@ export function scheduledForMonth(
       tag: COMMITMENT_LABEL[e.type],
       color: COMMITMENT_COLOR[e.type],
       scope: e.scope,
+      emiId: e.id,
     });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));

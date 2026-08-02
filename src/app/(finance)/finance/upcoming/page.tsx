@@ -6,6 +6,7 @@ import { buildDueItems, nextDueOnOrAfter, daysUntil } from "@/lib/finance";
 import { money, moneyShort } from "@/lib/invoice";
 import { StatCard } from "@/components/finance/pieces";
 import { PostDueButton } from "@/components/finance/post-due-button";
+import { PayDueButton } from "@/components/finance/pay-due-button";
 
 // Full list of everything due in the next 30 days, from ALL sources in one
 // place — loans, insurance, recurring bills, SIPs and future-dated one-off
@@ -81,6 +82,7 @@ export default async function UpcomingPage() {
                     </div>
                   </div>
                   <div className="text-[14px] font-extrabold tabular-nums">{money(it.amount)}</div>
+                  {it.emiId && <PayDueButton emiId={it.emiId} paidOn={it.date} />}
                 </div>
               );
             })}

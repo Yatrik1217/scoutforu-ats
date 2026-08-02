@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { CalendarClock } from "lucide-react";
 import { money } from "@/lib/invoice";
 import { PostDueButton } from "@/components/finance/post-due-button";
+import { PayDueButton } from "@/components/finance/pay-due-button";
 import type { DueItem } from "@/lib/finance";
 
 // Forward look at recurring payments scheduled for a month, before they're paid.
@@ -52,6 +53,7 @@ export function ScheduledPayments({
               </div>
             </div>
             <div className="text-[13px] font-bold tabular-nums text-[#92400e]">{money(it.amount)}</div>
+            {isCurrentMonth && it.emiId && <PayDueButton emiId={it.emiId} paidOn={it.date} />}
           </div>
         ))}
       </div>
