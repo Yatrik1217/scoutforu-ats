@@ -8,6 +8,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText } from "lucide-react";
+import { CandidateMessageModal } from "@/components/candidate-message-modal";
 import { createClient } from "@/lib/supabase/client";
 import {
   PIPELINE_STAGES,
@@ -326,12 +327,23 @@ export function CandidateDrawer({
 
             <div className="flex-1 overflow-y-auto p-[22px]">
               <div className="mb-5 flex gap-2">
-                <a
-                  href={`mailto:${detail.cand.email ?? ""}`}
-                  className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
-                >
-                  <Mail size={15} /> Email
-                </a>
+                {canWrite ? (
+                  <CandidateMessageModal
+                    candidate={{
+                      id: detail.cand.id,
+                      name: detail.cand.name,
+                      email: detail.cand.email,
+                      phone: detail.cand.phone,
+                    }}
+                  />
+                ) : (
+                  <a
+                    href={`mailto:${detail.cand.email ?? ""}`}
+                    className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
+                  >
+                    <Mail size={15} /> Email
+                  </a>
+                )}
                 {canWrite && detail.cand.resume_url && (
                   <button
                     onClick={async () => {
