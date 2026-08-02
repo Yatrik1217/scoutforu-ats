@@ -16,7 +16,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Clock, LayoutGrid, Rows3, Table2 } from "lucide-react";
+import { Briefcase, Clock, LayoutGrid, Rows3, Table2 } from "lucide-react";
 import {
   STAGES,
   stageColor,
@@ -328,13 +328,29 @@ function PipelineCard({
             {cand.name}
           </div>
           <div className="truncate text-[11.5px] font-medium text-[#8a94a6]">
-            {cand.jobTitle}
+            {cand.current_designation || "—"}
           </div>
         </div>
         <RatingChip value={cand.rating} />
       </div>
-      {/* Skills intentionally omitted here — the board stays scannable by name.
-          Full skill tags live in the candidate drawer and the Talent view. */}
+      {/* Which role this candidate is mapped to — so the board tells you who is
+          where AND for which position. Skills live in the drawer / Talent view. */}
+      <div className="mt-2.5">
+        {cand.jobTitle && cand.jobTitle !== "—" ? (
+          <div className="flex items-center gap-1.5 rounded-md bg-[#eef4fe] px-2 py-[5px] text-[10.5px] font-bold text-[#2a6fdb]">
+            <Briefcase size={12} strokeWidth={2.2} className="shrink-0" />
+            <span className="truncate">{cand.jobTitle}</span>
+            {cand.jobDept && (
+              <span className="shrink-0 font-semibold text-[#7aa0e0]">· {cand.jobDept}</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 rounded-md bg-[#f4f6fa] px-2 py-[5px] text-[10.5px] font-semibold text-[#9aa4b6]">
+            <Briefcase size={12} strokeWidth={2.2} className="shrink-0" />
+            <span>No role mapped</span>
+          </div>
+        )}
+      </div>
       <div className="mt-[11px] flex items-center justify-between border-t border-[#f0f3f8] pt-2.5">
         <div className="flex items-center gap-1.5">
           <RecBadge name={cand.recruiterName} color={cand.recruiterColor} />
