@@ -84,6 +84,23 @@ export async function getWorkspace(scope: EffectiveScope): Promise<Workspace> {
     eventRows = eventRows.filter((e) => candIds.has(e.candidate_id));
   }
 
+  // A recruiter only sees the openings assigned to them (jobs.recruiter_id) and
+  // the candidates on those jobs (plus any candidate assigned directly to them) —
+  // so one recruiter never sees another recruiter's positions or pipeline. Admins
+  // are unaffected (they see everything).
+  if (scope.role === "recruiter") {
+    const me = String(scope.userId);
+    jobRows = jobRows.filter((j) => String(j.recruiter_id) === me);
+    const jobIds = new Set(jobRows.map((j) => j.id));
+    candRows = candRows.filter(
+      (c) => String(c.recruiter_id) === me || (c.job_id && jobIds.has(c.job_id)),
+    );
+    const candIds = new Set(candRows.map((c) => c.id));
+    interviewRows = interviewRows.filter((i) => candIds.has(i.candidate_id));
+    offerRows = offerRows.filter((o) => candIds.has(o.candidate_id));
+    eventRows = eventRows.filter((e) => candIds.has(e.candidate_id));
+  }
+
   const enriched: EnrichedCandidate[] = candRows.map((c) => {
     const job = c.job_id ? jobById.get(c.job_id) : undefined;
     const rec = c.recruiter_id ? profileById.get(c.recruiter_id) : undefined;

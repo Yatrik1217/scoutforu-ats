@@ -9,6 +9,7 @@ export type EffectiveScope = {
   realRole: UserRole; // the user's true role
   isPreview: boolean; // admin previewing a non-admin role
   previewClientId: string | null; // when previewing as a client
+  userId: string; // the viewer's own profile id (used to scope a recruiter to their jobs)
   scopeLabel: string; // topbar caption
 };
 
@@ -24,6 +25,7 @@ export async function getEffectiveScope(
     realRole: profile.role,
     isPreview: false,
     previewClientId: profile.client_id,
+    userId: profile.id,
     scopeLabel:
       profile.role === "master_admin"
         ? "Full access · all clients"
@@ -45,6 +47,7 @@ export async function getEffectiveScope(
       realRole: "master_admin",
       isPreview: true,
       previewClientId: null,
+      userId: profile.id,
       scopeLabel: "Preview · Recruiter",
     };
   }
@@ -55,6 +58,7 @@ export async function getEffectiveScope(
       realRole: "master_admin",
       isPreview: true,
       previewClientId: clientId ?? null,
+      userId: profile.id,
       scopeLabel: `Preview · ${client?.name ?? "Client"}`,
     };
   }

@@ -22,7 +22,6 @@ import {
   FileText,
   Globe,
   KeyRound,
-  Building,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -42,8 +41,7 @@ export default async function GeneralSettingsPage() {
   const smtp = emailConfigured();
 
   const tiles: Tile[] = [
-    { title: "Organization Info", subtitle: "Your organization details", desc: "Company name, logo, address & branding used across the ATS.", icon: Building2, color: "#e8833a", href: "/admin/settings/organization" },
-    { title: "Branches", subtitle: "Manage branches / units", desc: "Multiple offices, divisions or business units.", icon: Building, color: "#e8833a", href: "/admin/settings/organization" },
+    { title: "Organization", subtitle: "Details & branches", desc: "Company name, logo, address, branding and your branches / units — all in one place.", icon: Building2, color: "#e8833a", href: "/admin/settings/organization" },
     { title: "Recruiters", subtitle: "Your recruiter accounts", desc: "Add, activate or deactivate recruiter logins.", icon: Users, color: "#2a6fdb", href: "/admin" },
     { title: "Clients", subtitle: "Your client companies", desc: "Manage client companies, contacts & KAMs.", icon: UsersRound, color: "#38a3e0", href: "/admin" },
     { title: "Approvers", subtitle: "Internal approvers", desc: "Approve job openings before they go live.", icon: ShieldCheck, color: "#17a673", href: "/admin/settings/approvers" },
