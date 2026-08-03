@@ -22,6 +22,14 @@ export async function listEmailTemplates(): Promise<
 const esc = (s: string) =>
   s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
 
+// Fill {{name}} / {{first_name}} from the candidate (so bulk sends personalize).
+function fillName(text: string, name: string): string {
+  const first = (name || "").trim().split(/\s+/)[0] || "";
+  return (text || "")
+    .replace(/\{\{\s*name\s*\}\}/gi, name || "")
+    .replace(/\{\{\s*first_name\s*\}\}/gi, first);
+}
+
 // Send an email and/or SMS to a candidate from inside the ATS, using the
 // company's configured SMTP + SMS provider, and log it to the candidate's
 // activity so the team can see it happened.
@@ -37,8 +45,8 @@ export async function messageCandidate(input: {
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Please sign in." };
 
-  const body = (input.body || "").trim();
-  if (!body) return { ok: false, error: "Write a message first." };
+  const rawBody = (input.body || "").trim();
+  if (!rawBody) return { ok: false, error: "Write a message first." };
 
   const { data: cand } = await sb
     .from("candidates")
@@ -46,6 +54,9 @@ export async function messageCandidate(input: {
     .eq("id", input.candidateId)
     .maybeSingle();
   if (!cand) return { ok: false, error: "Candidate not found." };
+
+  const body = fillName(rawBody, cand.name);
+  const subjectFilled = fillName(input.subject || "", cand.name);
 
   const wantEmail = input.channel === "email" || input.channel === "both";
   const wantSms = input.channel === "sms" || input.channel === "both";
@@ -57,7 +68,7 @@ export async function messageCandidate(input: {
     else if (!emailConfigured()) failed.push("email isn't set up (ask your admin)");
     else {
       try {
-        const subject = (input.subject || "").trim() || "A message regarding your application";
+        const subject = subjectFilled.trim() || "A message regarding your application";
         const html = `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(body)}</div>`;
         await sendMail({ to: cand.email, subject, html, text: body });
         sent.push("email");
