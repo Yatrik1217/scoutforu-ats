@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { loadWorkspace } from "@/lib/data";
 import { Avatar } from "@/components/bits";
 
 export default async function TeamPage() {
-  const { ws } = await loadWorkspace();
+  const { ws, scope } = await loadWorkspace();
+  if (scope.role !== "master_admin") redirect("/overview");
   const recruiters = ws.team.filter((p) => p.role === "recruiter");
 
   return (

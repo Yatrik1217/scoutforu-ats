@@ -44,7 +44,7 @@ export function PipelineClient({
   query: string;
 }) {
   const router = useRouter();
-  const { openDrawer, canWrite, openCandidateForm } = useShell();
+  const { openDrawer, canWrite, openCandidateForm, role } = useShell();
   const [items, setItems] = useState(candidates);
   const [filterJob, setFilterJob] = useState("all");
   const [filterRec, setFilterRec] = useState("all");
@@ -128,18 +128,20 @@ export function PipelineClient({
             </option>
           ))}
         </select>
-        <select
-          value={filterRec}
-          onChange={(e) => setFilterRec(e.target.value)}
-          className="cursor-pointer rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[13px] font-semibold text-[#42506b]"
-        >
-          <option value="all">All Recruiters</option>
-          {recruiters.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        {role === "master_admin" && (
+          <select
+            value={filterRec}
+            onChange={(e) => setFilterRec(e.target.value)}
+            className="cursor-pointer rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[13px] font-semibold text-[#42506b]"
+          >
+            <option value="all">All Recruiters</option>
+            {recruiters.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="tf-num text-[12.5px] font-semibold text-[#8a94a6]">
           {filtered.length} candidates
         </span>

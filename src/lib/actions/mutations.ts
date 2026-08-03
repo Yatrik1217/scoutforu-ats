@@ -495,12 +495,39 @@ export async function updateInvoiceSettings(patch: {
   return { ok: true, message: "Invoice settings saved" };
 }
 
+// A recruiter may only edit/delete the openings assigned to them; admins any.
+// (RLS enforces this at the DB too; this gives a clean message + works even
+// before the RLS migration is applied.)
+async function canManageJob(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+): Promise<boolean> {
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return false;
+  const { data: me } = await sb
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (me?.role === "master_admin") return true;
+  const { data: job } = await sb
+    .from("jobs")
+    .select("recruiter_id")
+    .eq("id", id)
+    .maybeSingle();
+  return !!job && String(job.recruiter_id) === String(user.id);
+}
+
 export async function updateRequisition(
   id: string,
   form: ReqForm,
 ): Promise<Result> {
   if (!form.title.trim()) return { ok: false, error: "Job title is required" };
   const sb = await createClient();
+  if (!(await canManageJob(sb, id)))
+    return { ok: false, error: "You can only edit openings assigned to you." };
   const { error } = await sb.from("jobs").update(jobPayload(form)).eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
@@ -509,6 +536,8 @@ export async function updateRequisition(
 
 export async function deleteJob(id: string): Promise<Result> {
   const sb = await createClient();
+  if (!(await canManageJob(sb, id)))
+    return { ok: false, error: "You can only delete openings assigned to you." };
   const { error } = await sb.from("jobs").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
