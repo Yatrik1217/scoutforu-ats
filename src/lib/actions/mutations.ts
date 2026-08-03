@@ -536,8 +536,15 @@ export async function updateRequisition(
 
 export async function deleteJob(id: string): Promise<Result> {
   const sb = await createClient();
-  if (!(await canManageJob(sb, id)))
-    return { ok: false, error: "You can only delete openings assigned to you." };
+  // Deleting an opening is destructive — restrict to master admins.
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const { data: me } = user
+    ? await sb.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  if (me?.role !== "master_admin")
+    return { ok: false, error: "Only an admin can delete an opening." };
   const { error } = await sb.from("jobs").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();

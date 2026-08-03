@@ -88,7 +88,7 @@ export function NewCandidateButton() {
 
 export function JobMenu({ job }: { job: JobRow }) {
   const router = useRouter();
-  const { openJobForm, canWrite } = useShell();
+  const { openJobForm, canWrite, role } = useShell();
   const [, start] = useTransition();
   if (!canWrite) return null;
   return (
@@ -100,21 +100,24 @@ export function JobMenu({ job }: { job: JobRow }) {
         <DropdownMenuItem onClick={() => openJobForm(job)} className="gap-2 text-[13px] font-semibold">
           <Pencil size={15} /> Edit role
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            if (!confirm(`Delete "${job.title}"?`)) return;
-            start(async () => {
-              const res = await deleteJob(job.id);
-              if (res.ok) {
-                toast.success(res.message ?? "Deleted");
-                router.refresh();
-              } else toast.error(res.error ?? "Failed");
-            });
-          }}
-          className="gap-2 text-[13px] font-semibold text-[#dc2626]"
-        >
-          <Trash2 size={15} /> Delete role
-        </DropdownMenuItem>
+        {/* Deleting an opening is destructive — admins only. */}
+        {role === "master_admin" && (
+          <DropdownMenuItem
+            onClick={() => {
+              if (!confirm(`Delete "${job.title}"?`)) return;
+              start(async () => {
+                const res = await deleteJob(job.id);
+                if (res.ok) {
+                  toast.success(res.message ?? "Deleted");
+                  router.refresh();
+                } else toast.error(res.error ?? "Failed");
+              });
+            }}
+            className="gap-2 text-[13px] font-semibold text-[#dc2626]"
+          >
+            <Trash2 size={15} /> Delete role
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
