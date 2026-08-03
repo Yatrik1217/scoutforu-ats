@@ -7,6 +7,18 @@ import { sendSms, smsProvider } from "@/lib/sms";
 
 type Result = { ok: boolean; error?: string; message?: string };
 
+// Templates recruiters can pick from in the "Message" box (read = any staff).
+export async function listEmailTemplates(): Promise<
+  { id: string; name: string; subject: string; body: string }[]
+> {
+  const sb = await createClient();
+  const { data } = await sb
+    .from("email_templates")
+    .select("id,name,subject,body")
+    .order("name");
+  return data ?? [];
+}
+
 const esc = (s: string) =>
   s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
 

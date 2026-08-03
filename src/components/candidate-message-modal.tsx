@@ -1,10 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, X, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { messageCandidate } from "@/lib/actions/candidate-message";
+import { messageCandidate, listEmailTemplates } from "@/lib/actions/candidate-message";
+
+type Tmpl = { id: string; name: string; subject: string; body: string };
+
+// Fill the supported placeholders from the candidate. Recruiters can use
+// {{name}} / {{first_name}} in any template.
+function fillVars(text: string, name: string): string {
+  const first = (name || "").trim().split(/\s+/)[0] || "";
+  return (text || "")
+    .replace(/\{\{\s*name\s*\}\}/gi, name || "")
+    .replace(/\{\{\s*first_name\s*\}\}/gi, first);
+}
 
 // "Message" action for the candidate drawer — sends an email and/or SMS to the
 // candidate from inside the ATS (uses the company's SMTP + SMS provider).
@@ -20,7 +31,22 @@ export function CandidateMessageModal({
   );
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [templates, setTemplates] = useState<Tmpl[]>([]);
   const [pending, start] = useTransition();
+
+  // Load templates the first time the composer opens.
+  useEffect(() => {
+    if (open && templates.length === 0) {
+      listEmailTemplates().then(setTemplates).catch(() => {});
+    }
+  }, [open, templates.length]);
+
+  const applyTemplate = (id: string) => {
+    const t = templates.find((x) => x.id === id);
+    if (!t) return;
+    setSubject(fillVars(t.subject, candidate.name));
+    setBody(fillVars(t.body, candidate.name));
+  };
 
   const wantEmail = channel === "email" || channel === "both";
   const wantSms = channel === "sms" || channel === "both";
@@ -97,6 +123,24 @@ export function CandidateMessageModal({
               {wantEmail && wantSms && " · "}
               {wantSms && <>SMS: {candidate.phone ?? "—"}</>}
             </div>
+
+            {templates.length > 0 && (
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  applyTemplate(e.target.value);
+                  e.target.selectedIndex = 0;
+                }}
+                className="mb-2 w-full cursor-pointer rounded-[10px] border border-[#e3e8f0] bg-[#f6f8fb] px-3 py-2.5 text-[13px] font-semibold text-[#42506b] outline-none focus:border-[#2a6fdb]"
+              >
+                <option value="">Insert a template…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {wantEmail && (
               <input
