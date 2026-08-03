@@ -49,7 +49,7 @@ export default async function GeneralSettingsPage() {
     { title: "Email (SMTP)", subtitle: smtp ? "Configured ✓" : "Not configured", desc: "Send trackers & résumés to clients from your mailbox.", icon: Mail, color: "#e0533a", href: "/admin/settings/email" },
     { title: "Default Emails", subtitle: "Templates & senders", desc: "Reusable email templates for common actions.", icon: Send, color: "#38a3e0", href: "/admin/settings/email-templates" },
     { title: "Application Pipeline", subtitle: "Recruitment workflow", desc: "The 9-stage hiring pipeline candidates move through.", icon: Workflow, color: "#e0533a", href: "/pipeline" },
-    { title: "Action Triggers", subtitle: "Automations", desc: "Auto-reject stale candidates, notify on stage change.", icon: Zap, color: "#e8833a", href: "/admin" },
+    { title: "Action Triggers", subtitle: "Automations", desc: "Auto-email a candidate when they move into a stage.", icon: Zap, color: "#e8833a", href: "/admin/settings/automations" },
     { title: "Disqualify Reasons", subtitle: "Rejection reasons", desc: "Standard reasons used when rejecting candidates.", icon: Ban, color: "#e0533a", href: "/admin/settings/disqualify-reasons" },
     { title: "Custom Fields", subtitle: "Extra columns", desc: "Add your own fields to candidates, jobs & clients.", icon: Columns3, color: "#38a3e0", href: "/admin/settings/custom-fields" },
     { title: "Invoice Setting", subtitle: "Billing details", desc: "Invoice numbering, GST & billing info — invoices live under Admin → Invoices.", icon: ReceiptIndianRupee, color: "#e0533a", href: "/admin/settings/invoice" },

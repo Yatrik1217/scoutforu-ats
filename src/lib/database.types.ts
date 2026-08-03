@@ -176,6 +176,13 @@ export type EmailTemplateRow = {
   updated_at: string;
 };
 
+export type StageEmailRuleRow = {
+  stage: string;
+  template_id: string | null;
+  enabled: boolean;
+  updated_at: string;
+};
+
 export type InvoiceSettingsRow = {
   id: boolean;
   prefix: string;
@@ -689,6 +696,7 @@ export type Database = {
       branches: Table<BranchRow>;
       custom_fields: Table<CustomFieldRow>;
       email_templates: Table<EmailTemplateRow>;
+      stage_email_rules: Table<StageEmailRuleRow>;
       invoice_settings: Table<InvoiceSettingsRow>;
       invoices: Table<InvoiceRow>;
       invoice_items: Table<InvoiceItemRow>;

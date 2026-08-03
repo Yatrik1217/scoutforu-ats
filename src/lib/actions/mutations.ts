@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { sendMail, emailConfigured } from "@/lib/email";
 import {
   stageToSlug,
   stageFromSlug,
@@ -96,12 +97,62 @@ export async function reviewCandidate(
   };
 }
 
+// Automation: if an enabled stage_email_rule exists for the new stage, auto-send
+// its template to the candidate. Best-effort — never blocks the stage move.
+async function sendStageAutoEmail(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  candidateId: string,
+  toSlug: string,
+): Promise<void> {
+  try {
+    const { data: rule } = await sb
+      .from("stage_email_rules")
+      .select("template_id,enabled")
+      .eq("stage", toSlug)
+      .maybeSingle();
+    if (!rule || !rule.enabled || !rule.template_id || !emailConfigured()) return;
+    const [{ data: tpl }, { data: cand }] = await Promise.all([
+      sb.from("email_templates").select("subject,body").eq("id", rule.template_id).maybeSingle(),
+      sb.from("candidates").select("name,email").eq("id", candidateId).maybeSingle(),
+    ]);
+    if (!tpl || !cand?.email) return;
+    const first = (cand.name || "").trim().split(/\s+/)[0] || "";
+    const fill = (t: string) =>
+      (t || "")
+        .replace(/\{\{\s*name\s*\}\}/gi, cand.name || "")
+        .replace(/\{\{\s*first_name\s*\}\}/gi, first);
+    const esc = (s: string) =>
+      String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
+    const bodyFilled = fill(tpl.body);
+    await sendMail({
+      to: cand.email,
+      subject: fill(tpl.subject) || "An update on your application",
+      html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyFilled)}</div>`,
+      text: bodyFilled,
+    });
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    await sb.from("candidate_notes").insert({
+      candidate_id: candidateId,
+      author_id: user?.id ?? null,
+      body: `📤 Auto-email sent (stage → ${toSlug})`,
+    });
+  } catch {
+    /* best-effort; a failed auto-email must never block the move */
+  }
+}
+
 export async function moveCandidateStage(
   id: string,
   toSlug: string,
 ): Promise<Result> {
   const to = stageFromSlug(toSlug);
   const res = await setStage(id, to);
+  if (res.ok) {
+    const sb = await createClient();
+    await sendStageAutoEmail(sb, id, toSlug);
+  }
   return res.ok ? { ...res, message: `Moved to ${to}` } : res;
 }
 
