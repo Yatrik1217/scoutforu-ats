@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Trash2, Save } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Plus, Trash2, Save, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   updateOrganization,
+  uploadOrgLogo,
   addBranch,
   setBranchActive,
   deleteBranch,
@@ -27,7 +28,21 @@ export function OrganizationForm({ org }: { org: OrganizationRow | null }) {
     website: org?.website ?? "",
   });
   const [pending, start] = useTransition();
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  const onLogo = async (file: File) => {
+    setUploading(true);
+    const fd = new FormData();
+    fd.set("logo", file);
+    const res = await uploadOrgLogo(fd);
+    setUploading(false);
+    if (res.ok && res.url) {
+      set("logo_url", res.url);
+      toast.success("Logo uploaded — click Save to apply");
+    } else toast.error(res.error || "Upload failed");
+  };
 
   const save = () =>
     start(async () => {
@@ -39,7 +54,6 @@ export function OrganizationForm({ org }: { org: OrganizationRow | null }) {
   const fields: [string, keyof typeof f, string][] = [
     ["Company name", "name", "ScoutforU Consultants"],
     ["Tagline", "tagline", "Recruitment, done right"],
-    ["Logo URL", "logo_url", "https://…/logo.png"],
     ["City", "city", "Ahmedabad"],
     ["Phone", "phone", "+91 …"],
     ["Email", "email", "hello@scoutforu.com"],
@@ -63,6 +77,53 @@ export function OrganizationForm({ org }: { org: OrganizationRow | null }) {
           </label>
         ))}
       </div>
+      <div className="mt-3">
+        <div className="text-[12px] font-bold text-[#42506b]">Company logo</div>
+        <div className="mt-1.5 flex items-center gap-3">
+          {f.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={f.logo_url}
+              alt="Logo"
+              className="h-12 w-auto max-w-[160px] rounded-[8px] border border-[#e9edf3] bg-white object-contain p-1"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-dashed border-[#d7dee8] text-[18px] font-extrabold text-[#c3cbd8]">
+              {(f.name || "?").charAt(0)}
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onLogo(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-2 rounded-[9px] border border-[#e6eaf1] bg-[#f6f8fb] px-3.5 py-2 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6] disabled:opacity-60"
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {uploading ? "Uploading…" : f.logo_url ? "Replace logo" : "Upload logo"}
+          </button>
+        </div>
+        <div className="mt-1.5 text-[11px] text-[#9aa4b6]">
+          PNG/JPG, transparent background looks best. Max 2 MB. (Or paste a URL below.)
+        </div>
+        <input
+          value={f.logo_url}
+          onChange={(e) => set("logo_url", e.target.value)}
+          placeholder="…or paste a logo image URL"
+          className={field + " mt-1.5 font-normal"}
+        />
+      </div>
+
       <label className="mt-3 block text-[12px] font-bold text-[#42506b]">
         Address
         <textarea

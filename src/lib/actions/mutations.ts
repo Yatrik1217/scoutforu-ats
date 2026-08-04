@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
 import {
   stageToSlug,
@@ -808,6 +808,42 @@ export async function deleteClientRecord(id: string): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true, message: "Client deleted" };
+}
+
+// Upload a company logo to a public storage bucket and return its URL (admin
+// only). Self-provisions the "branding" bucket so no manual setup is needed.
+export async function uploadOrgLogo(
+  formData: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const { data: me } = user
+    ? await sb.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  if (me?.role !== "master_admin") return { ok: false, error: "Admins only." };
+
+  const file = formData.get("logo") as File | null;
+  if (!file || file.size === 0) return { ok: false, error: "Please choose an image." };
+  if (file.size > 2 * 1024 * 1024) return { ok: false, error: "Image must be under 2 MB." };
+
+  let svc;
+  try {
+    svc = createServiceClient();
+  } catch {
+    return { ok: false, error: "Storage isn't configured on the server." };
+  }
+  await svc.storage.createBucket("branding", { public: true }).catch(() => {}); // ignore "exists"
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `logo-${Date.now()}.${ext || "png"}`;
+  const buf = Buffer.from(await file.arrayBuffer());
+  const { error } = await svc.storage
+    .from("branding")
+    .upload(path, buf, { contentType: file.type || "image/png", upsert: true });
+  if (error) return { ok: false, error: error.message };
+  const { data } = svc.storage.from("branding").getPublicUrl(path);
+  return { ok: true, url: data.publicUrl };
 }
 
 export type SchedForm = {
