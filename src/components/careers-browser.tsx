@@ -71,14 +71,17 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
         <div className="relative mx-auto max-w-[1000px] px-6 pt-8 pb-32">
           <div className="flex items-center gap-3">
             {org?.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={org.logo_url} alt={name} className="h-9 w-auto" />
+              // On a white chip so the logo never gets lost against the hero.
+              <span className="inline-flex items-center rounded-[12px] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(0,0,0,.12)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={org.logo_url} alt={name} className="h-9 w-auto max-w-[170px] object-contain" />
+              </span>
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/20 text-[15px] font-extrabold">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[16px] font-extrabold text-[#2a6fdb]">
                 {name.charAt(0)}
               </div>
             )}
-            <span className="text-[16px] font-extrabold tracking-tight">{name}</span>
+            <span className="text-[16px] font-extrabold tracking-tight text-white/95">{name}</span>
           </div>
 
           <div className="mt-12 max-w-[660px]">
