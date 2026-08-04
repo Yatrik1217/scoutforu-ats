@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
@@ -11,6 +12,7 @@ import {
   Tags,
   CalendarClock,
   ArrowLeft,
+  Menu,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor } from "@/lib/domain";
@@ -29,9 +31,26 @@ const NAV: NavItem[] = [
 
 export function FinanceSidebar({ name }: { name: string }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [pathname]);
 
   return (
-    <aside className="flex h-screen w-[248px] shrink-0 flex-col bg-[#0e1320] p-[20px_14px]">
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Open menu"
+        className="fixed left-3 top-[13px] z-30 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#0e1320] text-white shadow-lg md:hidden"
+      >
+        <Menu size={19} />
+      </button>
+      {open && (
+        <div onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-black/50 md:hidden" />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[248px] shrink-0 flex-col bg-[#0e1320] p-[20px_14px] transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       {/* logo */}
       <div className="flex shrink-0 items-center gap-[11px] px-2 pt-1.5 pb-[18px]">
         <div
@@ -95,7 +114,8 @@ export function FinanceSidebar({ name }: { name: string }) {
           <div className="text-[11px] font-medium text-[#6b7a96]">Owner</div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
