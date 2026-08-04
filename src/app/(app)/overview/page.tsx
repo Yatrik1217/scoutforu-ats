@@ -95,7 +95,7 @@ export default async function OverviewPage() {
       )}
 
       {/* metrics */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {metrics.map((m) => {
           const Icon = m.icon;
           return (
@@ -133,7 +133,7 @@ export default async function OverviewPage() {
       </div>
 
       {/* funnel + upcoming */}
-      <div className="mt-[18px] grid grid-cols-[1.55fr_1fr] gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-[1.55fr_1fr]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-[18px] flex items-center justify-between">
             <div>
@@ -225,7 +225,7 @@ export default async function OverviewPage() {
       </div>
 
       {/* activity + open roles */}
-      <div className="mt-[18px] grid grid-cols-[1fr_1.55fr] gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_1.55fr]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <Link href="/candidates" className="mb-4 block text-[15.5px] font-extrabold hover:text-[#2a6fdb]">
             Recent Activity

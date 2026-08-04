@@ -60,8 +60,8 @@ export function CandidatesBulk({
 
   return (
     <>
-      <div className="overflow-hidden rounded-[14px] border border-[#e9edf3] bg-white">
-        <table className="w-full border-collapse">
+      <div className="overflow-x-auto rounded-[14px] border border-[#e9edf3] bg-white">
+        <table className="w-full min-w-[680px] border-collapse">
           <thead>
             <tr className="bg-[#f7f9fc]">
               <th className="w-[42px] p-[13px_0_13px_18px]">
