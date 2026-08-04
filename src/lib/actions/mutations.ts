@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { sendMail, emailConfigured } from "@/lib/email";
+import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
 import {
   stageToSlug,
   stageFromSlug,
@@ -806,7 +806,45 @@ export type SchedForm = {
   time: string;
   type: InterviewTypeEnum;
   interviewerId: string | null;
+  location?: string;
+  notes?: string;
+  sendInvite?: boolean;
 };
+
+// Build a calendar invite (.ics) for the interview so the candidate + interviewer
+// can add it to their calendar in one tap.
+function buildInterviewIcs(opts: {
+  uid: string;
+  startISO: string;
+  minutes: number;
+  summary: string;
+  description: string;
+  location: string;
+  organizer: string;
+}): string {
+  const z = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const end = new Date(new Date(opts.startISO).getTime() + opts.minutes * 60000).toISOString();
+  const esc = (s: string) => (s || "").replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//ScoutforU//ATS//EN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:${opts.uid}`,
+    `DTSTAMP:${z(new Date().toISOString())}`,
+    `DTSTART:${z(opts.startISO)}`,
+    `DTEND:${z(end)}`,
+    `SUMMARY:${esc(opts.summary)}`,
+    `DESCRIPTION:${esc(opts.description)}`,
+    opts.location ? `LOCATION:${esc(opts.location)}` : "",
+    opts.organizer ? `ORGANIZER:MAILTO:${opts.organizer}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+}
 
 export async function scheduleInterview(form: SchedForm): Promise<Result> {
   if (!form.candidateId || !form.date || !form.time)
@@ -816,16 +854,76 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
   const {
     data: { user },
   } = await sb.auth.getUser();
-  const { error } = await sb.from("interviews").insert({
-    candidate_id: form.candidateId,
-    scheduled_at,
-    type: form.type,
-    interviewer_id: form.interviewerId,
-    created_by: user?.id ?? null,
-  });
+  const { data: row, error } = await sb
+    .from("interviews")
+    .insert({
+      candidate_id: form.candidateId,
+      scheduled_at,
+      type: form.type,
+      interviewer_id: form.interviewerId,
+      location: form.location ?? "",
+      notes: form.notes ?? "",
+      created_by: user?.id ?? null,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: error.message };
+
+  // Send the invite (email + calendar .ics) to the candidate and interviewer.
+  let noteSuffix = "";
+  if (form.sendInvite !== false) {
+    try {
+      const [{ data: cand }, { data: interviewer }] = await Promise.all([
+        sb.from("candidates").select("name,email,job_id").eq("id", form.candidateId).maybeSingle(),
+        form.interviewerId
+          ? sb.from("profiles").select("name,email").eq("id", form.interviewerId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      const { data: job } = cand?.job_id
+        ? await sb.from("jobs").select("title").eq("id", cand.job_id).maybeSingle()
+        : { data: null };
+      if (emailConfigured() && cand?.email) {
+        const when = new Date(scheduled_at);
+        const whenStr = when.toLocaleString("en-IN", {
+          dateStyle: "full",
+          timeStyle: "short",
+          timeZone: "Asia/Kolkata",
+        });
+        const typeLabel = { video: "Video", phone: "Phone", onsite: "On-site", practical: "Practical" }[form.type];
+        const role = job?.title ? ` for ${job.title}` : "";
+        const loc = form.location ? `\nLocation / link: ${form.location}` : "";
+        const notes = form.notes ? `\n\nNotes: ${form.notes}` : "";
+        const bodyText = `Hi ${cand.name},\n\nYour ${typeLabel} interview${role} is scheduled for:\n${whenStr} (IST)${loc}${notes}\n\nThe calendar invite is attached. See you then!\n\nScoutforU Consultants`;
+        const esc = (s: string) =>
+          String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
+        const ics = buildInterviewIcs({
+          uid: `${row.id}@scoutforu`,
+          startISO: scheduled_at,
+          minutes: 45,
+          summary: `Interview — ${cand.name}${role}`,
+          description: `${typeLabel} interview${role}.${form.location ? ` ${form.location}` : ""}`,
+          location: form.location ?? "",
+          organizer: fromAddress(),
+        });
+        await sendMail({
+          to: cand.email,
+          cc: interviewer?.email || undefined,
+          subject: `Interview scheduled${role} — ${whenStr}`,
+          html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyText)}</div>`,
+          text: bodyText,
+          attachments: [{ filename: "interview.ics", content: Buffer.from(ics), contentType: "text/calendar" }],
+        });
+        noteSuffix = " · invite emailed";
+      } else if (!cand?.email) {
+        noteSuffix = " · no email on candidate (invite not sent)";
+      }
+    } catch (e) {
+      noteSuffix = " · invite email failed: " + (e as Error).message;
+    }
+  }
+
   refresh();
-  return { ok: true, message: "Interview scheduled" };
+  return { ok: true, message: "Interview scheduled" + noteSuffix };
 }
 
 export async function setUserActive(

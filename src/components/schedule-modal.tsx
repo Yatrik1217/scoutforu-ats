@@ -43,12 +43,18 @@ export function ScheduleModal({
     time: string;
     type: InterviewTypeEnum;
     interviewerId: string | null;
+    location: string;
+    notes: string;
+    sendInvite: boolean;
   }>({
     candidateId: candidateId ?? "",
     date: "",
     time: "",
     type: "video",
     interviewerId: team[0]?.id ?? null,
+    location: "",
+    notes: "",
+    sendInvite: true,
   });
 
   useEffect(() => {
@@ -194,6 +200,45 @@ export function ScheduleModal({
               </select>
             </div>
           </div>
+
+          <div className="mt-4">
+            <label className={labelCls}>
+              Location / meeting link{" "}
+              <span className="font-medium text-[#9aa4b6]">(shown in the invite)</span>
+            </label>
+            <input
+              value={f.location}
+              onChange={(e) => set("location", e.target.value)}
+              placeholder="e.g. Google Meet link, or office address"
+              className={fieldCls}
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className={labelCls}>
+              Notes for the candidate <span className="font-medium text-[#9aa4b6]">(optional)</span>
+            </label>
+            <textarea
+              value={f.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              rows={2}
+              placeholder="Anything to carry, who to ask for, etc."
+              className={`${fieldCls} resize-none`}
+            />
+          </div>
+
+          <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-[10px] bg-[#f6f8fb] px-3.5 py-3">
+            <input
+              type="checkbox"
+              checked={f.sendInvite}
+              onChange={(e) => set("sendInvite", e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-[#2a6fdb]"
+            />
+            <span className="text-[13px] font-bold text-[#16203a]">
+              Email a calendar invite to the candidate
+              <span className="font-medium text-[#8a94a6]"> (and interviewer)</span>
+            </span>
+          </label>
         </div>
 
         <div className="flex gap-2.5 border-t border-[#f0f3f8] p-[16px_24px]">

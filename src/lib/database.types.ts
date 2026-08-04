@@ -218,6 +218,8 @@ export type InterviewRow = {
   scheduled_at: string;
   type: InterviewTypeEnum;
   interviewer_id: string | null;
+  location: string;
+  notes: string;
   created_by: string | null;
   created_at: string;
 };
