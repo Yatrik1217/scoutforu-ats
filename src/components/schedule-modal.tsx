@@ -35,7 +35,7 @@ export function ScheduleModal({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState("");
   const [opts, setOpts] = useState<{ id: string; label: string }[]>([]);
   const [f, setF] = useState<{
     candidateId: string;
@@ -60,7 +60,7 @@ export function ScheduleModal({
   useEffect(() => {
     if (!open) return;
     setF((s) => ({ ...s, candidateId: candidateId ?? "" }));
-    setErr(false);
+    setErr("");
     (async () => {
       const sb = createClient();
       const [{ data: cands }, { data: jobs }] = await Promise.all([
@@ -81,12 +81,18 @@ export function ScheduleModal({
   }, [open, candidateId]);
 
   if (!open) return null;
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) =>
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
+    setErr("");
     setF((s) => ({ ...s, [k]: v }));
+  };
 
   const submit = () => {
-    if (!f.candidateId || !f.date || !f.time) {
-      setErr(true);
+    const missing: string[] = [];
+    if (!f.candidateId) missing.push("candidate");
+    if (!f.date) missing.push("date");
+    if (!f.time) missing.push("time");
+    if (missing.length) {
+      setErr(`Please choose a ${missing.join(", ")}.`);
       return;
     }
     start(async () => {
@@ -144,7 +150,7 @@ export function ScheduleModal({
           </select>
           {err && (
             <div className="mt-1.5 text-[11.5px] font-semibold text-[#ef4444]">
-              Please pick a candidate, date and time.
+              {err}
             </div>
           )}
 
