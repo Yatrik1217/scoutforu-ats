@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ScoutforU ATS",
-    short_name: "ScoutforU",
+    name: "SFU - ATS",
+    short_name: "SFU - ATS",
     description: "Applicant Tracking System for ScoutforU Consultants",
     start_url: "/",
     display: "standalone",
