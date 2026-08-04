@@ -63,7 +63,7 @@ export function AppTopbar({
     });
 
   return (
-    <header className="flex h-[66px] shrink-0 items-center gap-[18px] border-b border-[#e6eaf1] bg-white px-[26px]">
+    <header className="flex h-[66px] shrink-0 items-center gap-[18px] border-b border-[#e6eaf1] bg-white px-[26px] max-md:pl-[64px]">
       <div className="shrink-0">
         <div className="whitespace-nowrap text-[18px] font-extrabold tracking-tight">
           {title}

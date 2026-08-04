@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { PWARegister } from "@/components/pwa-register";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -18,6 +19,19 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "ScoutforU ATS",
   description: "Applicant Tracking System for ScoutforU Consultants",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "ScoutforU ATS",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2a6fdb",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,6 +46,7 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         {children}
+        <PWARegister />
         <Toaster
           position="bottom-center"
           toastOptions={{
