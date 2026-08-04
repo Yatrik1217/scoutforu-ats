@@ -10,6 +10,8 @@ import {
   Users,
   Sparkles,
   ArrowUpRight,
+  LayoutGrid,
+  List as ListIcon,
 } from "lucide-react";
 
 export type CareerJob = {
@@ -42,6 +44,7 @@ const snippet = (s: string, n = 160) => {
 export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
   const [q, setQ] = useState("");
   const [loc, setLoc] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const name = org?.name || "ScoutforU Consultants";
 
   const filtered = useMemo(() => {
@@ -125,13 +128,19 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
 
       {/* Results */}
       <main className="mx-auto max-w-[1000px] px-6 py-9">
-        <div className="mb-5 text-[14px] font-bold text-[#42506b]">
-          {filtered.length} open position{filtered.length === 1 ? "" : "s"}
-          {(q || loc) && <span className="font-medium text-[#8a94a6]"> matching your search</span>}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="text-[14px] font-bold text-[#42506b]">
+            {filtered.length} open position{filtered.length === 1 ? "" : "s"}
+            {(q || loc) && <span className="font-medium text-[#8a94a6]"> matching your search</span>}
+          </div>
+          <div className="flex gap-0.5 rounded-[10px] border border-[#e6eaf1] bg-white p-0.5">
+            <ViewBtn active={view === "grid"} onClick={() => setView("grid")} icon={LayoutGrid} label="Grid" />
+            <ViewBtn active={view === "list"} onClick={() => setView("list")} icon={ListIcon} label="List" />
+          </div>
         </div>
 
         {filtered.length ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className={view === "grid" ? "grid gap-4 md:grid-cols-2" : "mx-auto flex max-w-[720px] flex-col gap-3"}>
             {filtered.map((j) => (
               <Link
                 key={j.id}
@@ -208,6 +217,30 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
         © {new Date().getFullYear()} {name} · Careers powered by ScoutforU ATS
       </footer>
     </div>
+  );
+}
+
+function ViewBtn({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof LayoutGrid;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className="flex items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[12px] font-bold transition"
+      style={active ? { background: "#eef4fe", color: "#2a6fdb" } : { color: "#8a94a6" }}
+    >
+      <Icon size={15} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
   );
 }
 
