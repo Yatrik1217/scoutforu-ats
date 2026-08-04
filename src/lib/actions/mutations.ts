@@ -668,7 +668,17 @@ function candidatePayload(form: CandidateForm) {
 export async function createCandidate(form: CandidateForm): Promise<Result> {
   if (!form.name.trim()) return { ok: false, error: "Candidate name is required" };
   const sb = await createClient();
-  const { error } = await sb.from("candidates").insert(candidatePayload(form));
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const { data: me } = user
+    ? await sb.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const payload = candidatePayload(form);
+  // A recruiter's submitted candidate is owned by them — so it's "theirs" under
+  // RLS and shows in their pickers/pipeline. Admins may assign to anyone.
+  if (me?.role !== "master_admin" && user) payload.recruiter_id = user.id;
+  const { error } = await sb.from("candidates").insert(payload);
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true, message: `${form.name.trim()} added` };

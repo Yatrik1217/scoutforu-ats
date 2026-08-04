@@ -99,7 +99,7 @@ export function CandidateFormModal({
   const [pending, start] = useTransition();
   const [err, setErr] = useState(false);
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([]);
-  const { openDrawer } = useShell();
+  const { openDrawer, role } = useShell();
   const [f, setF] = useState<CForm>(empty);
   const [tagsText, setTagsText] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -355,14 +355,16 @@ export function CandidateFormModal({
                 ))}
               </select>
             </Field>
-            <Field label="Recruiter">
-              <select value={f.recruiterId ?? ""} onChange={(e) => set("recruiterId", e.target.value || null)} className={`${fieldCls} cursor-pointer`}>
-                <option value="">— Unassigned —</option>
-                {team.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </Field>
+            {role === "master_admin" && (
+              <Field label="Recruiter">
+                <select value={f.recruiterId ?? ""} onChange={(e) => set("recruiterId", e.target.value || null)} className={`${fieldCls} cursor-pointer`}>
+                  <option value="">— Unassigned —</option>
+                  {team.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Stage">
               <select value={stageToSlug(STAGES.find((s) => s.slug === f.stage)?.key ?? "Sourced")} onChange={(e) => set("stage", e.target.value as CandidateStage)} className={`${fieldCls} cursor-pointer`}>
                 {STAGES.map((s) => (

@@ -154,29 +154,23 @@ export function ScheduleModal({
             </div>
           )}
 
+          <div className="mt-4">
+            <label className={labelCls}>
+              Date &amp; time <span className="text-[#ef4444]">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={f.date && f.time ? `${f.date}T${f.time}` : ""}
+              onChange={(e) => {
+                const [d, t] = e.target.value.split("T");
+                set("date", d || "");
+                set("time", t || "");
+              }}
+              className={fieldCls}
+            />
+          </div>
+
           <div className="mt-4 grid grid-cols-2 gap-3.5">
-            <div>
-              <label className={labelCls}>
-                Date <span className="text-[#ef4444]">*</span>
-              </label>
-              <input
-                type="date"
-                value={f.date}
-                onChange={(e) => set("date", e.target.value)}
-                className={fieldCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>
-                Time <span className="text-[#ef4444]">*</span>
-              </label>
-              <input
-                type="time"
-                value={f.time}
-                onChange={(e) => set("time", e.target.value)}
-                className={fieldCls}
-              />
-            </div>
             <div>
               <label className={labelCls}>Type</label>
               <select
