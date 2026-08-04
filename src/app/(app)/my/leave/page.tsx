@@ -81,7 +81,7 @@ export default async function MyLeavePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {balances.map((b) => (
           <div key={b.type.id} className="rounded-2xl border border-[#e9edf3] bg-white p-[18px]">
             <div

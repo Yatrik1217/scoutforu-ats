@@ -40,7 +40,7 @@ export default async function AdminPage() {
   const s = ws.settings;
 
   return (
-    <div className="animate-sc-fadein grid grid-cols-[1.2fr_1fr] gap-[18px] p-[22px_26px_40px]">
+    <div className="animate-sc-fadein grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-[18px] p-[22px_26px_40px]">
       <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[15.5px] font-extrabold">Users &amp; Roles</div>

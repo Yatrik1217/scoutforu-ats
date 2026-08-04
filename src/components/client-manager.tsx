@@ -151,7 +151,7 @@ export function ClientManager({
             </div>
 
             <div className="space-y-3.5 p-[20px_24px]">
-              <div className="grid grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
                 <Field label="Client Name *"><input value={f.name} onChange={(e) => set("name", e.target.value)} className={fieldCls} placeholder="Client name" /></Field>
                 <Field label="City"><input list="india-cities-client" value={f.city} onChange={(e) => set("city", e.target.value)} className={fieldCls} placeholder="City" /></Field>
                 <Field label="Reference Code"><input value={f.referenceCode} onChange={(e) => set("referenceCode", e.target.value)} className={fieldCls} placeholder="REF" /></Field>

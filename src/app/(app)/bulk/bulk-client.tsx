@@ -68,7 +68,7 @@ export function BulkUploadClient() {
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
       {/* stat chips */}
-      <div className="mb-4 grid grid-cols-4 gap-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Chip label="Queued" value={counts.pending + items.filter((i) => i.status === "processing").length} color="#2a6fdb" />
         <Chip label="Created" value={counts.created} color="#16a34a" />
         <Chip label="Duplicates" value={counts.duplicate} color="#f59e0b" />

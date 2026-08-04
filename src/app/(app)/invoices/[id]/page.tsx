@@ -115,7 +115,7 @@ export default async function InvoiceDetailPage({
 
       <InvoiceActions invoice={inv} />
 
-      <div className="mt-[18px] grid grid-cols-[1.6fr_1fr] items-start gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] items-start gap-[18px]">
         {/* invoice paper */}
         <div className="overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
           <div className="border-b border-[#eef1f6] p-[26px_28px]">

@@ -73,7 +73,7 @@ export default async function PayrollRunPage({
         </div>
       </div>
 
-      <div className="mb-[18px] grid grid-cols-4 gap-4">
+      <div className="mb-[18px] grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           { label: "Earned gross", value: money(totalGross), color: "#2a6fdb" },
           { label: "Incentive", value: money(totalIncentive), color: "#8b5cf6" },

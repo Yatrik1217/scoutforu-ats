@@ -164,7 +164,7 @@ export default async function RecruiterPerformancePage({
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
@@ -320,7 +320,7 @@ export default async function RecruiterPerformancePage({
       </div>
       )}
 
-      <div className="mt-[18px] grid grid-cols-[1.5fr_1fr] items-start gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] items-start gap-[18px]">
         {/* placements */}
         <div className="overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
           <div className="flex items-center justify-between border-b border-[#eef1f6] px-5 py-3.5">

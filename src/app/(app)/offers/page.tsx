@@ -52,7 +52,7 @@ export default async function OffersPage() {
                 </span>
               </div>
 
-              <div className="mt-[18px] grid grid-cols-3 gap-3 rounded-xl bg-[#f7f9fc] p-4">
+              <div className="mt-[18px] grid grid-cols-1 gap-3 sm:grid-cols-3 rounded-xl bg-[#f7f9fc] p-4">
                 <Field label="Package">
                   <span className="tf-num">{fmtSalary(offer.salary_lpa)}</span>
                 </Field>

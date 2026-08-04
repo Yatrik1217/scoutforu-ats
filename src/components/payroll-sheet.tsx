@@ -271,7 +271,7 @@ function LineModal({
         </div>
 
         <div className="flex-1 overflow-auto px-5 py-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-[10px] bg-[#f8fafc] p-3">
               <div className="text-[10.5px] font-bold uppercase text-[#a3acbd]">Monthly gross</div>
               <div className="tf-num text-[14px] font-extrabold">{money(line.monthly_gross)}</div>

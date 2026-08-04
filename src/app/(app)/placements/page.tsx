@@ -132,7 +132,7 @@ export default async function PlacementsDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
@@ -157,7 +157,7 @@ export default async function PlacementsDashboard() {
         })}
       </div>
 
-      <div className="mt-[18px] grid grid-cols-[1.55fr_1fr] gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.55fr_1fr] gap-[18px]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -226,7 +226,7 @@ export default async function PlacementsDashboard() {
         </div>
       </div>
 
-      <div className="mt-[18px] grid grid-cols-[1.55fr_1fr] gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.55fr_1fr] gap-[18px]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-[15.5px] font-extrabold">Recent Placements</div>

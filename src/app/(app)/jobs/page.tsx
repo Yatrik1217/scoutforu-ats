@@ -26,7 +26,7 @@ export default async function JobsPage() {
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {ws.jobs.map((j) => {
           const dc = DEPT_COLOR[j.dept] ?? "#64748b";
           return (

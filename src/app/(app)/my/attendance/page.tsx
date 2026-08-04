@@ -84,7 +84,7 @@ export default async function MyAttendancePage() {
 
       <CheckInCard today={today} shift={shift} />
 
-      <div className="mt-[18px] grid grid-cols-4 gap-4">
+      <div className="mt-[18px] grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((s) => (
           <div key={s.label} className="rounded-2xl border border-[#e9edf3] bg-white p-[18px]">
             <div className="font-display tf-num text-[26px] font-extrabold" style={{ color: s.color }}>

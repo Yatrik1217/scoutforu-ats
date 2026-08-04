@@ -205,7 +205,7 @@ export function JobFormModal({
             <input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Senior Backend Engineer" className={fieldCls} style={err ? { borderColor: "#ef4444" } : undefined} />
             {err && <div className="mt-1.5 text-[11.5px] font-semibold text-[#ef4444]">Please enter a job title.</div>}
           </div>
-          <div className="grid grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
             <Field label="Designation"><input value={f.designation} onChange={(e) => set("designation", e.target.value)} className={fieldCls} placeholder="e.g. SDE II" /></Field>
             <Field label="Vacancies"><input inputMode="numeric" value={f.openings} onChange={(e) => set("openings", e.target.value.replace(/[^0-9]/g, ""))} className={fieldCls} placeholder="1" /></Field>
             <Field label="Target Date"><input type="date" value={f.targetDate} onChange={(e) => set("targetDate", e.target.value)} className={fieldCls} /></Field>
@@ -226,7 +226,7 @@ export function JobFormModal({
 
           {/* Client */}
           <Section title="Client Information" />
-          <div className="grid grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
             <Field label="Client">
               <select value={f.clientId ?? ""} onChange={(e) => set("clientId", e.target.value || null)} className={`${fieldCls} cursor-pointer`}>
                 <option value="">— Select client —</option>

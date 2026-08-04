@@ -188,7 +188,7 @@ export function InvoiceSettingsForm({ settings }: { settings: InvoiceSettingsRow
 
   return (
     <div className="rounded-[12px] border border-[#e9edf3] bg-white p-5">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="text-[12px] font-bold text-[#42506b]">
           Invoice prefix
           <input value={f.prefix} onChange={(e) => set("prefix", e.target.value)} className={field + " mt-1 font-normal"} placeholder="INV-" />

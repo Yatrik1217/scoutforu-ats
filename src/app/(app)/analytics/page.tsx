@@ -40,7 +40,7 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
-      <div className="mb-[18px] grid grid-cols-4 gap-4">
+      <div className="mb-[18px] grid grid-cols-2 gap-4 sm:grid-cols-4">
         {kpis.map((k) => (
           <Link
             key={k.label}

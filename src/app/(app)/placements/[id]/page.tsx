@@ -113,7 +113,7 @@ export default async function PlacementDetailPage({
       <PlacementActions placement={p} />
 
       {/* fact cards */}
-      <div className="mt-[18px] grid grid-cols-4 gap-4">
+      <div className="mt-[18px] grid grid-cols-2 gap-4 sm:grid-cols-4">
         {facts.map((fct) => {
           const Icon = fct.icon;
           return (
@@ -129,7 +129,7 @@ export default async function PlacementDetailPage({
         })}
       </div>
 
-      <div className="mt-[18px] grid grid-cols-[1.5fr_1fr] items-start gap-[18px]">
+      <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] items-start gap-[18px]">
         {/* details */}
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="text-[15px] font-extrabold">Placement details</div>

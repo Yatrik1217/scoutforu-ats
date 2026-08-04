@@ -400,7 +400,7 @@ export function CandidateFormModal({
           <div className="mt-5 mb-3 border-b border-[#eef1f6] pb-1.5 text-[13px] font-extrabold text-[#16203a]">
             Profile Details
           </div>
-          <div className="grid grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
             <Field label="Gender">
               <select value={f.gender} onChange={(e) => set("gender", e.target.value)} className={`${fieldCls} cursor-pointer`}>
                 <option value="">— Select —</option>
@@ -459,7 +459,7 @@ export function CandidateFormModal({
               <div className="mt-5 mb-3 border-b border-[#eef1f6] pb-1.5 text-[13px] font-extrabold text-[#16203a]">
                 Additional Details
               </div>
-              <div className="grid grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
                 {customFields.map((cf) => {
                   const val = f.custom?.[cf.field_key] ?? "";
                   const setCustom = (v: string | number) =>

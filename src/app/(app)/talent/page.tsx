@@ -8,7 +8,7 @@ export default async function TalentPage() {
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {sourced.map((c) => (
           <div
             key={c.id}

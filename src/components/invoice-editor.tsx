@@ -109,7 +109,7 @@ export function InvoiceEditor({
   return (
     <div className="mx-auto max-w-[980px]">
       {/* bill-to + meta */}
-      <div className="grid grid-cols-[1.2fr_1fr] gap-[18px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-[18px]">
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[20px]">
           <div className="mb-3 text-[13px] font-extrabold text-[#16203a]">Bill to</div>
           <label className={label}>

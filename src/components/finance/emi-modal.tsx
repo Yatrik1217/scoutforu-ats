@@ -134,7 +134,7 @@ export function EmiModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className={label}>{amountLabel}</label>
                 <NumberInput className={field} value={f.emiAmount} onChange={(n) => set("emiAmount", n)} placeholder="0" />
@@ -160,7 +160,7 @@ export function EmiModal({
             </div>
 
             {isLoan && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className={label}>Total EMIs</label>
                   <NumberInput className={field} value={f.totalInstallments} onChange={(n) => set("totalInstallments", n)} decimals={false} placeholder="e.g. 60" />
@@ -176,7 +176,7 @@ export function EmiModal({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {!isLoan && (
                 <div>
                   <label className={label}>{isBill ? "Bill day" : "Due day"}</label>
