@@ -65,7 +65,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-[#16203a]">
       {/* Hero */}
-      <div className="relative overflow-hidden bg-[linear-gradient(135deg,#2a6fdb_0%,#3f54d1_45%,#6d3bd6_100%)] text-white">
+      <div className="relative overflow-hidden bg-[linear-gradient(135deg,#26245f_0%,#342d84_50%,#4b2fa8_100%)] text-white">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-32 left-10 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="relative mx-auto max-w-[1000px] px-6 pt-8 pb-32">
@@ -150,7 +150,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
                 href={`/careers/${j.id}`}
                 className="group relative flex flex-col overflow-hidden rounded-[16px] border border-[#e9edf3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#c3d4f0] hover:shadow-[0_14px_34px_rgba(20,32,58,.10)]"
               >
-                <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#2a6fdb,#6d3bd6)] opacity-0 transition group-hover:opacity-100" />
+                <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#342d84,#6d3bd6)] opacity-0 transition group-hover:opacity-100" />
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-[16.5px] font-extrabold leading-snug">{j.title}</h3>
                   <span className="shrink-0 rounded-full bg-[#eafaf0] px-2.5 py-1 text-[10.5px] font-bold text-[#128a3e]">
