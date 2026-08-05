@@ -1,11 +1,13 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { CareersBrowser, type CareerJob } from "@/components/careers-browser";
+import { maskClientName } from "@/lib/careers";
 
 export const dynamic = "force-dynamic";
 
 type OrgLite = { name: string; tagline: string; logo_url: string };
+type JobRaw = CareerJob & { client_id: string | null };
 
-const COLS = "id,title,dept,location,type,exp_min,exp_max,openings,description,posted_at";
+const COLS = "id,title,dept,location,type,exp_min,exp_max,openings,description,posted_at,client_id";
 
 async function loadCareers(): Promise<{ org: OrgLite | null; jobs: CareerJob[] }> {
   let sb;
@@ -34,7 +36,17 @@ async function loadCareers(): Promise<{ org: OrgLite | null; jobs: CareerJob[] }
       .eq("approval_status", "approved")
       .order("posted_at", { ascending: false }));
   }
-  return { org: (orgData as OrgLite) ?? null, jobs: (jobsData ?? []) as CareerJob[] };
+  const raw = (jobsData ?? []) as JobRaw[];
+
+  // Strip the client's name out of every public JD (agency confidentiality).
+  const { data: clientRows } = await sb.from("clients").select("id,name");
+  const clientName = new Map((clientRows ?? []).map((c) => [c.id, c.name as string]));
+  const jobs: CareerJob[] = raw.map(({ client_id, ...j }) => ({
+    ...j,
+    description: maskClientName(j.description, client_id ? clientName.get(client_id) : ""),
+  }));
+
+  return { org: (orgData as OrgLite) ?? null, jobs };
 }
 
 export default async function CareersPage() {

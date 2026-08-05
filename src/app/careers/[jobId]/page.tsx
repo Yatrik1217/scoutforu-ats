@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MapPin, Briefcase, ArrowLeft, IndianRupee } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ApplyForm } from "@/components/apply-form";
+import { maskClientName } from "@/lib/careers";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
     // eslint-disable-next-line prefer-const -- j is reassigned in the fallback below
     let { data: j, error } = await sb
       .from("jobs")
-      .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status")
+      .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status,client_id")
       .eq("id", jobId)
       .eq("approval_status", "approved")
       .eq("published", true)
@@ -41,7 +42,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
       // Migration 0021 not applied yet (no "published" column) — old behaviour.
       ({ data: j } = await sb
         .from("jobs")
-        .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status")
+        .select("id,title,dept,location,type,exp_min,exp_max,min_ctc_lpa,max_ctc_lpa,hide_salary,description,status,client_id")
         .eq("id", jobId)
         .eq("approval_status", "approved")
         .maybeSingle());
