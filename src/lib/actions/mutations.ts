@@ -977,6 +977,18 @@ export async function setUserActive(
   active: boolean,
 ): Promise<Result> {
   const sb = await createClient();
+  // Only the Master Admin may activate/deactivate accounts.
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data: me } = await sb.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (me?.role !== "master_admin") return { ok: false, error: "Only the Master Admin can do this" };
+  if (id === user.id) return { ok: false, error: "You can't deactivate your own account" };
+
+  // Deactivation only blocks sign-in — it never deletes the recruiter's data.
+  // Her candidates, jobs and placements stay owned by her profile and remain
+  // fully visible to the admin.
   const { error } = await sb.from("profiles").update({ active }).eq("id", id);
   if (error) return { ok: false, error: error.message };
   refresh();
