@@ -32,9 +32,7 @@ The ATS is in **good shape to hand to recruiters**, with a **strong data-isolati
 
 ### 🟠 P2 — Medium
 
-1. **Public endpoints have no rate-limiting / bot protection.**
-   `POST /api/careers/apply` and the public lead-capture form accept unauthenticated submissions. A bot could flood candidates or fill résumé storage.
-   **Fix:** add a lightweight rate limit (per-IP) or a Cloudflare Turnstile / honeypot field. Low effort, meaningful protection.
+1. **Public endpoint rate-limiting / bot protection.** _(FIXED this pass — see below.)_
 
 2. **Résumé upload previously accepted any file type.** _(FIXED this pass — see below.)_
 
@@ -51,6 +49,7 @@ The ATS is in **good shape to hand to recruiters**, with a **strong data-isolati
 
 ## 🔧 Fixed in this pass
 
+- **Public-endpoint rate-limiting + honeypot** (`/api/careers/apply`): 10 submissions per 15 min per IP (HTTP 429 beyond that), plus a hidden honeypot field that silently drops bots. In-memory limiter (`src/lib/rate-limit.ts`) — sufficient for the single pm2 process; move to Redis only if scaled to multiple instances.
 - **Résumé upload allowlist** (`/api/careers/apply`): now restricted to real document types (`pdf, doc, docx, rtf, odt, txt`); the browser-supplied MIME is no longer trusted (a fixed content-type is set per extension). Blocks storing `.html`/`.svg`/executable payloads via the public endpoint.
 - **Stale welcome-email URL** fixed (was the old Vercel URL → now `NEXT_PUBLIC_APP_URL` / `ats.scoutforu.com`).
 - **First-login password change** shipped (see feature notes below).
@@ -97,6 +96,6 @@ Run as **each role** (Master Admin, Recruiter, Client). ✅ = pass.
 ---
 
 ## Suggested priority for the developer
-1. Add rate-limiting/Turnstile to public endpoints (P2 #1).
-2. Turn on Supabase leaked-password protection (P3 #3 — 2 minutes, free).
-3. Add pagination to large lists before scale (P3 #5).
+1. ~~Add rate-limiting to public endpoints~~ — **done.**
+2. Turn on Supabase leaked-password protection (P3 #3 — 2 minutes, free, Supabase dashboard).
+3. **Pagination is architectural, not a bolt-on.** `getWorkspace()` (`src/lib/data.ts`) loads the *entire* dataset (all candidates/jobs/interviews/offers) into memory, and the Kanban board + filters operate on the full set client-side. Real pagination means server-side windowing + reworking those views. Do **not** add a silent row cap (it would hide records). Schedule this as a dedicated task before the pipeline approaches a few thousand candidates.

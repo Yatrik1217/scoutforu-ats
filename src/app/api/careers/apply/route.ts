@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { rateLimit, ipFrom } from "@/lib/rate-limit";
 
 // Public job application from the careers page → creates a candidate in Sourced.
 // No auth: uses the service role (RLS-bypassing) but only ever inserts a
@@ -8,6 +9,14 @@ import { createServiceClient } from "@/lib/supabase/server";
 const digits10 = (s: string) => (s || "").replace(/\D/g, "").slice(-10);
 
 export async function POST(req: NextRequest) {
+  // Throttle abusive/bot traffic on this public endpoint (10 per 15 min per IP).
+  const rl = rateLimit(`apply:${ipFrom(req)}`, 10, 15 * 60 * 1000);
+  if (!rl.ok)
+    return NextResponse.json(
+      { ok: false, error: "Too many applications from your network. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+
   let sb;
   try {
     sb = createServiceClient();
@@ -23,6 +32,10 @@ export async function POST(req: NextRequest) {
   }
 
   const s = (k: string) => (form.get(k) ? String(form.get(k)).trim() : "");
+
+  // Honeypot: real users never see/fill the hidden "website" field. Bots that
+  // fill every input get a silent success so they don't learn they were caught.
+  if (s("website")) return NextResponse.json({ ok: true, status: "created" });
   const jobId = s("jobId");
   const name = s("name");
   const email = s("email").toLowerCase();

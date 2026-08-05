@@ -50,6 +50,15 @@ export function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle: string
 
   return (
     <form onSubmit={onSubmit} className="mt-4 space-y-3">
+      {/* Honeypot — hidden from real users; bots that fill it are dropped server-side. */}
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="hidden"
+      />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input name="name" placeholder="Full name *" className={field} />
         <input name="email" type="email" placeholder="Email *" className={field} />
