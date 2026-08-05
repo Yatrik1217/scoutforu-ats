@@ -21,6 +21,7 @@ type Job = {
   hide_salary: boolean;
   description: string;
   status: string;
+  client_id: string | null;
 };
 
 export default async function JobPage({ params }: { params: Promise<{ jobId: string }> }) {
@@ -53,6 +54,17 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
     /* falls through to notFound */
   }
   if (!job || (job.status !== "open" && job.status !== "hot")) notFound();
+
+  // Strip the client's name from the public JD (agency confidentiality).
+  if (job.client_id) {
+    try {
+      const sb = createServiceClient();
+      const { data: c } = await sb.from("clients").select("name").eq("id", job.client_id).maybeSingle();
+      job.description = maskClientName(job.description, c?.name);
+    } catch {
+      /* leave the description as-is if the lookup fails */
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
