@@ -48,18 +48,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, status: "duplicate" });
   }
 
-  // Optional résumé upload.
+  // Optional résumé upload. Restrict to real document types (never trust the
+  // browser-supplied MIME) and cap the size, so the public endpoint can't be
+  // used to store executable/HTML/SVG payloads or junk.
+  const RESUME_TYPES: Record<string, string> = {
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    rtf: "application/rtf",
+    odt: "application/vnd.oasis.opendocument.text",
+    txt: "text/plain",
+  };
   let resumeUrl = "";
   const file = form.get("resume");
   if (file instanceof File && file.size > 0 && file.size <= 8 * 1024 * 1024) {
-    try {
-      const ext = (file.name.split(".").pop() || "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf";
-      const path = `${crypto.randomUUID()}.${ext}`;
-      const buf = Buffer.from(await file.arrayBuffer());
-      const { error } = await sb.storage.from("resumes").upload(path, buf, { contentType: file.type || undefined });
-      if (!error) resumeUrl = path;
-    } catch {
-      /* résumé optional */
+    const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const contentType = RESUME_TYPES[ext];
+    if (contentType) {
+      try {
+        const path = `${crypto.randomUUID()}.${ext}`;
+        const buf = Buffer.from(await file.arrayBuffer());
+        const { error } = await sb.storage.from("resumes").upload(path, buf, { contentType });
+        if (!error) resumeUrl = path;
+      } catch {
+        /* résumé optional */
+      }
     }
   }
 
