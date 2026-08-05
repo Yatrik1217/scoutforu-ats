@@ -151,8 +151,14 @@ export function AppTopbar({
             </div>
           )}
           <DropdownMenuItem
+            onClick={() => router.push("/change-password")}
+            className="mt-1 text-[13px] font-semibold text-[#42506b]"
+          >
+            Change password
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onClick={() => start(() => signOutAction())}
-            className="mt-1 text-[13px] font-semibold text-[#dc2626]"
+            className="text-[13px] font-semibold text-[#dc2626]"
           >
             Sign out
           </DropdownMenuItem>

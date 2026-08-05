@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { getEffectiveScope } from "@/lib/preview";
 import { getNavCounts } from "@/lib/data";
@@ -12,6 +13,8 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const profile = await requireProfile();
+  // New logins must set their own password before using the app.
+  if (profile.must_change_password) redirect("/change-password");
   const sb = await createClient();
   const [{ data: clients }, { data: team }, counts] = await Promise.all([
     sb.from("clients").select("*").order("name"),

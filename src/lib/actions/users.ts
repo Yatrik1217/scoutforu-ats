@@ -53,6 +53,8 @@ export async function addUser(input: {
       role: input.role,
       color,
       client_id: input.role === "client" ? input.clientId : "",
+      // Force them to set their own password on first sign-in.
+      must_change_password: "true",
     },
   });
   if (error) {
@@ -72,10 +74,10 @@ export async function addUser(input: {
         html: `<div style="font:14px/1.6 system-ui,Arial,sans-serif;color:#16203a">
 <p>Hi ${name},</p>
 <p>Your ScoutforU ATS account is ready:</p>
-<p><b>URL:</b> https://scoutforu-ats.vercel.app<br>
+<p><b>URL:</b> ${process.env.NEXT_PUBLIC_APP_URL || "https://ats.scoutforu.com"}<br>
 <b>Email:</b> ${email}<br>
 <b>Temporary password:</b> ${input.password}</p>
-<p>Please sign in and keep your password safe.</p></div>`,
+<p>You'll be asked to set your own password the first time you sign in.</p></div>`,
       });
       mailed = true;
     } catch {

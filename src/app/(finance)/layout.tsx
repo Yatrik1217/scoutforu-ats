@@ -12,6 +12,7 @@ export default async function FinanceLayout({
   children: React.ReactNode;
 }) {
   const profile = await requireProfile();
+  if (profile.must_change_password) redirect("/change-password");
   if (profile.role !== "master_admin") redirect("/overview");
 
   return (

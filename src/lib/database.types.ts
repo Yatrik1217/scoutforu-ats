@@ -52,6 +52,7 @@ export type ProfileRow = {
   api_token: string | null;
   is_approver: boolean;
   incentive_percent: number | null;
+  must_change_password: boolean;
   created_at: string;
 };
 
