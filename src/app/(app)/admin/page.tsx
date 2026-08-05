@@ -3,7 +3,8 @@ import { loadWorkspace } from "@/lib/data";
 import { getProfile } from "@/lib/auth";
 import { ROLE_LABEL } from "@/lib/domain";
 import { Avatar } from "@/components/bits";
-import { SettingsToggle, UserActiveToggle } from "@/components/view-actions";
+import { SettingsToggle } from "@/components/view-actions";
+import { DeactivateRecruiter } from "@/components/deactivate-recruiter";
 import { ClientManager } from "@/components/client-manager";
 import { ApiTokenCard } from "@/components/api-token-card";
 import { AddUserButton } from "@/components/add-user-modal";
@@ -77,7 +78,17 @@ export default async function AdminPage() {
               <div className="text-[11.5px] text-[#9aa4b6]">{u.email}</div>
             </div>
             {isAdmin && u.role === "recruiter" && (
-              <UserActiveToggle id={u.id} active={u.active} />
+              <DeactivateRecruiter
+                id={u.id}
+                name={u.name}
+                active={u.active}
+                team={ws.team.map((m) => ({
+                  id: m.id,
+                  name: m.name,
+                  role: m.role,
+                  active: m.active,
+                }))}
+              />
             )}
             <span
               className="rounded-full px-2.5 py-1 text-[11px] font-bold"

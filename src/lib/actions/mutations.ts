@@ -972,6 +972,63 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
   return { ok: true, message: "Interview scheduled" + noteSuffix };
 }
 
+// Hand a recruiter's live pipeline to someone else (used when she resigns).
+// Moves only OPEN work — active candidates (not yet joined/not-joined) and open
+// jobs — so her historical hires, placements and commission stay attributed to
+// her. Optionally deactivates her in the same step.
+export async function reassignRecruiterWork(input: {
+  fromId: string;
+  toId: string;
+  deactivate?: boolean;
+}): Promise<Result & { moved?: { candidates: number; jobs: number } }> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data: me } = await sb.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (me?.role !== "master_admin") return { ok: false, error: "Only the Master Admin can do this" };
+
+  const { fromId, toId, deactivate } = input;
+  if (!fromId || !toId) return { ok: false, error: "Pick who to hand the work to" };
+  if (fromId === toId) return { ok: false, error: "Choose a different person to receive the work" };
+
+  // The receiver must be an active recruiter or the admin — never a client login.
+  const { data: target } = await sb.from("profiles").select("id,active,role").eq("id", toId).maybeSingle();
+  if (!target || target.active === false || target.role === "client")
+    return { ok: false, error: "The receiving user must be an active recruiter or admin" };
+
+  const { data: movedCands, error: cErr } = await sb
+    .from("candidates")
+    .update({ recruiter_id: toId })
+    .eq("recruiter_id", fromId)
+    .not("stage", "in", "(joined,not_joined)")
+    .select("id");
+  if (cErr) return { ok: false, error: cErr.message };
+
+  const { data: movedJobs, error: jErr } = await sb
+    .from("jobs")
+    .update({ recruiter_id: toId })
+    .eq("recruiter_id", fromId)
+    .in("status", ["open", "hot"])
+    .select("id");
+  if (jErr) return { ok: false, error: jErr.message };
+
+  if (deactivate) {
+    if (fromId === user.id) return { ok: false, error: "You can't deactivate your own account" };
+    const { error: dErr } = await sb.from("profiles").update({ active: false }).eq("id", fromId);
+    if (dErr) return { ok: false, error: dErr.message };
+  }
+
+  refresh();
+  const moved = { candidates: movedCands?.length ?? 0, jobs: movedJobs?.length ?? 0 };
+  return {
+    ok: true,
+    moved,
+    message: `Moved ${moved.candidates} candidate${moved.candidates === 1 ? "" : "s"} and ${moved.jobs} job${moved.jobs === 1 ? "" : "s"}${deactivate ? " · recruiter deactivated" : ""}`,
+  };
+}
+
 export async function setUserActive(
   id: string,
   active: boolean,
