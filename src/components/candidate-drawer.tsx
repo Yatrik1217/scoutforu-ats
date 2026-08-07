@@ -12,8 +12,10 @@ import { CandidateMessageModal } from "@/components/candidate-message-modal";
 import { createClient } from "@/lib/supabase/client";
 import {
   PIPELINE_STAGES,
+  STAGES,
   stageColor,
   stageFromSlug,
+  stageToSlug,
   stageIndex,
   nextStage,
   hexA,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/domain";
 import {
   advanceCandidate,
+  moveCandidateStage,
   rejectCandidate,
   deleteCandidate,
   addCandidateNote,
@@ -704,6 +707,30 @@ export function CandidateDrawer({
                 >
                   Reject
                 </button>
+                {/* Jump straight to any stage — lets recruiters bypass steps
+                    (e.g. a walk-in placed directly, or mark Joined / Not Joined). */}
+                <select
+                  value={stageToSlug(detail.stage)}
+                  disabled={pending}
+                  title="Jump to any stage"
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    start(async () => {
+                      const res = await moveCandidateStage(candidateId, slug);
+                      if (res.ok) {
+                        toast.success(res.message ?? "Moved");
+                        router.refresh();
+                      } else toast.error(res.error ?? "Action failed");
+                    });
+                  }}
+                  className="rounded-[11px] border border-[#e3e8f0] bg-[#f6f8fb] px-2.5 py-3 text-[13px] font-bold text-[#42506b] outline-none focus:border-[#2a6fdb] disabled:opacity-60"
+                >
+                  {STAGES.map((s) => (
+                    <option key={s.slug} value={s.slug}>
+                      {s.key}
+                    </option>
+                  ))}
+                </select>
                 <button
                   disabled={pending || !next}
                   onClick={() => run(advanceCandidate)}

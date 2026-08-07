@@ -6,6 +6,7 @@ import {
   Calendar,
   FileText,
   TrendingUp,
+  CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -63,17 +64,16 @@ export default async function OverviewPage() {
   const metrics: {
     label: string;
     value: string | number;
-    delta: string;
-    up: boolean;
     icon: LucideIcon;
     color: string;
     href: string;
   }[] = [
-    { label: "Open Jobs", value: ws.jobs.length, delta: "+2", up: true, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
-    { label: "Active Candidates", value: activeCount(ws.candidates), delta: "+11", up: true, icon: Users, color: "#8b5cf6", href: "/candidates" },
-    { label: "Interviews / wk", value: interviewsThisWeek, delta: "+3", up: true, icon: Calendar, color: "#06b6d4", href: "/interviews" },
-    { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), delta: "+1", up: true, icon: FileText, color: "#f59e0b", href: "/offers" },
-    { label: "Avg Time-to-Hire", value: avgTimeToHire(ws.events), delta: "-3d", up: true, icon: TrendingUp, color: "#16a34a", href: "/analytics" },
+    { label: "Open Jobs", value: ws.jobs.length, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
+    { label: "Active Candidates", value: activeCount(ws.candidates), icon: Users, color: "#8b5cf6", href: "/candidates" },
+    { label: "Interviews / wk", value: interviewsThisWeek, icon: Calendar, color: "#06b6d4", href: "/interviews" },
+    { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), icon: FileText, color: "#f59e0b", href: "/offers" },
+    { label: "Hires (Joined)", value: stageCount(ws.candidates, "Joined"), icon: CheckCircle2, color: "#16a34a", href: "/candidates?stage=joined" },
+    { label: "Avg Time-to-Hire", value: avgTimeToHire(ws.events), icon: TrendingUp, color: "#0ea5e9", href: "/analytics" },
   ];
 
   const upcoming = ws.interviews.slice(0, 5);
@@ -95,7 +95,7 @@ export default async function OverviewPage() {
       )}
 
       {/* metrics */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {metrics.map((m) => {
           const Icon = m.icon;
           return (
@@ -111,15 +111,6 @@ export default async function OverviewPage() {
                 >
                   <Icon size={18} />
                 </div>
-                <span
-                  className="rounded-full px-2 py-[3px] text-[12px] font-extrabold"
-                  style={{
-                    color: m.up ? "#16a34a" : "#ef4444",
-                    background: m.up ? "#e9f9ef" : "#fef2f2",
-                  }}
-                >
-                  {m.delta}
-                </span>
               </div>
               <div className="font-display tf-num mt-3.5 text-[30px] font-extrabold tracking-tight">
                 {m.value}
