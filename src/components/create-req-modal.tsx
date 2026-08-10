@@ -136,6 +136,22 @@ export function JobFormModal({
         telephonic: job.telephonic,
         status: job.status,
       });
+      // Load the full assigned set (lead + co-recruiters) for this job.
+      const jobId = job.id;
+      createClient()
+        .from("job_recruiters")
+        .select("recruiter_id")
+        .eq("job_id", jobId)
+        .then(({ data }) => {
+          if (!data || !data.length) return;
+          const ids = data.map((r) => r.recruiter_id as string);
+          // Keep the lead (job.recruiter_id) first.
+          const ordered = [
+            ...(job.recruiter_id && ids.includes(job.recruiter_id) ? [job.recruiter_id] : []),
+            ...ids.filter((x) => x !== job.recruiter_id),
+          ];
+          setF((s) => ({ ...s, recruiterIds: ordered, recruiterId: ordered[0] ?? s.recruiterId }));
+        });
     } else {
       setF(blank(clients, team));
     }
