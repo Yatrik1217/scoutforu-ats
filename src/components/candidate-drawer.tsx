@@ -7,7 +7,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText } from "lucide-react";
+import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText, Check } from "lucide-react";
 import { CandidateMessageModal } from "@/components/candidate-message-modal";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -731,14 +731,28 @@ export function CandidateDrawer({
                     </option>
                   ))}
                 </select>
-                <button
-                  disabled={pending || !next}
-                  onClick={() => run(advanceCandidate)}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#2a6fdb] py-3 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(42,111,219,.32)] hover:bg-[#1f5bc0] disabled:opacity-60"
-                >
-                  {next ? `Move to ${next}` : "Final Stage"}
-                  {next && <ArrowRight size={16} strokeWidth={2.4} />}
-                </button>
+                {next ? (
+                  <button
+                    disabled={pending}
+                    onClick={() => run(advanceCandidate)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#2a6fdb] py-3 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(42,111,219,.32)] hover:bg-[#1f5bc0] disabled:opacity-60"
+                  >
+                    Move to {next}
+                    <ArrowRight size={16} strokeWidth={2.4} />
+                  </button>
+                ) : (
+                  // Terminal stage (Joined / Not Joined) — no "next" to advance to.
+                  // Show a clear status, not a dead button. Use the dropdown to change it.
+                  <div
+                    className="flex flex-1 items-center justify-center gap-2 rounded-[11px] py-3 text-[13.5px] font-extrabold"
+                    style={{
+                      background: hexA(stageColor(detail.stage), 0.14),
+                      color: stageColor(detail.stage),
+                    }}
+                  >
+                    <Check size={17} strokeWidth={2.8} /> {detail.stage}
+                  </div>
+                )}
               </div>
             )}
           </>
