@@ -10,6 +10,7 @@ import {
   updateRequisition,
   type ReqForm,
 } from "@/lib/actions/mutations";
+import { createClient } from "@/lib/supabase/client";
 import {
   INDIAN_CITIES,
   FUNCTIONAL_AREAS,
@@ -38,8 +39,9 @@ const labelCls = "mb-1.5 block text-xs font-bold text-[#42506b]";
 // like 5.5, etc.) and only coerced to numbers on submit.
 type FormState = Omit<
   ReqForm,
-  "openings" | "expMin" | "expMax" | "minCtc" | "maxCtc"
+  "openings" | "expMin" | "expMax" | "minCtc" | "maxCtc" | "recruiterIds"
 > & {
+  recruiterIds: string[];
   openings: string;
   expMin: string;
   expMax: string;
@@ -58,6 +60,7 @@ const blank = (clients: ClientRow[], team: ProfileRow[]): FormState => ({
   referenceCode: "",
   clientId: clients[0]?.id ?? null,
   recruiterId: team[0]?.id ?? null,
+  recruiterIds: team[0]?.id ? [team[0].id] : [],
   interviewerHr: "",
   interviewVenue: "",
   remoteWork: false,
@@ -113,6 +116,7 @@ export function JobFormModal({
         referenceCode: job.reference_code,
         clientId: job.client_id,
         recruiterId: job.recruiter_id,
+        recruiterIds: job.recruiter_id ? [job.recruiter_id] : [],
         interviewerHr: job.interviewer_hr,
         interviewVenue: job.interview_venue,
         remoteWork: job.remote_work,

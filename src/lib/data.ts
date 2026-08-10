@@ -45,7 +45,7 @@ export type Workspace = {
 
 export async function getWorkspace(scope: EffectiveScope): Promise<Workspace> {
   const sb = await createClient();
-  const [clients, jobs, team, candidates, interviews, offers, events, settings] =
+  const [clients, jobs, team, candidates, interviews, offers, events, settings, jobRecs] =
     await Promise.all([
       sb.from("clients").select("*").order("name"),
       sb.from("jobs").select("*").order("posted_at", { ascending: false }),
@@ -58,6 +58,7 @@ export async function getWorkspace(scope: EffectiveScope): Promise<Workspace> {
         .select("*")
         .order("created_at", { ascending: false }),
       sb.from("app_settings").select("*").maybeSingle(),
+      sb.from("job_recruiters").select("job_id,recruiter_id"),
     ]);
 
   const profileById = new Map<string, ProfileRow>(
@@ -90,7 +91,15 @@ export async function getWorkspace(scope: EffectiveScope): Promise<Workspace> {
   // are unaffected (they see everything).
   if (scope.role === "recruiter") {
     const me = String(scope.userId);
-    jobRows = jobRows.filter((j) => String(j.recruiter_id) === me);
+    // Jobs where this recruiter is a co-assignee (not just the lead recruiter_id).
+    const assignedJobIds = new Set(
+      (jobRecs.data ?? [])
+        .filter((r) => String(r.recruiter_id) === me)
+        .map((r) => r.job_id as string),
+    );
+    jobRows = jobRows.filter(
+      (j) => String(j.recruiter_id) === me || assignedJobIds.has(j.id),
+    );
     const jobIds = new Set(jobRows.map((j) => j.id));
     candRows = candRows.filter(
       (c) => String(c.recruiter_id) === me || (c.job_id && jobIds.has(c.job_id)),

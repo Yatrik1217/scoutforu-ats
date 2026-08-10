@@ -356,6 +356,9 @@ export type ReqForm = {
   referenceCode: string;
   clientId: string | null;
   recruiterId: string | null;
+  // Full set of recruiters assigned to the job (lead + co-recruiters). The lead
+  // is recruiterId (kept for "owned by" display); this drives co-recruiting.
+  recruiterIds?: string[];
   interviewerHr: string;
   interviewVenue: string;
   remoteWork: boolean;
@@ -409,6 +412,21 @@ function jobPayload(form: ReqForm) {
   };
 }
 
+// Replace the set of recruiters assigned to a job. The lead (recruiterId) is
+// always included. Delete-then-insert keeps it simple and idempotent.
+async function syncJobRecruiters(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  form: ReqForm,
+) {
+  const ids = Array.from(
+    new Set([form.recruiterId, ...(form.recruiterIds ?? [])].filter(Boolean)),
+  ) as string[];
+  await sb.from("job_recruiters").delete().eq("job_id", jobId);
+  if (ids.length)
+    await sb.from("job_recruiters").insert(ids.map((rid) => ({ job_id: jobId, recruiter_id: rid })));
+}
+
 export async function createRequisition(form: ReqForm): Promise<Result> {
   if (!form.title.trim()) return { ok: false, error: "Job title is required" };
   const sb = await createClient();
@@ -435,12 +453,17 @@ export async function createRequisition(form: ReqForm): Promise<Result> {
     )
       approval = "pending";
   }
-  const { error } = await sb.from("jobs").insert({
-    ...jobPayload(form),
-    approval_status: approval,
-    posted_at: new Date().toISOString(),
-  });
-  if (error) return { ok: false, error: error.message };
+  const { data: created, error } = await sb
+    .from("jobs")
+    .insert({
+      ...jobPayload(form),
+      approval_status: approval,
+      posted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error || !created) return { ok: false, error: error?.message ?? "Could not create the job" };
+  await syncJobRecruiters(sb, created.id, form);
   refresh();
   return {
     ok: true,
@@ -581,6 +604,7 @@ export async function updateRequisition(
     return { ok: false, error: "You can only edit openings assigned to you." };
   const { error } = await sb.from("jobs").update(jobPayload(form)).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await syncJobRecruiters(sb, id, form);
   refresh();
   return { ok: true, message: `"${form.title.trim()}" updated` };
 }
