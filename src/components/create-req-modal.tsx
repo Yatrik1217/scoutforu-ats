@@ -253,11 +253,45 @@ export function JobFormModal({
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="Assign Recruiter">
-              <select value={f.recruiterId ?? ""} onChange={(e) => set("recruiterId", e.target.value || null)} className={`${fieldCls} cursor-pointer`}>
-                <option value="">— Unassigned —</option>
-                {team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+            <Field label="Assign Recruiter(s)">
+              <div className="max-h-[128px] overflow-auto rounded-[10px] border border-[#e3e8f0] p-1">
+                {team.length === 0 && (
+                  <div className="px-2 py-2 text-[12.5px] text-[#9aa4b6]">No recruiters yet</div>
+                )}
+                {team.map((t) => {
+                  const checked = f.recruiterIds.includes(t.id);
+                  const isLead = checked && f.recruiterIds[0] === t.id;
+                  return (
+                    <label
+                      key={t.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-[7px] px-2 py-1.5 text-[13px] font-semibold text-[#16203a] hover:bg-[#f6f8fb]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setF((s) => {
+                            const next = e.target.checked
+                              ? [...s.recruiterIds, t.id]
+                              : s.recruiterIds.filter((x) => x !== t.id);
+                            return { ...s, recruiterIds: next, recruiterId: next[0] ?? null };
+                          })
+                        }
+                        className="h-3.5 w-3.5 accent-[#2a6fdb]"
+                      />
+                      <span className="flex-1">{t.name}</span>
+                      {isLead && (
+                        <span className="rounded bg-[#eef4fe] px-1.5 py-0.5 text-[10px] font-bold text-[#2a6fdb]">
+                          Lead
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[11px] font-medium text-[#9aa4b6]">
+                First one is the lead owner. Tick more than one to co-recruit the role.
+              </p>
             </Field>
             <Field label="Interviewer HR Person"><input value={f.interviewerHr} onChange={(e) => set("interviewerHr", e.target.value)} className={fieldCls} placeholder="HR contact name" /></Field>
           </div>

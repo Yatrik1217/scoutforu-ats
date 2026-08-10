@@ -56,6 +56,12 @@ export type ProfileRow = {
   created_at: string;
 };
 
+export type JobRecruiterRow = {
+  job_id: string;
+  recruiter_id: string;
+  created_at: string;
+};
+
 export type JobRow = {
   id: string;
   title: string;
@@ -688,6 +694,7 @@ export type Database = {
       clients: Table<ClientRow>;
       profiles: Table<ProfileRow>;
       jobs: Table<JobRow>;
+      job_recruiters: Table<JobRecruiterRow>;
       candidates: Table<CandidateRow>;
       interviews: Table<InterviewRow>;
       stage_events: Table<StageEventRow>;
