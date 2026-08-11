@@ -20,7 +20,7 @@ export default async function AttendanceSettingsPage() {
   return (
     <div className="animate-sc-fadein mx-auto max-w-[640px] p-[22px_26px_40px]">
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="text-[20px] font-extrabold text-[#16203a]">Working Hours</h1>
+        <h1 className="text-[20px] font-extrabold text-[#16203a]">Attendance &amp; Holidays</h1>
         <Link href="/admin/settings" className="text-[12.5px] font-bold text-[#2a6fdb] hover:underline">
           ← General Settings
         </Link>
