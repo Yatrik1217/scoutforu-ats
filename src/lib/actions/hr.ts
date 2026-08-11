@@ -8,6 +8,10 @@ import {
   dayCount,
   daysInMonth,
   lopDaysForMonth,
+  approvedLeaveDates,
+  unmarkedAbsentCount,
+  weeklyOffDates,
+  APP_TIMEZONE,
   monthLabel,
   incentiveDue,
   onProbation,
@@ -528,15 +532,35 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
   const monthEnd = toISODate(
     new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0),
   );
-  const [{ data: emps }, { data: types }, { data: leaves }, { data: priorLines }, { data: att }] =
+  const [{ data: emps }, { data: types }, { data: leaves }, { data: priorLines }, { data: att }, { data: settingsRow }, { data: holData }] =
     await Promise.all([
       sb.from("employees").select("*").eq("status", "active"),
       sb.from("leave_types").select("*"),
       sb.from("leave_requests").select("*").eq("status", "approved"),
       sb.from("payroll_lines").select("employee_id,incentive,run_id"),
       sb.from("attendance").select("*").gte("on_date", period).lte("on_date", monthEnd),
+      sb.from("attendance_settings").select("weekly_offs,saturday_off_weeks").maybeSingle(),
+      sb.from("holidays").select("on_date").gte("on_date", period).lte("on_date", monthEnd),
     ]);
   const attendance = (att ?? []) as AttendanceRow[];
+
+  // Off days = weekly-off policy + holidays; un-marked working days are absent
+  // and dock pay just like an explicit "absent" mark.
+  const year = Number(period.slice(0, 4));
+  const monthNo = Number(period.slice(5, 7));
+  const monthDays = Array.from(
+    { length: new Date(year, monthNo, 0).getDate() },
+    (_, i) => toISODate(new Date(year, monthNo - 1, i + 1)),
+  );
+  const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+  const offDates = new Set<string>([
+    ...weeklyOffDates(
+      monthDays,
+      (settingsRow?.weekly_offs as number[] | undefined) ?? [0],
+      (settingsRow?.saturday_off_weeks as number[] | undefined) ?? [],
+    ),
+    ...((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
+  ]);
 
   // Incentive already carried on finalised/paid runs, per employee.
   const { data: doneRuns } = await sb
@@ -556,12 +580,17 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
 
   const rows = ((emps ?? []) as EmployeeRow[]).map((e) => {
     const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
-    const lop = lopDaysForMonth(
-      mine,
-      leaveTypes,
-      period,
-      attendance.filter((a) => a.employee_id === e.id),
-    );
+    const myAtt = attendance.filter((a) => a.employee_id === e.id);
+    const unmarked = unmarkedAbsentCount({
+      monthDays,
+      markedDates: new Set(myAtt.map((a) => a.on_date)),
+      leaveDates: approvedLeaveDates(mine, period),
+      offDates,
+      joinedOn: e.joined_on,
+      exitOn: e.exit_on,
+      todayISO,
+    });
+    const lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
     const incentive = e.profile_id
       ? incentiveDue({
           earnedThisFY: earned.get(e.profile_id) ?? 0,

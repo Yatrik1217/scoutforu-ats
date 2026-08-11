@@ -71,9 +71,10 @@ export default async function AttendancePage({
   const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
   // Weekly-off days per policy (Sunday + any configured off-Saturdays).
   const settingsRow = shiftData as AttendanceSettingsRow | null;
+  const holidayDates = ((holData ?? []) as { on_date: string }[]).map((h) => h.on_date);
   const offDates = new Set<string>([
     ...weeklyOffDates(days, settingsRow?.weekly_offs ?? [0], settingsRow?.saturday_off_weeks ?? []),
-    ...((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
+    ...holidayDates,
   ]);
   // Approved-leave dates per employee, so a day on leave is never an absence.
   const leaveByEmp: Record<string, string[]> = {};
@@ -127,6 +128,7 @@ export default async function AttendancePage({
         todayISO={todayISO}
         leaveByEmp={leaveByEmp}
         offDates={[...offDates]}
+        holidayDates={holidayDates}
       />
 
       {/* per-employee summary + the LOP payroll will use */}
