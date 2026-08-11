@@ -8,11 +8,14 @@ import {
   monthLabel,
   lopDaysForMonth,
   attendanceSummary,
+  approvedLeaveDates,
+  unmarkedAbsentCount,
   grossMinutes,
   netMinutes,
   formatDuration,
   formatShiftTime,
   assessDay,
+  APP_TIMEZONE,
   DEFAULT_SHIFT,
 } from "@/lib/hr";
 import { AttendanceGrid } from "@/components/attendance-widgets";
@@ -61,6 +64,17 @@ export default async function AttendancePage({
   const types = (typeData ?? []) as LeaveTypeRow[];
   const shift = (shiftData as AttendanceSettingsRow) ?? DEFAULT_SHIFT;
 
+  // "Today" in the app timezone (IST) — past days that were never marked count
+  // as absent, but today and future days do not (the day isn't over).
+  const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+  // Approved-leave dates per employee, so a day on leave is never an absence.
+  const leaveByEmp: Record<string, string[]> = {};
+  for (const e of employees) {
+    leaveByEmp[e.id] = [
+      ...approvedLeaveDates(leaves.filter((l) => l.employee_id === e.id), period),
+    ];
+  }
+
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -102,6 +116,8 @@ export default async function AttendancePage({
         rows={rows}
         days={days}
         month={monthLabel(period)}
+        todayISO={todayISO}
+        leaveByEmp={leaveByEmp}
       />
 
       {/* per-employee summary + the LOP payroll will use */}
@@ -120,12 +136,24 @@ export default async function AttendancePage({
         {employees.map((e) => {
           const mine = rows.filter((r) => r.employee_id === e.id);
           const s = attendanceSummary(mine);
-          const lop = lopDaysForMonth(
-            leaves.filter((l) => l.employee_id === e.id),
-            types,
-            period,
-            mine,
-          );
+          // Past working days never marked (and not on approved leave) count as
+          // absent — added to the explicit "absent" marks and to loss of pay.
+          const unmarked = unmarkedAbsentCount({
+            monthDays: days,
+            markedDates: new Set(mine.map((r) => r.on_date)),
+            leaveDates: new Set(leaveByEmp[e.id]),
+            joinedOn: e.joined_on,
+            exitOn: e.exit_on,
+            todayISO,
+          });
+          const absentTotal = s.absent + unmarked;
+          const lop =
+            lopDaysForMonth(
+              leaves.filter((l) => l.employee_id === e.id),
+              types,
+              period,
+              mine,
+            ) + unmarked;
           const gross = mine.reduce((s, r) => s + (grossMinutes(r) ?? 0), 0);
           const net = mine.reduce((s, r) => s + (netMinutes(r) ?? 0), 0);
           const lateDays = mine.filter((r) => {
@@ -151,7 +179,7 @@ export default async function AttendancePage({
                 {s.leave || "—"}
               </div>
               <div className="tf-num text-center text-[13px] font-bold text-[#dc2626]">
-                {s.absent || "—"}
+                {absentTotal || "—"}
               </div>
               <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
                 {lateDays || "—"}

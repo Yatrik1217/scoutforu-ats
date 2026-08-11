@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { toISODate } from "@/lib/invoice";
 import {
   attendanceSummary,
+  approvedLeaveDates,
+  unmarkedAbsentCount,
   monthStart,
   monthLabel,
   formatClock,
@@ -14,10 +16,16 @@ import {
   firstIn,
   lastOut,
   assessDay,
+  APP_TIMEZONE,
   DEFAULT_SHIFT,
 } from "@/lib/hr";
 import { CheckInCard, AttendancePill } from "@/components/attendance-widgets";
-import type { AttendanceRow, AttendanceSettingsRow, EmployeeRow } from "@/lib/database.types";
+import type {
+  AttendanceRow,
+  AttendanceSettingsRow,
+  EmployeeRow,
+  LeaveRequestRow,
+} from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +72,31 @@ export default async function MyAttendancePage() {
     );
   }
 
+  // Un-marked past working days (not on approved leave) count as absent too.
+  const monthDays = Array.from(
+    { length: new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0).getDate() },
+    (_, i) => toISODate(new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, i + 1)),
+  );
+  const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+  const { data: myLeaves } = await sb
+    .from("leave_requests")
+    .select("*")
+    .eq("employee_id", employee.id)
+    .eq("status", "approved");
+  const unmarked = unmarkedAbsentCount({
+    monthDays,
+    markedDates: new Set(rows.map((r) => r.on_date)),
+    leaveDates: approvedLeaveDates((myLeaves ?? []) as LeaveRequestRow[], period),
+    joinedOn: employee.joined_on,
+    exitOn: employee.exit_on,
+    todayISO,
+  });
+
   const stats = [
     { label: "Present", value: sum.present, color: "#16a34a" },
     { label: "Half days", value: sum.halfDay, color: "#e8833a" },
     { label: "On leave", value: sum.leave, color: "#2a6fdb" },
-    { label: "Absent", value: sum.absent, color: "#dc2626" },
+    { label: "Absent", value: sum.absent + unmarked, color: "#dc2626" },
   ];
 
   return (

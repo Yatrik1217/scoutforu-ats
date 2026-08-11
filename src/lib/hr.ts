@@ -215,6 +215,54 @@ export function attendanceSummary(rows: AttendanceRow[]) {
   };
 }
 
+// Dates (ISO) in the given month covered by an APPROVED leave request — used so
+// a day someone is legitimately on leave is never treated as an absence.
+export function approvedLeaveDates(
+  requests: LeaveRequestRow[],
+  periodISO: string,
+): Set<string> {
+  const out = new Set<string>();
+  for (const r of requests) {
+    if (r.status !== "approved") continue;
+    for (const d of datesInRange(r.from_date, r.to_date, periodISO)) out.add(d);
+  }
+  return out;
+}
+
+// A past working day with NO attendance record and NO approved leave is a real,
+// un-marked absence. Sunday is the default weekly off (mark any other day as
+// "Week off" if your week differs). Today and future days are never counted —
+// the day isn't over yet. Also respects the employee's joining/exit dates.
+export function isUnmarkedAbsent(
+  dateISO: string,
+  todayISO: string,
+  joinedOn: string | null,
+  exitOn: string | null,
+): boolean {
+  if (dateISO >= todayISO) return false;
+  if (joinedOn && dateISO < joinedOn) return false;
+  if (exitOn && dateISO > exitOn) return false;
+  return new Date(dateISO + "T00:00:00").getDay() !== 0; // 0 = Sunday
+}
+
+// How many un-marked absences an employee has in the month (excludes days that
+// already have any status and days covered by approved leave).
+export function unmarkedAbsentCount(args: {
+  monthDays: string[];
+  markedDates: Set<string>;
+  leaveDates: Set<string>;
+  joinedOn: string | null;
+  exitOn: string | null;
+  todayISO: string;
+}): number {
+  let n = 0;
+  for (const d of args.monthDays) {
+    if (args.markedDates.has(d) || args.leaveDates.has(d)) continue;
+    if (isUnmarkedAbsent(d, args.todayISO, args.joinedOn, args.exitOn)) n++;
+  }
+  return n;
+}
+
 // ---- clock times & durations ---------------------------------------------------
 //
 // Everything is stored as a UTC timestamp. Formatting MUST pin the timezone —

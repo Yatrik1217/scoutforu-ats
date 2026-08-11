@@ -14,6 +14,7 @@ import {
   lastOut,
   elapsedMinutes,
   assessDay,
+  isUnmarkedAbsent,
   formatClock,
   formatDuration,
   formatShiftTime,
@@ -159,12 +160,19 @@ export function AttendanceGrid({
   rows,
   days,
   month,
+  todayISO,
+  leaveByEmp,
 }: {
   employees: EmployeeRow[];
   rows: AttendanceRow[];
   days: string[]; // ISO dates in the month
   month: string;
+  todayISO: string;
+  leaveByEmp: Record<string, string[]>;
 }) {
+  const leaveSets = new Map(
+    Object.entries(leaveByEmp).map(([id, dates]) => [id, new Set(dates)]),
+  );
   const [local, setLocal] = useState<Record<string, AttendanceStatus | null>>({});
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -248,20 +256,32 @@ export function AttendanceGrid({
                 {days.map((d) => {
                   const s = statusOf(e.id, d);
                   const meta = s ? ATTENDANCE_META[s] : null;
+                  // Un-marked past working day (not on leave) = auto absent.
+                  const autoAbsent =
+                    !meta &&
+                    !(leaveSets.get(e.id)?.has(d)) &&
+                    isUnmarkedAbsent(d, todayISO, e.joined_on, e.exit_on);
+                  const cellStyle = meta
+                    ? { background: meta.color, color: "#fff" }
+                    : autoAbsent
+                      ? { background: "#fdecec", color: "#dc2626" } // faint = auto, not manually set
+                      : { background: "#f1f4f9", color: "#c2cad8" };
                   return (
                     <td key={d} className="border-b border-[#f4f6fa] p-0 text-center">
                       <button
                         onClick={() => cycle(e.id, d)}
                         disabled={pending}
-                        title={`${e.name} · ${d}${meta ? ` · ${meta.label}` : ""} — click to change`}
-                        className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold transition hover:ring-2 hover:ring-[#cbd7ea]"
-                        style={
+                        title={`${e.name} · ${d}${
                           meta
-                            ? { background: meta.color, color: "#fff" }
-                            : { background: "#f1f4f9", color: "#c2cad8" }
-                        }
+                            ? ` · ${meta.label}`
+                            : autoAbsent
+                              ? " · Absent (no attendance marked)"
+                              : ""
+                        } — click to change`}
+                        className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold transition hover:ring-2 hover:ring-[#cbd7ea]"
+                        style={cellStyle}
                       >
-                        {meta ? meta.short : "·"}
+                        {meta ? meta.short : autoAbsent ? "A" : "·"}
                       </button>
                     </td>
                   );
@@ -277,8 +297,10 @@ export function AttendanceGrid({
         </div>
       )}
       <div className="border-t border-[#eef1f6] px-5 py-2.5 text-[11.5px] text-[#8a94a6]">
-        Click any day to cycle through the statuses. <b>Absent</b> counts as a full loss-of-pay day
-        and <b>Half day</b> as ½ — combined with unpaid leave, never double-counted.
+        A faint red <b style={{ color: "#dc2626" }}>A</b> is a past working day nobody marked — it counts
+        as <b>Absent</b> automatically. Sundays are treated as the weekly off; mark other days as
+        <b> Week off</b> or <b>Holiday</b> if needed. Click any day to set a status. Absent = a full
+        loss-of-pay day, Half day = ½, and it&apos;s never double-counted with unpaid leave.
       </div>
     </div>
   );
