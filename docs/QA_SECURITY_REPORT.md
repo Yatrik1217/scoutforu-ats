@@ -5,6 +5,22 @@ _Scope: static code/security audit + a manual test plan. No destructive tests we
 
 ---
 
+## Final QA cycle — session close
+
+**Automated tests:** `npm test` → **27/27 finance + 11/11 attendance passing.** New attendance→payroll tests (`test/hr/attendance.test.mts`) cover the weekly-off policy (6-day, alternate Saturdays), auto-absent boundaries (past/today/future, joining/exit, weekly-off), the "Present 8 / Absent 1" register scenario, holiday & leave exclusion, and LOP→net-pay.
+
+**Build & lint:** production `next build` compiles clean; `eslint` clean on all touched files.
+
+**Security:** all **38** tables have RLS enabled (new `job_recruiters` and `holidays` included). New mutations are admin-gated (`addHoliday`, `deleteHoliday`, `updateAttendanceSettings`, `reassignRecruiterWork`, `setUserActive`); the profile privilege-escalation trigger (0043) is live. Service-role key remains server-only.
+
+**Performance:** no N+1 introduced — payroll's per-employee calc (LOP incl. auto-absents) is pure in-memory; page loads use batched `Promise.all` fetches.
+
+**DB migrations verified live in Supabase:** 0042 (first-login password), 0043 (privilege guard), 0044 (co-recruiting), 0045 (weekly-off policy), 0046 (holidays) — all applied.
+
+**Not covered (needs a human):** live multi-user click-through with real logins, cross-browser/mobile rendering, and real load testing — see the manual checklist below.
+
+---
+
 ## Verdict
 
 The ATS is in **good shape to hand to recruiters**, with a **strong data-isolation and access-control posture**. No critical (P1) vulnerabilities were found. A few medium/low hardening items are listed below; two were fixed in this pass.
