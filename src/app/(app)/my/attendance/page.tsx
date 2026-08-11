@@ -7,6 +7,7 @@ import {
   approvedLeaveDates,
   unmarkedAbsentCount,
   weeklyOffDates,
+  isUnmarkedAbsent,
   monthStart,
   monthLabel,
   formatClock,
@@ -25,6 +26,7 @@ import type {
   AttendanceRow,
   AttendanceSettingsRow,
   EmployeeRow,
+  HolidayRow,
   LeaveRequestRow,
 } from "@/lib/database.types";
 
@@ -79,24 +81,46 @@ export default async function MyAttendancePage() {
     (_, i) => toISODate(new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, i + 1)),
   );
   const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
-  const { data: myLeaves } = await sb
-    .from("leave_requests")
-    .select("*")
-    .eq("employee_id", employee.id)
-    .eq("status", "approved");
-  const unmarked = unmarkedAbsentCount({
-    monthDays,
-    markedDates: new Set(rows.map((r) => r.on_date)),
-    leaveDates: approvedLeaveDates((myLeaves ?? []) as LeaveRequestRow[], period),
-    offDates: weeklyOffDates(
+  const [{ data: myLeaves }, { data: holData }] = await Promise.all([
+    sb.from("leave_requests").select("*").eq("employee_id", employee.id).eq("status", "approved"),
+    sb.from("holidays").select("*").gte("on_date", period).lte("on_date", monthEnd),
+  ]);
+  const holidays = (holData ?? []) as HolidayRow[];
+  const holidayName = new Map(holidays.map((h) => [h.on_date, h.name]));
+  const leaveDates = approvedLeaveDates((myLeaves ?? []) as LeaveRequestRow[], period);
+  // Off days = weekly-off policy + national/company holidays. None count absent.
+  const offDates = new Set<string>([
+    ...weeklyOffDates(
       monthDays,
       (shiftData as AttendanceSettingsRow | null)?.weekly_offs ?? [0],
       (shiftData as AttendanceSettingsRow | null)?.saturday_off_weeks ?? [],
     ),
+    ...holidays.map((h) => h.on_date),
+  ]);
+  const unmarked = unmarkedAbsentCount({
+    monthDays,
+    markedDates: new Set(rows.map((r) => r.on_date)),
+    leaveDates,
+    offDates,
     joinedOn: employee.joined_on,
     exitOn: employee.exit_on,
     todayISO,
   });
+
+  // Build the register list: real check-ins + auto-absent days + holidays, so an
+  // un-marked day (e.g. an absence) is actually visible, not just counted.
+  const rowByDate = new Map(rows.map((r) => [r.on_date, r]));
+  type Entry = { date: string; row: AttendanceRow | null; kind: "record" | "absent" | "holiday" };
+  const entries: Entry[] = [];
+  for (const d of monthDays) {
+    if (d > todayISO) continue;
+    const rec = rowByDate.get(d);
+    if (rec) entries.push({ date: d, row: rec, kind: "record" });
+    else if (holidayName.has(d)) entries.push({ date: d, row: null, kind: "holiday" });
+    else if (!leaveDates.has(d) && isUnmarkedAbsent(d, todayISO, employee.joined_on, employee.exit_on, offDates))
+      entries.push({ date: d, row: null, kind: "absent" });
+  }
+  entries.sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const stats = [
     { label: "Present", value: sum.present, color: "#16a34a" },
@@ -140,7 +164,36 @@ export default async function MyAttendancePage() {
           <div className="text-center">Late</div>
           <div className="text-right">Status</div>
         </div>
-        {rows.map((r) => {
+        {entries.map((entry) => {
+          const r = entry.row;
+          if (!r) {
+            // Auto-absent or holiday — no check-in times to show.
+            const isHoliday = entry.kind === "holiday";
+            return (
+              <div
+                key={entry.date}
+                className="grid grid-cols-[1fr_100px_100px_80px_80px_80px_90px_110px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-2.5 last:border-0"
+              >
+                <div className="text-[12.5px] font-bold text-[#16203a]">
+                  {format(new Date(entry.date + "T00:00:00"), "EEE, dd MMM")}
+                  {isHoliday && holidayName.get(entry.date) && (
+                    <span className="ml-2 text-[11px] font-semibold text-[#8b5cf6]">
+                      {holidayName.get(entry.date)}
+                    </span>
+                  )}
+                </div>
+                <div className="tf-num text-[12px] text-[#a3acbd]">—</div>
+                <div className="tf-num text-[12px] text-[#a3acbd]">—</div>
+                <div className="tf-num text-center text-[12px] text-[#a3acbd]">—</div>
+                <div className="tf-num text-center text-[12px] text-[#a3acbd]">—</div>
+                <div className="tf-num text-center text-[12px] text-[#a3acbd]">—</div>
+                <div className="tf-num text-center text-[12px] text-[#a3acbd]">—</div>
+                <div className="text-right">
+                  <AttendancePill status={isHoliday ? "holiday" : "absent"} />
+                </div>
+              </div>
+            );
+          }
           const a = firstIn(r) ? assessDay(r, shift) : null;
           return (
             <div
@@ -170,7 +223,7 @@ export default async function MyAttendancePage() {
             </div>
           );
         })}
-        {rows.length === 0 && (
+        {entries.length === 0 && (
           <div className="py-12 text-center text-[13px] font-semibold text-[#a3acbd]">
             Nothing marked this month yet — check in above to start.
           </div>

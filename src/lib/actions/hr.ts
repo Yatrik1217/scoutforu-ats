@@ -694,3 +694,27 @@ export async function deletePayrollRun(runId: string): Promise<Result> {
   refresh();
   return { ok: true, message: "Payroll run deleted" };
 }
+
+// ---- holidays -----------------------------------------------------------------
+
+export async function addHoliday(dateISO: string, name: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage holidays." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO))
+    return { ok: false, error: "Pick a valid date." };
+  const { error } = await sb
+    .from("holidays")
+    .upsert({ on_date: dateISO, name: name.trim() }, { onConflict: "on_date" });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: `Holiday added for ${dateISO}` };
+}
+
+export async function deleteHoliday(id: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can manage holidays." };
+  const { error } = await sb.from("holidays").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Holiday removed" };
+}

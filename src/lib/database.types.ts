@@ -583,6 +583,13 @@ export type AttendanceSettingsRow = {
   updated_at: string;
 };
 
+export type HolidayRow = {
+  id: string;
+  on_date: string; // ISO date
+  name: string;
+  created_at: string;
+};
+
 export type AttendanceRow = {
   id: string;
   employee_id: string;
@@ -726,6 +733,7 @@ export type Database = {
       payroll_lines: Table<PayrollLineRow>;
       attendance: Table<AttendanceRow>;
       attendance_settings: Table<AttendanceSettingsRow>;
+      holidays: Table<HolidayRow>;
       app_settings: Table<AppSettingsRow>;
       finance_categories: Table<FinanceCategoryRow>;
       finance_expenses: Table<FinanceExpenseRow>;

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AttendanceSettingsForm } from "@/components/attendance-settings-form";
-import type { AttendanceSettingsRow } from "@/lib/database.types";
+import { HolidaysManager } from "@/components/holidays-manager";
+import type { AttendanceSettingsRow, HolidayRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,10 @@ export default async function AttendanceSettingsPage() {
   const me = await requireProfile();
   if (me.role !== "master_admin") redirect("/admin");
   const sb = await createClient();
-  const { data } = await sb.from("attendance_settings").select("*").maybeSingle();
+  const [{ data }, { data: holData }] = await Promise.all([
+    sb.from("attendance_settings").select("*").maybeSingle(),
+    sb.from("holidays").select("*").order("on_date", { ascending: false }),
+  ]);
 
   return (
     <div className="animate-sc-fadein mx-auto max-w-[640px] p-[22px_26px_40px]">
@@ -26,6 +30,9 @@ export default async function AttendanceSettingsPage() {
         <Link href="/attendance" className="font-bold text-[#2a6fdb] hover:underline">Attendance</Link>.
       </p>
       <AttendanceSettingsForm settings={(data as AttendanceSettingsRow) ?? null} />
+      <div className="mt-4">
+        <HolidaysManager holidays={(holData ?? []) as HolidayRow[]} />
+      </div>
     </div>
   );
 }

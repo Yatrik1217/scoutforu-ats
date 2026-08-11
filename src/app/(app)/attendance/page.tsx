@@ -50,13 +50,14 @@ export default async function AttendancePage({
   );
 
   const sb = await createClient();
-  const [{ data: empData }, { data: attData }, { data: leaveData }, { data: typeData }, { data: shiftData }] =
+  const [{ data: empData }, { data: attData }, { data: leaveData }, { data: typeData }, { data: shiftData }, { data: holData }] =
     await Promise.all([
       sb.from("employees").select("*").eq("status", "active").order("name"),
       sb.from("attendance").select("*").gte("on_date", period).lte("on_date", monthEnd),
       sb.from("leave_requests").select("*").eq("status", "approved"),
       sb.from("leave_types").select("*"),
       sb.from("attendance_settings").select("*").maybeSingle(),
+      sb.from("holidays").select("on_date").gte("on_date", period).lte("on_date", monthEnd),
     ]);
 
   const employees = (empData ?? []) as EmployeeRow[];
@@ -70,7 +71,10 @@ export default async function AttendancePage({
   const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
   // Weekly-off days per policy (Sunday + any configured off-Saturdays).
   const settingsRow = shiftData as AttendanceSettingsRow | null;
-  const offDates = weeklyOffDates(days, settingsRow?.weekly_offs ?? [0], settingsRow?.saturday_off_weeks ?? []);
+  const offDates = new Set<string>([
+    ...weeklyOffDates(days, settingsRow?.weekly_offs ?? [0], settingsRow?.saturday_off_weeks ?? []),
+    ...((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
+  ]);
   // Approved-leave dates per employee, so a day on leave is never an absence.
   const leaveByEmp: Record<string, string[]> = {};
   for (const e of employees) {
