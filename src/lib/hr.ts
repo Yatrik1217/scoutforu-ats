@@ -229,28 +229,50 @@ export function approvedLeaveDates(
   return out;
 }
 
+// The weekly-off dates in a month per policy. weeklyOffs = weekday numbers
+// always off (0=Sun..6=Sat). saturdayOffWeeks = which Saturdays-of-the-month are
+// off (1=first..5=fifth); empty means every Saturday works (true 6-day week).
+export function weeklyOffDates(
+  monthDays: string[],
+  weeklyOffs: number[] = [0],
+  saturdayOffWeeks: number[] = [],
+): Set<string> {
+  const off = new Set<string>();
+  for (const d of monthDays) {
+    const dt = new Date(d + "T00:00:00");
+    const dow = dt.getDay();
+    if (weeklyOffs.includes(dow)) {
+      off.add(d);
+    } else if (dow === 6 && saturdayOffWeeks.includes(Math.ceil(dt.getDate() / 7))) {
+      off.add(d); // this Saturday-of-the-month is a configured off
+    }
+  }
+  return off;
+}
+
 // A past working day with NO attendance record and NO approved leave is a real,
-// un-marked absence. Sunday is the default weekly off (mark any other day as
-// "Week off" if your week differs). Today and future days are never counted —
-// the day isn't over yet. Also respects the employee's joining/exit dates.
+// un-marked absence. Weekly-off days (per policy) and today/future days are
+// never counted, and it respects the employee's joining/exit dates.
 export function isUnmarkedAbsent(
   dateISO: string,
   todayISO: string,
   joinedOn: string | null,
   exitOn: string | null,
+  offDates: Set<string>,
 ): boolean {
   if (dateISO >= todayISO) return false;
   if (joinedOn && dateISO < joinedOn) return false;
   if (exitOn && dateISO > exitOn) return false;
-  return new Date(dateISO + "T00:00:00").getDay() !== 0; // 0 = Sunday
+  return !offDates.has(dateISO);
 }
 
 // How many un-marked absences an employee has in the month (excludes days that
-// already have any status and days covered by approved leave).
+// already have any status, days covered by approved leave, and weekly-offs).
 export function unmarkedAbsentCount(args: {
   monthDays: string[];
   markedDates: Set<string>;
   leaveDates: Set<string>;
+  offDates: Set<string>;
   joinedOn: string | null;
   exitOn: string | null;
   todayISO: string;
@@ -258,7 +280,7 @@ export function unmarkedAbsentCount(args: {
   let n = 0;
   for (const d of args.monthDays) {
     if (args.markedDates.has(d) || args.leaveDates.has(d)) continue;
-    if (isUnmarkedAbsent(d, args.todayISO, args.joinedOn, args.exitOn)) n++;
+    if (isUnmarkedAbsent(d, args.todayISO, args.joinedOn, args.exitOn, args.offDates)) n++;
   }
   return n;
 }

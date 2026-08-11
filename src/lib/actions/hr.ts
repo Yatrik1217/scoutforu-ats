@@ -281,6 +281,7 @@ export async function updateAttendanceSettings(input: {
   graceMinutes: number;
   fullDayHours: number;
   halfDayHours: number;
+  saturdayOffWeeks?: number[];
 }): Promise<Result> {
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can change work hours." };
@@ -298,6 +299,13 @@ export async function updateAttendanceSettings(input: {
       grace_minutes: Math.max(0, Number(input.graceMinutes) || 0),
       full_day_hours: Math.max(0, Number(input.fullDayHours) || 0),
       half_day_hours: Math.max(0, Number(input.halfDayHours) || 0),
+      ...(input.saturdayOffWeeks
+        ? {
+            saturday_off_weeks: [...new Set(input.saturdayOffWeeks)]
+              .filter((n) => n >= 1 && n <= 5)
+              .sort((a, b) => a - b),
+          }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", true);

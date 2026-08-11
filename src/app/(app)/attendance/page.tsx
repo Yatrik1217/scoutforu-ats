@@ -10,6 +10,7 @@ import {
   attendanceSummary,
   approvedLeaveDates,
   unmarkedAbsentCount,
+  weeklyOffDates,
   grossMinutes,
   netMinutes,
   formatDuration,
@@ -67,6 +68,9 @@ export default async function AttendancePage({
   // "Today" in the app timezone (IST) — past days that were never marked count
   // as absent, but today and future days do not (the day isn't over).
   const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+  // Weekly-off days per policy (Sunday + any configured off-Saturdays).
+  const settingsRow = shiftData as AttendanceSettingsRow | null;
+  const offDates = weeklyOffDates(days, settingsRow?.weekly_offs ?? [0], settingsRow?.saturday_off_weeks ?? []);
   // Approved-leave dates per employee, so a day on leave is never an absence.
   const leaveByEmp: Record<string, string[]> = {};
   for (const e of employees) {
@@ -118,6 +122,7 @@ export default async function AttendancePage({
         month={monthLabel(period)}
         todayISO={todayISO}
         leaveByEmp={leaveByEmp}
+        offDates={[...offDates]}
       />
 
       {/* per-employee summary + the LOP payroll will use */}
@@ -142,6 +147,7 @@ export default async function AttendancePage({
             monthDays: days,
             markedDates: new Set(mine.map((r) => r.on_date)),
             leaveDates: new Set(leaveByEmp[e.id]),
+            offDates,
             joinedOn: e.joined_on,
             exitOn: e.exit_on,
             todayISO,

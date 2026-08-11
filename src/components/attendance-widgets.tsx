@@ -162,6 +162,7 @@ export function AttendanceGrid({
   month,
   todayISO,
   leaveByEmp,
+  offDates,
 }: {
   employees: EmployeeRow[];
   rows: AttendanceRow[];
@@ -169,10 +170,12 @@ export function AttendanceGrid({
   month: string;
   todayISO: string;
   leaveByEmp: Record<string, string[]>;
+  offDates: string[]; // weekly-off dates per policy
 }) {
   const leaveSets = new Map(
     Object.entries(leaveByEmp).map(([id, dates]) => [id, new Set(dates)]),
   );
+  const offSet = new Set(offDates);
   const [local, setLocal] = useState<Record<string, AttendanceStatus | null>>({});
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -232,12 +235,12 @@ export function AttendanceGrid({
                 Employee
               </th>
               {days.map((d) => {
-                const dow = new Date(d + "T00:00:00").getDay();
+                const isOff = offSet.has(d);
                 return (
                   <th
                     key={d}
                     className={`border-b border-[#eef1f6] px-0 py-2 text-center text-[10px] font-bold ${
-                      dow === 0 ? "bg-[#fef2f2] text-[#dc2626]" : "bg-[#f8fafc] text-[#8a94a6]"
+                      isOff ? "bg-[#f1f0f7] text-[#8b5cf6]" : "bg-[#f8fafc] text-[#8a94a6]"
                     }`}
                     style={{ minWidth: 26 }}
                   >
@@ -256,16 +259,20 @@ export function AttendanceGrid({
                 {days.map((d) => {
                   const s = statusOf(e.id, d);
                   const meta = s ? ATTENDANCE_META[s] : null;
-                  // Un-marked past working day (not on leave) = auto absent.
+                  const isOff = offSet.has(d);
+                  // Un-marked past working day (not off, not on leave) = auto absent.
                   const autoAbsent =
                     !meta &&
+                    !isOff &&
                     !(leaveSets.get(e.id)?.has(d)) &&
-                    isUnmarkedAbsent(d, todayISO, e.joined_on, e.exit_on);
+                    isUnmarkedAbsent(d, todayISO, e.joined_on, e.exit_on, offSet);
                   const cellStyle = meta
                     ? { background: meta.color, color: "#fff" }
                     : autoAbsent
                       ? { background: "#fdecec", color: "#dc2626" } // faint = auto, not manually set
-                      : { background: "#f1f4f9", color: "#c2cad8" };
+                      : isOff
+                        ? { background: "#f1f0f7", color: "#a99fd6" } // weekly off
+                        : { background: "#f1f4f9", color: "#c2cad8" };
                   return (
                     <td key={d} className="border-b border-[#f4f6fa] p-0 text-center">
                       <button
@@ -276,12 +283,14 @@ export function AttendanceGrid({
                             ? ` · ${meta.label}`
                             : autoAbsent
                               ? " · Absent (no attendance marked)"
-                              : ""
+                              : isOff
+                                ? " · Weekly off"
+                                : ""
                         } — click to change`}
                         className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold transition hover:ring-2 hover:ring-[#cbd7ea]"
                         style={cellStyle}
                       >
-                        {meta ? meta.short : autoAbsent ? "A" : "·"}
+                        {meta ? meta.short : autoAbsent ? "A" : isOff ? "W" : "·"}
                       </button>
                     </td>
                   );

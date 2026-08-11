@@ -18,6 +18,9 @@ export function AttendanceSettingsForm({ settings }: { settings: AttendanceSetti
   const [grace, setGrace] = useState(settings?.grace_minutes ?? 10);
   const [fullDay, setFullDay] = useState(settings?.full_day_hours ?? 8);
   const [halfDay, setHalfDay] = useState(settings?.half_day_hours ?? 4);
+  const [satPolicy, setSatPolicy] = useState(
+    (settings?.saturday_off_weeks ?? []).slice().sort((a, b) => a - b).join(","),
+  );
   const [pending, start] = useTransition();
 
   const save = () =>
@@ -28,6 +31,7 @@ export function AttendanceSettingsForm({ settings }: { settings: AttendanceSetti
         graceMinutes: grace,
         fullDayHours: fullDay,
         halfDayHours: halfDay,
+        saturdayOffWeeks: satPolicy ? satPolicy.split(",").map(Number) : [],
       });
       if (res.ok) toast.success(res.message || "Saved");
       else toast.error(res.error || "Failed");
@@ -72,6 +76,26 @@ export function AttendanceSettingsForm({ settings }: { settings: AttendanceSetti
         <label className={lbl}>
           Half day below (hrs)
           <NumberInput value={halfDay} onChange={setHalfDay} className={field + " mt-1 font-normal"} />
+        </label>
+      </div>
+      <div className="mt-3">
+        <label className={lbl}>
+          Weekly off
+          <select
+            value={satPolicy}
+            onChange={(e) => setSatPolicy(e.target.value)}
+            className={field + " mt-1 cursor-pointer font-normal"}
+          >
+            <option value="">Sunday only (6-day week — all Saturdays working)</option>
+            <option value="2,4">Sunday + 2nd &amp; 4th Saturday off (alternate)</option>
+            <option value="1,3">Sunday + 1st &amp; 3rd Saturday off</option>
+            <option value="1,3,5">Sunday + 1st, 3rd &amp; 5th Saturday off</option>
+            <option value="1,2,3,4,5">Sunday + every Saturday off (5-day week)</option>
+          </select>
+          <span className="mt-1 block text-[11px] font-medium text-[#a3acbd]">
+            Un-marked working days count as Absent. Off days never do. For a one-off change (e.g. one
+            person works an off-Saturday), just click that day in the register.
+          </span>
         </label>
       </div>
       <div className="mt-4 rounded-[10px] bg-[#f8fafc] px-4 py-3 text-[12px] text-[#7a8696]">

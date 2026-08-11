@@ -578,6 +578,8 @@ export type AttendanceSettingsRow = {
   grace_minutes: number;
   full_day_hours: number;
   half_day_hours: number;
+  weekly_offs: number[]; // weekday numbers always off (0=Sun..6=Sat)
+  saturday_off_weeks: number[]; // ordinal Saturdays off (1..5); empty = 6-day
   updated_at: string;
 };
 
