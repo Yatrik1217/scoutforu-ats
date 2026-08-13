@@ -4,7 +4,7 @@ import type { Database } from "@/lib/database.types";
 
 // "/invoice/" (trailing slash) keeps the tokenized public invoice view open
 // without exposing the staff "/invoices" area.
-const PUBLIC_PATHS = ["/login", "/auth", "/careers", "/invoice/"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth", "/careers", "/invoice/"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

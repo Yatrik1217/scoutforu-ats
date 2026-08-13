@@ -38,6 +38,31 @@ export async function signOutAction() {
   redirect("/login");
 }
 
+function siteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "https://scoutforu-ats.vercel.app"
+  ).replace(/\/$/, "");
+}
+
+// Email a password-reset link. Always returns a generic success so we never
+// reveal whether an address has an account. Supabase sends the recovery email
+// and handles the token; the link lands on /auth/callback which establishes a
+// short-lived session and forwards to /reset-password.
+export async function requestPasswordResetAction(
+  _prev: { error?: string; ok?: boolean } | null,
+  formData: FormData,
+): Promise<{ error?: string; ok?: boolean } | null> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter your email address." };
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl()}/auth/callback?next=/reset-password`,
+  });
+  return { ok: true };
+}
+
 // Set a new password for the signed-in user. Used for the forced first-login
 // change and for voluntary changes from the account menu. Clears the
 // must_change_password flag on success.
