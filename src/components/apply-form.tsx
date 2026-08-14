@@ -69,7 +69,7 @@ export function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle: string
       </div>
       <textarea name="message" rows={3} placeholder="A short note (optional)" className={field + " resize-none"} />
       <label className="block text-[12.5px] font-bold text-[#42506b]">
-        Résumé (PDF / Word)
+        Resume (PDF / Word)
         <input
           name="resume"
           type="file"

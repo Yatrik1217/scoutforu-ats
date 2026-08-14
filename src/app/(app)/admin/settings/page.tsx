@@ -46,7 +46,7 @@ export default async function GeneralSettingsPage() {
     { title: "Clients", subtitle: "Your client companies", desc: "Manage client companies, contacts & KAMs.", icon: UsersRound, color: "#38a3e0", href: "/admin" },
     { title: "Approvers", subtitle: "Internal approvers", desc: "Approve job openings before they go live.", icon: ShieldCheck, color: "#17a673", href: "/admin/settings/approvers" },
     { title: "SMS Settings", subtitle: "SMS gateway", desc: "Configure an SMS gateway for candidate alerts.", icon: MessageSquareText, color: "#38a3e0", href: "/admin/settings/sms" },
-    { title: "Email (SMTP)", subtitle: smtp ? "Configured ✓" : "Not configured", desc: "Send trackers & résumés to clients from your mailbox.", icon: Mail, color: "#e0533a", href: "/admin/settings/email" },
+    { title: "Email (SMTP)", subtitle: smtp ? "Configured ✓" : "Not configured", desc: "Send trackers & resumes to clients from your mailbox.", icon: Mail, color: "#e0533a", href: "/admin/settings/email" },
     { title: "Default Emails", subtitle: "Templates & senders", desc: "Reusable email templates for common actions.", icon: Send, color: "#38a3e0", href: "/admin/settings/email-templates" },
     { title: "Application Pipeline", subtitle: "Recruitment workflow", desc: "The 9-stage hiring pipeline candidates move through.", icon: Workflow, color: "#e0533a", href: "/pipeline" },
     { title: "Action Triggers", subtitle: "Automations", desc: "Auto-email a candidate when they move into a stage.", icon: Zap, color: "#e8833a", href: "/admin/settings/automations" },
@@ -55,9 +55,9 @@ export default async function GeneralSettingsPage() {
     { title: "Invoice Setting", subtitle: "Billing details", desc: "Invoice numbering, GST & billing info — invoices live under Admin → Invoices.", icon: ReceiptIndianRupee, color: "#e0533a", href: "/admin/settings/invoice" },
     { title: "Recruiter Incentives", subtitle: "Commission scheme", desc: "How recruiter incentives are calculated on placement fees — flat % or slabs, on money collected or fee booked.", icon: Trophy, color: "#17a673", href: "/admin/settings/incentives" },
     { title: "Attendance & Holidays", subtitle: "Shift, week-off & holidays", desc: "Shift start/end and grace period, the weekly-off policy (6-day / alternate Saturdays), and the national/company holiday list. Un-marked working days count as Absent.", icon: Clock, color: "#e8833a", href: "/admin/settings/attendance" },
-    { title: "Import Data", subtitle: "Import from Excel", desc: "Candidates, jobs, clients & recruiter logins from .xlsx/.csv — plus AI résumé bulk upload.", icon: Upload, color: "#17a673", href: "/admin/settings/import" },
-    { title: "File Name Formats", subtitle: "Résumé naming", desc: "Downloads are named by the candidate — active.", icon: FileText, color: "#e8833a", status: "active" },
-    { title: "Résumé Import Token", subtitle: "Naukri Resdex", desc: "API token for the one-click Resdex import extension.", icon: KeyRound, color: "#2a6fdb", href: "/admin" },
+    { title: "Import Data", subtitle: "Import from Excel", desc: "Candidates, jobs, clients & recruiter logins from .xlsx/.csv — plus AI resume bulk upload.", icon: Upload, color: "#17a673", href: "/admin/settings/import" },
+    { title: "File Name Formats", subtitle: "Resume naming", desc: "Downloads are named by the candidate — active.", icon: FileText, color: "#e8833a", status: "active" },
+    { title: "Resume Import Token", subtitle: "Naukri Resdex", desc: "API token for the one-click Resdex import extension.", icon: KeyRound, color: "#2a6fdb", href: "/admin" },
     { title: "Career Page", subtitle: "Website & custom domain", desc: "Publish roles to careers.scoutforu.com and embed them on your website.", icon: Globe, color: "#38a3e0", href: "/admin/settings/career-page" },
   ];
 

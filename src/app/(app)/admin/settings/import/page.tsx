@@ -19,7 +19,7 @@ export default async function ImportPage() {
       <p className="mb-5 text-[13px] text-[#8a94a6]">
         Bulk-import from Excel (.xlsx) or CSV. Download the template, fill it, upload — every row is
         validated, duplicates are skipped, and you get a per-row report. For importing{" "}
-        <b>résumé files</b> (PDF/Word) use{" "}
+        <b>resume files</b> (PDF/Word) use{" "}
         <Link href="/bulk" className="font-bold text-[#2a6fdb] hover:underline">
           Bulk Upload
         </Link>{" "}

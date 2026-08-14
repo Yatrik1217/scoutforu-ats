@@ -68,7 +68,7 @@ function decodeEntities(s: string): string {
 
 // Naukri's rendered CV markup is full of layout junk (timeline widgets, empty
 // nodes, pseudo "hover-style" text, lazy-loaded images). Convert it to clean,
-// readable lines so the stored résumé is presentable rather than raw HTML.
+// readable lines so the stored resume is presentable rather than raw HTML.
 const JUNK_LINE = /^(hover-style|no-hover|last-child|first-child|even|odd|["'“”\-•\s]*)$/i;
 function htmlToText(html: string): string {
   const withBreaks = html
@@ -91,7 +91,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string);
 }
 
-// Build a clean, printable résumé document from Naukri's rendered CV HTML.
+// Build a clean, printable resume document from Naukri's rendered CV HTML.
 function renderResumeDoc(name: string, cvHtml: string): string {
   const text = htmlToText(cvHtml);
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)} — CV</title><style>body{font:14px/1.65 system-ui,-apple-system,Arial,sans-serif;max-width:800px;margin:32px auto;padding:0 22px;color:#16203a}h1{font-size:22px;margin:0 0 2px}.sfu-src{color:#7a8699;font-size:12px;margin:0 0 20px}pre{white-space:pre-wrap;word-wrap:break-word;font:inherit;margin:0}@media print{body{margin:0}}</style></head><body><h1>${escapeHtml(name)}</h1><div class="sfu-src">Imported from Naukri Resdex · ScoutforU ATS</div><pre>${escapeHtml(text)}</pre></body></html>`;
@@ -180,9 +180,9 @@ export async function POST(req: NextRequest) {
   ]);
   const ai: ParsedResume | null = mergeParsed(aiFile, aiText);
 
-  // Decide what résumé file to store: the original download if the extension
+  // Decide what resume file to store: the original download if the extension
   // captured one, otherwise the rendered CV HTML snapshot from the page (which
-  // Resdex always shows), so a résumé document is attached either way.
+  // Resdex always shows), so a resume document is attached either way.
   let storeBuf = resumeBuf;
   let storeName = resumeName;
   let storeType = resumeType;
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     storeType = "text/html";
   }
 
-  // Store the résumé file so recruiters can view/download it later.
+  // Store the resume file so recruiters can view/download it later.
   let resumeUrl = "";
   if (storeBuf && storeBuf.length <= 8 * 1024 * 1024) {
     try {

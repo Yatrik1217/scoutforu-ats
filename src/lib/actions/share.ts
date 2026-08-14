@@ -110,7 +110,7 @@ export async function shareWithClient(input: {
     },
   ];
 
-  // Attach each candidate's résumé (downloaded via service role from the bucket).
+  // Attach each candidate's resume (downloaded via service role from the bucket).
   const svc = createServiceClient();
   const used = new Set<string>();
   for (const c of cands) {
@@ -126,7 +126,7 @@ export async function shareWithClient(input: {
       used.add(fname.toLowerCase());
       attachments.push({ filename: fname, content: Buffer.from(ab) });
     } catch {
-      /* skip unreadable résumé */
+      /* skip unreadable resume */
     }
   }
 
@@ -142,7 +142,7 @@ export async function shareWithClient(input: {
     .join("");
   const html = `<div style="font:14px/1.6 system-ui,Arial,sans-serif;color:#16203a">
 ${intro ? `<p>${escapeHtml(intro).replace(/\n/g, "<br>")}</p>` : ""}
-<p>Please find attached the candidate tracker (Excel) and ${cands.length} résumé${cands.length > 1 ? "s" : ""}.</p>
+<p>Please find attached the candidate tracker (Excel) and ${cands.length} resume${cands.length > 1 ? "s" : ""}.</p>
 <ul>${list}</ul>
 <p style="color:#7a8699;font-size:12px">Sent via ScoutforU ATS${me.name ? " by " + escapeHtml(me.name) : ""}.</p>
 </div>`;
@@ -154,7 +154,7 @@ ${intro ? `<p>${escapeHtml(intro).replace(/\n/g, "<br>")}</p>` : ""}
   }
 
   // Log the share on each candidate's activity.
-  const note = `Shared with client (${to}) — tracker + résumé emailed.`;
+  const note = `Shared with client (${to}) — tracker + resume emailed.`;
   await sb.from("candidate_notes").insert(
     cands.map((c) => ({ candidate_id: c.id, author_id: user.id, body: note })),
   );
@@ -163,6 +163,6 @@ ${intro ? `<p>${escapeHtml(intro).replace(/\n/g, "<br>")}</p>` : ""}
   const attachedResumes = attachments.length - 1;
   return {
     ok: true,
-    message: `Sent to ${to} · ${cands.length} candidate${cands.length > 1 ? "s" : ""}, ${attachedResumes} résumé${attachedResumes === 1 ? "" : "s"} attached.`,
+    message: `Sent to ${to} · ${cands.length} candidate${cands.length > 1 ? "s" : ""}, ${attachedResumes} resume${attachedResumes === 1 ? "" : "s"} attached.`,
   };
 }

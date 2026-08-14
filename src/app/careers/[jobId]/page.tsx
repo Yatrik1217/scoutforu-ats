@@ -110,7 +110,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
 
         <div className="mt-6 rounded-[14px] border border-[#e9edf3] bg-white p-6">
           <h2 className="text-[17px] font-extrabold text-[#16203a]">Apply for this role</h2>
-          <p className="mt-1 text-[13px] text-[#8a94a6]">Fill in your details and attach your résumé.</p>
+          <p className="mt-1 text-[13px] text-[#8a94a6]">Fill in your details and attach your resume.</p>
           <ApplyForm jobId={job.id} jobTitle={job.title} />
         </div>
       </main>

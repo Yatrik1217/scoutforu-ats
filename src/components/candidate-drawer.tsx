@@ -361,7 +361,7 @@ export function CandidateDrawer({
                     }}
                     className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]"
                   >
-                    <FileText size={15} /> Résumé
+                    <FileText size={15} /> Resume
                   </button>
                 )}
                 {canWrite && (

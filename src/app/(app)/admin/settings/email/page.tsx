@@ -39,7 +39,7 @@ export default async function EmailSettingsPage() {
           </div>
           <div className="text-[12.5px] text-[#6b7686]">
             {ok
-              ? `Sending as ${from}. The "Share with Client" action will email trackers + résumés.`
+              ? `Sending as ${from}. The "Share with Client" action will email trackers + resumes.`
               : "Add the SMTP environment variables below to enable client emails."}
           </div>
         </div>
