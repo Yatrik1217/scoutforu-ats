@@ -8,7 +8,27 @@ import { rateLimit, ipFrom } from "@/lib/rate-limit";
 
 const digits10 = (s: string) => (s || "").replace(/\D/g, "").slice(-10);
 
+// CORS — this endpoint is submitted to cross-origin from the public marketing
+// site (scoutforu.com), so responses must allow that origin for the browser to
+// read them. No cookies/credentials are used, so a wildcard is safe here.
+const CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handleApply(req);
+  for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
+  return res;
+}
+
+async function handleApply(req: NextRequest) {
   // Throttle abusive/bot traffic on this public endpoint (10 per 15 min per IP).
   const rl = rateLimit(`apply:${ipFrom(req)}`, 10, 15 * 60 * 1000);
   if (!rl.ok)
