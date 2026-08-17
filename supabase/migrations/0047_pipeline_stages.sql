@@ -38,18 +38,29 @@ create unique index if not exists uq_pipeline_stage_client_slug
 create index if not exists idx_pipeline_stages_client_pos
   on public.pipeline_stages (client_id, position);
 
--- ---------- 2. seed the DEFAULT pipeline (mirrors the old enum order) ----------
+-- ---------- 2. seed the DEFAULT pipeline (the full ScoutforU flow) ----------
+-- Existing slugs are reused where possible so current candidates aren't
+-- orphaned: sourced, screening, selected, offered, offer_accepted, joined,
+-- not_joined keep their slugs; the old 'practical_interview' is reused as
+-- "Practical". The old generic 'interview' stage is dropped — candidates in it
+-- are remapped to 'hr_round' below.
 insert into public.pipeline_stages (client_id, name, slug, position, color, outcome)
 values
-  (null, 'Sourced',             'sourced',             0, '#64748b', 'in_progress'),
-  (null, 'Screening',           'screening',           1, '#2a6fdb', 'in_progress'),
-  (null, 'Interview',           'interview',           2, '#6366f1', 'in_progress'),
-  (null, 'Practical Interview', 'practical_interview', 3, '#8b5cf6', 'in_progress'),
-  (null, 'Selected',            'selected',            4, '#06b6d4', 'in_progress'),
-  (null, 'Offered',             'offered',             5, '#f59e0b', 'in_progress'),
-  (null, 'Offer Accepted',      'offer_accepted',      6, '#10b981', 'in_progress'),
-  (null, 'Joined',              'joined',              7, '#16a34a', 'won'),
-  (null, 'Not Joined',          'not_joined',          8, '#ef4444', 'lost')
+  (null, 'Sourced',                'sourced',             0,  '#64748b', 'in_progress'),
+  (null, 'Screening',              'screening',           1,  '#2a6fdb', 'in_progress'),
+  (null, 'Client Submit',          'client_submit',       2,  '#0ea5e9', 'in_progress'),
+  (null, 'HR Round',               'hr_round',            3,  '#6366f1', 'in_progress'),
+  (null, '1st Technical Round',    'technical_round_1',   4,  '#8b5cf6', 'in_progress'),
+  (null, '2nd Technical Round',    'technical_round_2',   5,  '#a855f7', 'in_progress'),
+  (null, 'Practical',              'practical_interview', 6,  '#f59e0b', 'in_progress'),
+  (null, 'Managerial / CEO Round', 'managerial_ceo_round',7,  '#ec4899', 'in_progress'),
+  (null, 'Selected',               'selected',            8,  '#06b6d4', 'in_progress'),
+  (null, 'Rejected',               'rejected',            9,  '#ef4444', 'lost'),
+  (null, 'Offered',                'offered',             10, '#eab308', 'in_progress'),
+  (null, 'Offer Accepted',         'offer_accepted',      11, '#10b981', 'in_progress'),
+  (null, 'Offer Declined',         'offer_declined',      12, '#f97316', 'lost'),
+  (null, 'Joined',                 'joined',              13, '#16a34a', 'won'),
+  (null, 'Not Joined',             'not_joined',          14, '#b91c1c', 'lost')
 on conflict do nothing;
 
 -- ---------- 3. candidates.stage: enum -> text (values preserved) ----------
@@ -60,6 +71,10 @@ alter table public.candidates alter column stage set default 'sourced';
 -- ---------- 4. stage_events: enum -> text (values preserved) ----------
 alter table public.stage_events alter column to_stage   type text using to_stage::text;
 alter table public.stage_events alter column from_stage type text using from_stage::text;
+
+-- Now that stage is text, remap candidates sitting in the retired 'interview'
+-- stage to 'HR Round' so they land in a real column (movable from there).
+update public.candidates set stage = 'hr_round' where stage = 'interview';
 
 -- Note: the `candidate_stage` enum type is intentionally left in place (unused).
 -- The stage-change triggers (touch_entered_stage, log_stage_event,
