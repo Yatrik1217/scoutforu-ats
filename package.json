@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "test": "node --import ./test/finance/register.mjs test/finance/finance.test.mts && node --import ./test/finance/register.mjs test/hr/attendance.test.mts",
+    "test": "node --import ./test/finance/register.mjs test/finance/finance.test.mts && node --import ./test/finance/register.mjs test/hr/attendance.test.mts && node --import ./test/finance/register.mjs test/pipeline/pipeline.test.mts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
