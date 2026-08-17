@@ -24,16 +24,18 @@ function refresh() {
   revalidatePath("/", "layout");
 }
 
-async function setStage(id: string, to: StageKey): Promise<Result> {
+// Slug-based core so custom per-client stages (e.g. "ceo_round") write through
+// verbatim instead of being collapsed to a default StageKey.
+async function setStageBySlug(id: string, toSlug: string): Promise<Result> {
   const sb = await createClient();
   const patch: { stage: CandidateStage; review_status?: "pending" } = {
-    stage: stageToSlug(to) as CandidateStage,
+    stage: toSlug as CandidateStage,
   };
 
   // Internal profile approval: when a plain recruiter submits a candidate to
   // Screening (and approvers are configured), the profile goes to "pending"
   // until an internal approver signs it off for client submission.
-  if (to === "Screening") {
+  if (toSlug === "screening") {
     const {
       data: { user },
     } = await sb.auth.getUser();
@@ -55,6 +57,12 @@ async function setStage(id: string, to: StageKey): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };
+}
+
+// Back-compat wrapper for callers that work in default StageKey terms
+// (advance/reject/join etc.).
+async function setStage(id: string, to: StageKey): Promise<Result> {
+  return setStageBySlug(id, stageToSlug(to));
 }
 
 // Internal approver signs off (or sends back) a submitted profile.
@@ -147,13 +155,13 @@ export async function moveCandidateStage(
   id: string,
   toSlug: string,
 ): Promise<Result> {
-  const to = stageFromSlug(toSlug);
-  const res = await setStage(id, to);
+  // Write the target slug verbatim so custom per-client stages are preserved.
+  const res = await setStageBySlug(id, toSlug);
   if (res.ok) {
     const sb = await createClient();
     await sendStageAutoEmail(sb, id, toSlug);
   }
-  return res.ok ? { ...res, message: `Moved to ${to}` } : res;
+  return res;
 }
 
 export async function advanceCandidate(id: string): Promise<Result> {
@@ -632,7 +640,7 @@ export type CandidateForm = {
   phone: string;
   jobId: string | null;
   recruiterId: string | null;
-  stage: CandidateStage;
+  stage: string; // pipeline stage slug
   source: string;
   location: string;
   expYears: number;
@@ -729,7 +737,7 @@ export async function updateCandidate(
 export type DuplicateMatch = {
   id: string;
   name: string;
-  stage: CandidateStage;
+  stage: string;
   via: "email" | "phone";
 };
 

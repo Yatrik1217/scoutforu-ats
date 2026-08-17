@@ -48,7 +48,7 @@ export default async function GeneralSettingsPage() {
     { title: "SMS Settings", subtitle: "SMS gateway", desc: "Configure an SMS gateway for candidate alerts.", icon: MessageSquareText, color: "#38a3e0", href: "/admin/settings/sms" },
     { title: "Email (SMTP)", subtitle: smtp ? "Configured ✓" : "Not configured", desc: "Send trackers & resumes to clients from your mailbox.", icon: Mail, color: "#e0533a", href: "/admin/settings/email" },
     { title: "Default Emails", subtitle: "Templates & senders", desc: "Reusable email templates for common actions.", icon: Send, color: "#38a3e0", href: "/admin/settings/email-templates" },
-    { title: "Application Pipeline", subtitle: "Recruitment workflow", desc: "The 9-stage hiring pipeline candidates move through.", icon: Workflow, color: "#e0533a", href: "/pipeline" },
+    { title: "Application Pipeline", subtitle: "Stages & per-client flows", desc: "Edit the stages candidates move through — the Default pipeline, or a custom one per client (e.g. HR → 1st Tech → 2nd Tech → CEO → Salary).", icon: Workflow, color: "#e0533a", href: "/admin/settings/pipeline" },
     { title: "Action Triggers", subtitle: "Automations", desc: "Auto-email a candidate when they move into a stage.", icon: Zap, color: "#e8833a", href: "/admin/settings/automations" },
     { title: "Disqualify Reasons", subtitle: "Rejection reasons", desc: "Standard reasons used when rejecting candidates.", icon: Ban, color: "#e0533a", href: "/admin/settings/disqualify-reasons" },
     { title: "Custom Fields", subtitle: "Extra columns", desc: "Add your own fields to candidates, jobs & clients.", icon: Columns3, color: "#38a3e0", href: "/admin/settings/custom-fields" },

@@ -17,14 +17,9 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { Briefcase, Clock, LayoutGrid, Rows3, Table2 } from "lucide-react";
-import {
-  STAGES,
-  stageColor,
-  stageToSlug,
-  hexA,
-  type StageKey,
-} from "@/lib/domain";
-import { Avatar, RecBadge, RatingChip, StageBadge } from "@/components/bits";
+import { hexA } from "@/lib/domain";
+import type { PipelineStage } from "@/lib/pipeline";
+import { Avatar, RecBadge, RatingChip } from "@/components/bits";
 import { useShell } from "@/components/shell-provider";
 import { UserPlus } from "lucide-react";
 import { moveCandidateStage } from "@/lib/actions/mutations";
@@ -37,11 +32,15 @@ export function PipelineClient({
   jobs,
   recruiters,
   query,
+  defaultStages,
+  clientStages,
 }: {
   candidates: EnrichedCandidate[];
-  jobs: { id: string; title: string }[];
+  jobs: { id: string; title: string; clientId: string | null }[];
   recruiters: string[];
   query: string;
+  defaultStages: PipelineStage[];
+  clientStages: Record<string, PipelineStage[]>;
 }) {
   const router = useRouter();
   const { openDrawer, canWrite, openCandidateForm, role } = useShell();
@@ -81,7 +80,27 @@ export function PipelineClient({
     [items, filterJob, filterRec, q],
   );
 
-  const byStage = (key: StageKey) => filtered.filter((c) => c.stageKey === key);
+  // The stage list that governs the board columns: follows the selected job's
+  // client pipeline; the "All roles" view uses the Default.
+  const activeStages = useMemo(() => {
+    if (filterJob !== "all") {
+      const job = jobs.find((j) => j.id === filterJob);
+      const cid = job?.clientId ?? null;
+      if (cid && clientStages[cid]) return clientStages[cid];
+    }
+    return defaultStages;
+  }, [filterJob, jobs, clientStages, defaultStages]);
+
+  // A candidate's own pipeline (its job's client override, else Default) — used
+  // to resolve display name/color and to validate a drag target.
+  const stagesForCand = (c: EnrichedCandidate) =>
+    (c.clientId && clientStages[c.clientId]) || defaultStages;
+  const stageInfoOf = (c: EnrichedCandidate) => {
+    const st = stagesForCand(c).find((s) => s.slug === c.stage);
+    return { name: st?.name ?? c.stage, color: st?.color ?? "#64748b" };
+  };
+
+  const byStage = (slug: string) => filtered.filter((c) => c.stage === slug);
   const active = activeId ? items.find((c) => c.id === activeId) : null;
 
   const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
@@ -91,17 +110,21 @@ export function PipelineClient({
     const overStage = e.over?.id ? String(e.over.id) : null;
     if (!overStage) return;
     const cand = items.find((c) => c.id === id);
-    if (!cand || stageToSlug(cand.stageKey) === overStage) return;
-    const target = STAGES.find((s) => s.slug === overStage)!;
+    if (!cand || cand.stage === overStage) return;
+    // Only move into a stage that exists in this candidate's own pipeline.
+    const target = stagesForCand(cand).find((s) => s.slug === overStage);
+    if (!target) return;
     const prev = items;
     setItems((list) =>
       list.map((c) =>
-        c.id === id ? { ...c, stageKey: target.key, stage: overStage as never, days: 0 } : c,
+        c.id === id
+          ? { ...c, stage: overStage as EnrichedCandidate["stage"], days: 0 }
+          : c,
       ),
     );
     moveCandidateStage(id, overStage).then((res) => {
       if (res.ok) {
-        toast.success(res.message ?? `Moved to ${target.key}`);
+        toast.success(`Moved to ${target.name}`);
         router.refresh();
       } else {
         setItems(prev);
@@ -184,7 +207,7 @@ export function PipelineClient({
       </div>
 
       {layout === "table" ? (
-        <PipelineTable rows={filtered} onOpen={openDrawer} />
+        <PipelineTable rows={filtered} stageInfoOf={stageInfoOf} onOpen={openDrawer} />
       ) : (
         <DndContext
           id="pipeline-board"
@@ -195,13 +218,15 @@ export function PipelineClient({
         >
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-[4px_26px_22px]">
             <div className="flex h-full items-start gap-3.5">
-              {STAGES.map((s) => (
+              {activeStages.map((s) => (
                 <Column
-                  key={s.key}
-                  stage={s.key}
+                  key={s.slug}
+                  name={s.name}
                   slug={s.slug}
+                  color={s.color}
                   dense={dense}
-                  candidates={byStage(s.key)}
+                  candidates={byStage(s.slug)}
+                  stageInfoOf={stageInfoOf}
                   draggable={canWrite}
                   onOpen={openDrawer}
                 />
@@ -210,7 +235,12 @@ export function PipelineClient({
           </div>
           <DragOverlay>
             {active && (
-              <PipelineCard cand={active} dense={dense} onOpen={() => {}} />
+              <PipelineCard
+                cand={active}
+                dense={dense}
+                color={stageInfoOf(active).color}
+                onOpen={() => {}}
+              />
             )}
           </DragOverlay>
         </DndContext>
@@ -220,22 +250,26 @@ export function PipelineClient({
 }
 
 function Column({
-  stage,
+  name,
   slug,
+  color,
   dense,
   candidates,
+  stageInfoOf,
   draggable,
   onOpen,
 }: {
-  stage: StageKey;
+  name: string;
   slug: string;
+  color: string;
   dense: boolean;
   candidates: EnrichedCandidate[];
+  stageInfoOf: (c: EnrichedCandidate) => { name: string; color: string };
   draggable: boolean;
   onOpen: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: slug });
-  const c = stageColor(stage);
+  const c = color;
   return (
     <div
       className="flex h-full flex-col"
@@ -246,7 +280,7 @@ function Column({
           className="h-[9px] w-[9px] shrink-0 rounded-[3px]"
           style={{ background: c }}
         />
-        <span className="text-[13px] font-extrabold text-[#1c2840]">{stage}</span>
+        <span className="text-[13px] font-extrabold text-[#1c2840]">{name}</span>
         <span
           className="tf-num ml-auto rounded-full px-2.5 py-px text-[11.5px] font-extrabold"
           style={{ color: c, background: hexA(c, 0.12) }}
@@ -267,6 +301,7 @@ function Column({
             key={cand.id}
             cand={cand}
             dense={dense}
+            color={stageInfoOf(cand).color}
             draggable={draggable}
             onOpen={onOpen}
           />
@@ -284,11 +319,13 @@ function Column({
 function DraggableCard({
   cand,
   dense,
+  color,
   draggable,
   onOpen,
 }: {
   cand: EnrichedCandidate;
   dense: boolean;
+  color: string;
   draggable: boolean;
   onOpen: (id: string) => void;
 }) {
@@ -303,7 +340,7 @@ function DraggableCard({
       {...listeners}
       style={{ opacity: isDragging ? 0.4 : 1 }}
     >
-      <PipelineCard cand={cand} dense={dense} onOpen={onOpen} />
+      <PipelineCard cand={cand} dense={dense} color={color} onOpen={onOpen} />
     </div>
   );
 }
@@ -311,17 +348,19 @@ function DraggableCard({
 function PipelineCard({
   cand,
   dense,
+  color,
   onOpen,
 }: {
   cand: EnrichedCandidate;
   dense: boolean;
+  color: string;
   onOpen: (id: string) => void;
 }) {
   return (
     <div
       onClick={() => onOpen(cand.id)}
       className="cursor-pointer rounded-xl border border-[#eaeef4] bg-white p-[13px] shadow-[0_1px_2px_rgba(20,40,80,.04)] transition hover:-translate-y-px hover:border-[#c3d4f0] hover:shadow-[0_6px_18px_rgba(20,40,80,.10)]"
-      style={{ borderLeft: `3px solid ${stageColor(cand.stageKey)}` }}
+      style={{ borderLeft: `3px solid ${color}` }}
     >
       <div className="flex items-start gap-2.5">
         <Avatar name={cand.name} size={36} />
@@ -371,9 +410,11 @@ function PipelineCard({
 
 function PipelineTable({
   rows,
+  stageInfoOf,
   onOpen,
 }: {
   rows: EnrichedCandidate[];
+  stageInfoOf: (c: EnrichedCandidate) => { name: string; color: string };
   onOpen: (id: string) => void;
 }) {
   return (
@@ -414,7 +455,17 @@ function PipelineTable({
                   {r.jobTitle}
                 </td>
                 <td className="p-[12px_18px]">
-                  <StageBadge stage={r.stageKey} />
+                  {(() => {
+                    const info = stageInfoOf(r);
+                    return (
+                      <span
+                        className="inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ color: info.color, background: hexA(info.color, 0.12) }}
+                      >
+                        {info.name}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="tf-num p-[12px_18px] text-[13px] font-extrabold text-[#b27400]">
                   ★ {r.rating.toFixed(1)}

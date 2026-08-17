@@ -11,21 +11,13 @@ import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText, Check } from "
 import { CandidateMessageModal } from "@/components/candidate-message-modal";
 import { createClient } from "@/lib/supabase/client";
 import {
-  PIPELINE_STAGES,
-  STAGES,
-  stageColor,
-  stageFromSlug,
-  stageToSlug,
-  stageIndex,
-  nextStage,
   hexA,
   fmtSalary,
   daysInStage,
   RECOMMENDATIONS,
-  type StageKey,
 } from "@/lib/domain";
+import { buildResolver, type PipelineStage } from "@/lib/pipeline-core";
 import {
-  advanceCandidate,
   moveCandidateStage,
   rejectCandidate,
   deleteCandidate,
@@ -45,7 +37,8 @@ type Note = { id: string; body: string; created_at: string; author: string };
 
 type Detail = {
   cand: CandidateRow;
-  stage: StageKey;
+  stageSlug: string;
+  stages: PipelineStage[]; // this candidate's pipeline (its client's, or Default)
   jobTitle: string;
   recruiterName: string;
   events: StageEventRow[];
@@ -195,9 +188,9 @@ export function CandidateDrawer({
         .eq("id", candidateId)
         .single();
       if (!cand || !active) return;
-      const [job, rec, events] = await Promise.all([
+      const [job, rec, events, ps] = await Promise.all([
         cand.job_id
-          ? sb.from("jobs").select("title").eq("id", cand.job_id).single()
+          ? sb.from("jobs").select("title, client_id").eq("id", cand.job_id).single()
           : Promise.resolve({ data: null }),
         cand.recruiter_id
           ? sb
@@ -211,11 +204,15 @@ export function CandidateDrawer({
           .select("*")
           .eq("candidate_id", candidateId)
           .order("created_at"),
+        sb.from("pipeline_stages").select("*").order("position"),
       ]);
       if (!active) return;
+      // Resolve this candidate's pipeline: its client's override, else Default.
+      const stages = buildResolver(ps.data ?? []).forClient(job.data?.client_id ?? null);
       setDetail({
         cand,
-        stage: stageFromSlug(cand.stage),
+        stageSlug: cand.stage,
+        stages,
         jobTitle: job.data?.title ?? "—",
         recruiterName: rec.data?.name ?? "Unassigned",
         events: events.data ?? [],
@@ -275,9 +272,18 @@ export function CandidateDrawer({
     });
   };
 
-  const sc = detail ? stageColor(detail.stage) : "#64748b";
-  const idx = detail ? stageIndex(detail.stage) : 0;
-  const next = detail ? nextStage(detail.stage) : null;
+  // Resolve stage display from this candidate's own pipeline.
+  const curStage = detail?.stages.find((s) => s.slug === detail.stageSlug) ?? null;
+  const sc = curStage?.color ?? "#64748b";
+  // The forward rail = stages that aren't a "lost" outcome (mirrors the old
+  // 8-step progress that excluded "Not Joined").
+  const railStages = detail ? detail.stages.filter((s) => s.outcome !== "lost") : [];
+  const railIdx = curStage ? railStages.findIndex((s) => s.slug === curStage.slug) : -1;
+  // Next stage to advance to: next by position that isn't a "lost" outcome.
+  const nextStageObj =
+    detail && curStage
+      ? railStages.find((s) => s.position > curStage.position) ?? null
+      : null;
 
   return (
     <>
@@ -318,7 +324,7 @@ export function CandidateDrawer({
                   </div>
                   <div className="mt-[7px] flex items-center gap-2">
                     <span className="rounded-full bg-white/20 px-2.5 py-[3px] text-[11px] font-bold text-white">
-                      {detail.stage}
+                      {curStage?.name ?? detail.stageSlug}
                     </span>
                     <span className="tf-num text-[12px] font-extrabold text-white">
                       ★ {detail.cand.rating.toFixed(1)}
@@ -502,12 +508,12 @@ export function CandidateDrawer({
 
               <div className="mb-3.5 text-[13px] font-extrabold">Stage Progress</div>
               <div className="relative pl-1.5">
-                {PIPELINE_STAGES.map((s, i) => {
-                  const done = i < idx;
-                  const current = i === idx;
-                  const last = i === PIPELINE_STAGES.length - 1;
+                {railStages.map((s, i) => {
+                  const done = railIdx >= 0 && i < railIdx;
+                  const current = i === railIdx;
+                  const last = i === railStages.length - 1;
                   return (
-                    <div key={s.key} className="relative flex gap-3.5 pb-[18px]">
+                    <div key={s.slug} className="relative flex gap-3.5 pb-[18px]">
                       {!last && (
                         <div
                           className="absolute left-[11px] top-6 w-0.5"
@@ -548,7 +554,7 @@ export function CandidateDrawer({
                             color: current ? sc : done ? "#16203a" : "#9aa4b6",
                           }}
                         >
-                          {s.key}
+                          {s.name}
                         </div>
                         <div className="text-[11px] font-medium text-[#a3acbd]">
                           {done ? "Completed" : current ? "Current stage" : "Upcoming"}
@@ -710,7 +716,7 @@ export function CandidateDrawer({
                 {/* Jump straight to any stage — lets recruiters bypass steps
                     (e.g. a walk-in placed directly, or mark Joined / Not Joined). */}
                 <select
-                  value={stageToSlug(detail.stage)}
+                  value={detail.stageSlug}
                   disabled={pending}
                   title="Jump to any stage"
                   onChange={(e) => {
@@ -725,19 +731,21 @@ export function CandidateDrawer({
                   }}
                   className="rounded-[11px] border border-[#e3e8f0] bg-[#f6f8fb] px-2.5 py-3 text-[13px] font-bold text-[#42506b] outline-none focus:border-[#2a6fdb] disabled:opacity-60"
                 >
-                  {STAGES.map((s) => (
+                  {detail.stages.map((s) => (
                     <option key={s.slug} value={s.slug}>
-                      {s.key}
+                      {s.name}
                     </option>
                   ))}
                 </select>
-                {next ? (
+                {nextStageObj ? (
                   <button
                     disabled={pending}
-                    onClick={() => run(advanceCandidate)}
+                    onClick={() =>
+                      run((id) => moveCandidateStage(id, nextStageObj.slug))
+                    }
                     className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#2a6fdb] py-3 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(42,111,219,.32)] hover:bg-[#1f5bc0] disabled:opacity-60"
                   >
-                    Move to {next}
+                    Move to {nextStageObj.name}
                     <ArrowRight size={16} strokeWidth={2.4} />
                   </button>
                 ) : (
@@ -746,11 +754,11 @@ export function CandidateDrawer({
                   <div
                     className="flex flex-1 items-center justify-center gap-2 rounded-[11px] py-3 text-[13.5px] font-extrabold"
                     style={{
-                      background: hexA(stageColor(detail.stage), 0.14),
-                      color: stageColor(detail.stage),
+                      background: hexA(sc, 0.14),
+                      color: sc,
                     }}
                   >
-                    <Check size={17} strokeWidth={2.8} /> {detail.stage}
+                    <Check size={17} strokeWidth={2.8} /> {curStage?.name ?? detail.stageSlug}
                   </div>
                 )}
               </div>

@@ -108,7 +108,7 @@ export type CandidateRow = {
   email: string | null;
   phone: string | null;
   job_id: string | null;
-  stage: CandidateStage;
+  stage: string; // a pipeline stage slug (Default or a client's custom stage)
   rating: number;
   exp_years: number;
   location: string | null;
@@ -234,8 +234,8 @@ export type InterviewRow = {
 export type StageEventRow = {
   id: string;
   candidate_id: string;
-  from_stage: CandidateStage | null;
-  to_stage: CandidateStage;
+  from_stage: string | null;
+  to_stage: string;
   by_user_id: string | null;
   created_at: string;
 };
@@ -697,9 +697,21 @@ type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
+export type PipelineStageDbRow = {
+  id: string;
+  client_id: string | null; // null = the Default pipeline
+  name: string;
+  slug: string;
+  position: number;
+  color: string;
+  outcome: "in_progress" | "won" | "lost";
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
+      pipeline_stages: Table<PipelineStageDbRow>;
       clients: Table<ClientRow>;
       profiles: Table<ProfileRow>;
       jobs: Table<JobRow>;
