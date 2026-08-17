@@ -20,6 +20,7 @@ import {
   DEFAULT_SHIFT,
 } from "@/lib/hr";
 import { AttendanceGrid } from "@/components/attendance-widgets";
+import { getCrmSalespeopleAttendance } from "@/lib/crm-attendance";
 import { Avatar } from "@/components/bits";
 import type {
   AttendanceRow,
@@ -84,6 +85,11 @@ export default async function AttendancePage({
     ];
   }
 
+  // Salespeople (e.g. Sweta) live in the Outreach CRM, not in this ATS. Pull
+  // their month read-only from the shared CRM store so they appear on the
+  // Register too. Display-only — never feeds ATS payroll / loss-of-pay.
+  const crmRows = await getCrmSalespeopleAttendance(days, todayISO);
+
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -129,6 +135,7 @@ export default async function AttendancePage({
         leaveByEmp={leaveByEmp}
         offDates={[...offDates]}
         holidayDates={holidayDates}
+        crmRows={crmRows}
       />
 
       {/* per-employee summary + the LOP payroll will use */}
@@ -208,6 +215,52 @@ export default async function AttendancePage({
             </div>
           );
         })}
+
+        {crmRows.length > 0 && (
+          <div className="border-b border-t border-[#eef1f6] bg-[#f8fafc] px-5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[#8a94a6]">
+            From CRM · view-only
+          </div>
+        )}
+        {crmRows.map((c) => (
+          <div
+            key={`crm-${c.id}`}
+            className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] items-center gap-2 border-b border-[#f4f6fa] bg-[#fcfdff] px-5 py-3 last:border-0"
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar name={c.name} size={30} />
+              <div className="flex min-w-0 items-center gap-1.5">
+                <div className="truncate text-[12.5px] font-bold text-[#16203a]">{c.name}</div>
+                <span className="rounded-[4px] bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#6366f1]">
+                  CRM
+                </span>
+              </div>
+            </div>
+            <div className="tf-num text-center text-[13px] font-bold text-[#16a34a]">
+              {c.summary.present || "—"}
+            </div>
+            <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
+              {c.summary.halfDay || "—"}
+            </div>
+            <div className="tf-num text-center text-[13px] font-bold text-[#2a6fdb]">
+              {c.summary.leave || "—"}
+            </div>
+            <div className="tf-num text-center text-[13px] font-bold text-[#dc2626]">
+              {c.summary.absent || "—"}
+            </div>
+            <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
+              {c.summary.late || "—"}
+            </div>
+            <div className="tf-num text-right text-[12.5px] font-bold text-[#2a6fdb]">
+              {c.summary.grossMin ? formatDuration(c.summary.grossMin) : "—"}
+            </div>
+            <div className="tf-num text-right text-[12.5px] font-extrabold text-[#16a34a]">
+              {c.summary.netMin ? formatDuration(c.summary.netMin) : "—"}
+            </div>
+            <div className="tf-num text-right text-[11px] font-semibold text-[#a3acbd]">
+              view-only
+            </div>
+          </div>
+        ))}
       </div>
       <p className="mt-3 text-[12px] text-[#8a94a6]">
         Loss of pay combines <b>absent / half days</b> marked here with <b>approved unpaid leave</b>

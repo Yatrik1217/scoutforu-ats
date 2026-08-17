@@ -22,6 +22,7 @@ import {
 } from "@/lib/hr";
 import { hexA } from "@/lib/domain";
 import type { AttendanceRow, AttendanceStatus, EmployeeRow } from "@/lib/database.types";
+import type { CrmAttnRow } from "@/lib/crm-attendance";
 
 // ---- self check-in / check-out -------------------------------------------------
 
@@ -164,6 +165,7 @@ export function AttendanceGrid({
   leaveByEmp,
   offDates,
   holidayDates = [],
+  crmRows = [],
 }: {
   employees: EmployeeRow[];
   rows: AttendanceRow[];
@@ -173,6 +175,7 @@ export function AttendanceGrid({
   leaveByEmp: Record<string, string[]>;
   offDates: string[]; // weekly-off + holiday dates
   holidayDates?: string[]; // holidays only (shown as HO)
+  crmRows?: CrmAttnRow[]; // read-only rows pulled from the CRM (e.g. Sweta)
 }) {
   const leaveSets = new Map(
     Object.entries(leaveByEmp).map(([id, dates]) => [id, new Set(dates)]),
@@ -306,10 +309,57 @@ export function AttendanceGrid({
                 })}
               </tr>
             ))}
+
+            {crmRows.length > 0 && (
+              <tr>
+                <td
+                  colSpan={days.length + 1}
+                  className="sticky left-0 border-b border-t border-[#eef1f6] bg-[#f8fafc] px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[#8a94a6]"
+                >
+                  From CRM · view-only
+                </td>
+              </tr>
+            )}
+            {crmRows.map((c) => (
+              <tr key={`crm-${c.id}`} className="bg-[#fcfdff]">
+                <td className="sticky left-0 z-10 border-b border-[#f4f6fa] bg-[#fcfdff] px-4 py-2 text-[12.5px] font-bold text-[#16203a]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate">{c.name}</span>
+                    <span className="rounded-[4px] bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#6366f1]">
+                      CRM
+                    </span>
+                  </div>
+                </td>
+                {days.map((d) => {
+                  const s = c.statuses[d] ?? null;
+                  const meta = s ? ATTENDANCE_META[s] : null;
+                  const isHoliday = !meta && holidaySet.has(d);
+                  const isOff = !meta && !isHoliday && offSet.has(d);
+                  const cellStyle = meta
+                    ? { background: meta.color, color: "#fff" }
+                    : isHoliday
+                      ? { background: "#f1e9ff", color: "#8b5cf6" }
+                      : isOff
+                        ? { background: "#f1f0f7", color: "#a99fd6" }
+                        : { background: "#f1f4f9", color: "#c2cad8" };
+                  return (
+                    <td key={d} className="border-b border-[#f4f6fa] p-0 text-center">
+                      <span
+                        title={`${c.name} · ${d}${meta ? ` · ${meta.label}` : ""} — from CRM (view-only)`}
+                        className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold"
+                        style={cellStyle}
+                      >
+                        {meta ? meta.short : isHoliday ? "HO" : isOff ? "W" : "·"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-      {employees.length === 0 && (
+      {employees.length === 0 && crmRows.length === 0 && (
         <div className="py-12 text-center text-[13px] font-semibold text-[#a3acbd]">
           No active employees.
         </div>
