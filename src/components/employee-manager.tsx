@@ -22,12 +22,16 @@ const TYPE_LABEL: Record<EmployeeEmploymentType, string> = {
   part_time: "Part-time",
 };
 
+export type CrmPerson = { id: string; name: string; role: string; active: boolean };
+
 export function EmployeeManager({
   employees,
   logins,
+  crmUsers = [],
 }: {
   employees: EmployeeRow[];
   logins: { id: string; name: string; email: string }[];
+  crmUsers?: CrmPerson[];
 }) {
   const [editing, setEditing] = useState<EmployeeRow | "new" | null>(null);
   const [pending, start] = useTransition();
@@ -140,6 +144,7 @@ export function EmployeeManager({
         <EmployeeModal
           employee={editing === "new" ? null : editing}
           logins={logins}
+          crmUsers={crmUsers}
           taken={employees.map((e) => e.profile_id).filter(Boolean) as string[]}
           onClose={() => setEditing(null)}
         />
@@ -151,11 +156,13 @@ export function EmployeeManager({
 function EmployeeModal({
   employee,
   logins,
+  crmUsers,
   taken,
   onClose,
 }: {
   employee: EmployeeRow | null;
   logins: { id: string; name: string; email: string }[];
+  crmUsers: CrmPerson[];
   taken: string[];
   onClose: () => void;
 }) {
@@ -168,6 +175,13 @@ function EmployeeModal({
     designation: employee?.designation ?? "",
     department: employee?.department ?? "",
     employmentType: employee?.employment_type ?? "full_time",
+    attendanceSource: employee?.attendance_source ?? "ats",
+    crmUserId: employee?.crm_user_id ?? "",
+    dob: employee?.dob ?? null,
+    gender: employee?.gender ?? "",
+    address: employee?.address ?? "",
+    emergencyName: employee?.emergency_name ?? "",
+    emergencyPhone: employee?.emergency_phone ?? "",
     joinedOn: employee?.joined_on ?? null,
     probationMonths: employee?.probation_months ?? 3,
     monthlyGross: employee?.monthly_gross ?? 0,
@@ -273,6 +287,99 @@ function EmployeeModal({
                 Leave taken during probation is unpaid (LWP). 0 = no probation.
               </span>
             </label>
+          </div>
+
+          <div className="mt-4 rounded-[10px] border border-[#eef1f6] p-4">
+            <div className="mb-3 text-[12.5px] font-extrabold text-[#16203a]">Personal details</div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={lbl}>
+                Date of birth
+                <input
+                  type="date"
+                  value={f.dob ?? ""}
+                  onChange={(e) => set("dob", e.target.value || null)}
+                  className={input + " mt-1 font-normal"}
+                />
+              </label>
+              <label className={lbl}>
+                Gender
+                <select value={f.gender} onChange={(e) => set("gender", e.target.value)} className={input + " mt-1 font-normal"}>
+                  <option value="">—</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label className={lbl + " col-span-2"}>
+                Address
+                <input value={f.address} onChange={(e) => set("address", e.target.value)} className={input + " mt-1 font-normal"} />
+              </label>
+              <label className={lbl}>
+                Emergency contact
+                <input value={f.emergencyName} onChange={(e) => set("emergencyName", e.target.value)} className={input + " mt-1 font-normal"} placeholder="Name" />
+              </label>
+              <label className={lbl}>
+                Emergency phone
+                <input value={f.emergencyPhone} onChange={(e) => set("emergencyPhone", e.target.value)} className={input + " mt-1 font-normal"} />
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-[10px] border border-[#eef1f6] p-4">
+            <div className="mb-2 text-[12.5px] font-extrabold text-[#16203a]">
+              Attendance & leave
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => set("attendanceSource", "ats")}
+                className={`flex-1 rounded-[9px] border px-3 py-2 text-[12.5px] font-bold ${
+                  f.attendanceSource === "ats"
+                    ? "border-[#2a6fdb] bg-[#eaf1fd] text-[#2a6fdb]"
+                    : "border-[#e3e8f0] bg-white text-[#8a94a6]"
+                }`}
+              >
+                In this ATS (recruiters / internal)
+              </button>
+              <button
+                type="button"
+                onClick={() => set("attendanceSource", "crm")}
+                className={`flex-1 rounded-[9px] border px-3 py-2 text-[12.5px] font-bold ${
+                  f.attendanceSource === "crm"
+                    ? "border-[#b26a00] bg-[#fff3e0] text-[#b26a00]"
+                    : "border-[#e3e8f0] bg-white text-[#8a94a6]"
+                }`}
+              >
+                In the CRM (salespeople)
+              </button>
+            </div>
+            {f.attendanceSource === "crm" && (
+              <label className={lbl + " mt-3"}>
+                Linked CRM person
+                <select
+                  value={f.crmUserId}
+                  onChange={(e) => {
+                    const picked = crmUsers.find((u) => u.id === e.target.value);
+                    set("crmUserId", e.target.value);
+                    if (picked && !f.name.trim()) set("name", picked.name);
+                  }}
+                  className={input + " mt-1 font-normal"}
+                >
+                  <option value="">— Select a CRM user —</option>
+                  {crmUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} · {u.role}
+                      {u.active ? "" : " (inactive)"}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[11px] font-medium text-[#a3acbd]">
+                  {crmUsers.length === 0
+                    ? "Couldn't reach the CRM — you can still save; enter the CRM user id later."
+                    : "Their attendance shows read-only on the profile; they check in from the CRM."}
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="mt-4 rounded-[10px] border border-[#eef1f6] p-4">

@@ -556,6 +556,9 @@ export type IncentiveSettingsRow = {
 export type EmploymentStatus = "active" | "exited";
 // Employees allow part-time, which the jobs enum doesn't.
 export type EmployeeEmploymentType = "full_time" | "part_time" | "intern" | "contract";
+// Where a person's day-to-day attendance & leave are recorded: this ATS
+// (recruiters/internal) or the Outreach CRM (salespeople, read-only here).
+export type EmployeeAttendanceSource = "ats" | "crm";
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type PayrollStatus = "draft" | "finalised" | "paid";
 export type AttendanceStatus =
@@ -615,6 +618,13 @@ export type EmployeeRow = {
   designation: string;
   department: string;
   employment_type: EmployeeEmploymentType;
+  attendance_source: EmployeeAttendanceSource;
+  crm_user_id: string;
+  dob: string | null;
+  gender: string;
+  address: string;
+  emergency_name: string;
+  emergency_phone: string;
   joined_on: string | null;
   exit_on: string | null;
   status: EmploymentStatus;

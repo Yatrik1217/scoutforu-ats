@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { EmployeeManager } from "@/components/employee-manager";
+import { getCrmUsers } from "@/lib/crm-attendance";
 import type { EmployeeRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,11 @@ export default async function EmployeesPage() {
   const me = await requireProfile();
   if (me.role !== "master_admin") redirect("/overview");
   const sb = await createClient();
-  const [{ data: employees }, { data: logins }, { data: pendingLeave }] = await Promise.all([
+  const [{ data: employees }, { data: logins }, { data: pendingLeave }, crmUsers] = await Promise.all([
     sb.from("employees").select("*").order("status").order("name"),
     sb.from("profiles").select("id,name,email").neq("role", "client").order("name"),
     sb.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    getCrmUsers(),
   ]);
   void pendingLeave;
 
@@ -47,6 +49,7 @@ export default async function EmployeesPage() {
       <EmployeeManager
         employees={(employees ?? []) as EmployeeRow[]}
         logins={logins ?? []}
+        crmUsers={crmUsers}
       />
     </div>
   );

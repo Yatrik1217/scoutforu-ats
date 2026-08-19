@@ -134,6 +134,66 @@ export type CrmAttnRow = {
   };
 };
 
+// A CRM person we can link an ATS employee record to.
+export type CrmUserLite = { id: string; name: string; role: string; active: boolean };
+
+// Download + parse the CRM blob. Returns null (never throws) when unreadable.
+async function loadCrmDb(): Promise<CrmDB | null> {
+  try {
+    const svc = createServiceClient();
+    const { data, error } = await svc.storage.from(CRM_BUCKET).download(CRM_OBJECT);
+    if (error || !data) return null;
+    return JSON.parse(await data.text()) as CrmDB;
+  } catch {
+    return null;
+  }
+}
+
+// Compute one CRM user's month from a prepared lookup — shared by the Register
+// (many salespeople) and a single employee's profile page.
+function computeUserRow(
+  u: CrmUser,
+  byUserDate: Map<string, CrmAttendance>,
+  cfg: CrmConfig,
+  days: string[],
+  todayISO: string,
+): CrmAttnRow {
+  const statuses: Record<string, AttendanceStatus> = {};
+  const summary = { present: 0, halfDay: 0, leave: 0, absent: 0, late: 0, grossMin: 0, netMin: 0 };
+  for (const ds of days) {
+    if (ds > todayISO) continue; // not yet due
+    // Don't back-date absences before the person joined the CRM.
+    if (u.createdAt && ds < u.createdAt) continue;
+    const rec = byUserDate.get(`${u.id}|${ds}`);
+    let st: string;
+    if (rec) {
+      const sp = spans(rec);
+      st = rec.status || "present";
+      if (attnLate(sp.firstIn, cfg)) summary.late++;
+      summary.grossMin += sp.grossMin;
+      summary.netMin += sp.netMin;
+    } else {
+      st = statusForDay(ds, cfg);
+    }
+    if (st === "none") continue;
+    if (!CRM_STATUSES.includes(st as AttendanceStatus)) continue;
+    statuses[ds] = st as AttendanceStatus;
+    if (st === "present") summary.present++;
+    else if (st === "half_day") summary.halfDay++;
+    else if (st === "leave") summary.leave++;
+    else if (st === "absent") summary.absent++;
+  }
+  return { id: String(u.id), name: u.name, statuses, summary };
+}
+
+function indexAttendance(db: CrmDB): Map<string, CrmAttendance> {
+  const byUserDate = new Map<string, CrmAttendance>();
+  for (const a of Array.isArray(db.attendance) ? db.attendance : []) {
+    byUserDate.set(`${a.userId}|${a.date}`, a);
+  }
+  return byUserDate;
+}
+
 /**
  * Read-only CRM salespeople for the given month days. Returns [] (never throws)
  * if the CRM blob can't be read — the ATS register still renders its own staff.
@@ -142,59 +202,45 @@ export async function getCrmSalespeopleAttendance(
   days: string[],
   todayISO: string,
 ): Promise<CrmAttnRow[]> {
-  let db: CrmDB;
-  try {
-    const svc = createServiceClient();
-    const { data, error } = await svc.storage.from(CRM_BUCKET).download(CRM_OBJECT);
-    if (error || !data) return [];
-    db = JSON.parse(await data.text()) as CrmDB;
-  } catch {
-    return [];
-  }
-
+  const db = await loadCrmDb();
+  if (!db) return [];
   const cfg: CrmConfig = db.attendanceConfig || {};
-  const attn = Array.isArray(db.attendance) ? db.attendance : [];
-  const byUserDate = new Map<string, CrmAttendance>();
-  for (const a of attn) byUserDate.set(`${a.userId}|${a.date}`, a);
+  const byUserDate = indexAttendance(db);
+  return (db.users || [])
+    .filter((u) => u.active !== false && u.role === "salesperson")
+    .map((u) => computeUserRow(u, byUserDate, cfg, days, todayISO));
+}
 
-  const salespeople = (db.users || []).filter(
-    (u) => u.active !== false && u.role === "salesperson",
-  );
+/**
+ * One CRM person's attendance for the given month days, keyed by their CRM user
+ * id. Returns null when the blob can't be read or the id isn't found — the ATS
+ * employee profile still renders everything else.
+ */
+export async function getCrmPersonAttendance(
+  crmUserId: string,
+  days: string[],
+  todayISO: string,
+): Promise<CrmAttnRow | null> {
+  if (!crmUserId) return null;
+  const db = await loadCrmDb();
+  if (!db) return null;
+  const u = (db.users || []).find((x) => String(x.id) === String(crmUserId));
+  if (!u) return null;
+  const cfg: CrmConfig = db.attendanceConfig || {};
+  return computeUserRow(u, indexAttendance(db), cfg, days, todayISO);
+}
 
-  return salespeople.map((u) => {
-    const statuses: Record<string, AttendanceStatus> = {};
-    const summary = {
-      present: 0,
-      halfDay: 0,
-      leave: 0,
-      absent: 0,
-      late: 0,
-      grossMin: 0,
-      netMin: 0,
-    };
-    for (const ds of days) {
-      if (ds > todayISO) continue; // not yet due
-      // Don't back-date absences before the person joined the CRM.
-      if (u.createdAt && ds < u.createdAt) continue;
-      const rec = byUserDate.get(`${u.id}|${ds}`);
-      let st: string;
-      if (rec) {
-        const sp = spans(rec);
-        st = rec.status || "present";
-        if (attnLate(sp.firstIn, cfg)) summary.late++;
-        summary.grossMin += sp.grossMin;
-        summary.netMin += sp.netMin;
-      } else {
-        st = statusForDay(ds, cfg);
-      }
-      if (st === "none") continue;
-      if (!CRM_STATUSES.includes(st as AttendanceStatus)) continue;
-      statuses[ds] = st as AttendanceStatus;
-      if (st === "present") summary.present++;
-      else if (st === "half_day") summary.halfDay++;
-      else if (st === "leave") summary.leave++;
-      else if (st === "absent") summary.absent++;
-    }
-    return { id: String(u.id), name: u.name, statuses, summary };
-  });
+/**
+ * All CRM users, so the admin can link an ATS employee record to a CRM identity.
+ * Returns [] when the blob can't be read.
+ */
+export async function getCrmUsers(): Promise<CrmUserLite[]> {
+  const db = await loadCrmDb();
+  if (!db) return [];
+  return (db.users || []).map((u) => ({
+    id: String(u.id),
+    name: u.name,
+    role: u.role,
+    active: u.active !== false,
+  }));
 }

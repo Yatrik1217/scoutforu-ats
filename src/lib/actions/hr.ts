@@ -36,6 +36,7 @@ import type {
   PlacementRow,
   PlacementPaymentRow,
   EmployeeEmploymentType,
+  EmployeeAttendanceSource,
 } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; message?: string; id?: string };
@@ -76,6 +77,13 @@ export type EmployeeForm = {
   designation: string;
   department: string;
   employmentType: EmployeeEmploymentType;
+  attendanceSource: EmployeeAttendanceSource;
+  crmUserId: string;
+  dob: string | null;
+  gender: string;
+  address: string;
+  emergencyName: string;
+  emergencyPhone: string;
   joinedOn: string | null;
   probationMonths: number;
   monthlyGross: number;
@@ -100,6 +108,13 @@ export async function saveEmployee(id: string | null, form: EmployeeForm): Promi
     designation: form.designation.trim(),
     department: form.department.trim(),
     employment_type: form.employmentType,
+    attendance_source: (form.attendanceSource === "crm" ? "crm" : "ats") as EmployeeAttendanceSource,
+    crm_user_id: form.attendanceSource === "crm" ? form.crmUserId.trim() : "",
+    dob: form.dob || null,
+    gender: form.gender.trim(),
+    address: form.address.trim(),
+    emergency_name: form.emergencyName.trim(),
+    emergency_phone: form.emergencyPhone.trim(),
     joined_on: form.joinedOn || null,
     probation_months: Math.max(0, Number(form.probationMonths) || 0),
     monthly_gross: Math.max(0, Number(form.monthlyGross) || 0),
