@@ -73,7 +73,7 @@ export default async function InvestmentsPage() {
             </span>
             {asOf && (
               <span className="pl-1.5 text-[10px] font-semibold text-[#8a94a6]">
-                NAV {navDateLabel(asOf)}
+                NAV {navDateLabel(asOf).split(" ").slice(0, 2).join(" ")}
               </span>
             )}
           </span>
