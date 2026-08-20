@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sendMail, emailConfigured } from "@/lib/email";
+import { recruiterMailAccount } from "@/lib/user-mail";
 import { sendSms, smsProvider } from "@/lib/sms";
+import { renderTemplate } from "@/lib/template-render";
 
 type Result = { ok: boolean; error?: string; message?: string };
 
@@ -22,13 +24,6 @@ export async function listEmailTemplates(): Promise<
 const esc = (s: string) =>
   s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
 
-// Fill {{name}} / {{first_name}} from the candidate (so bulk sends personalize).
-function fillName(text: string, name: string): string {
-  const first = (name || "").trim().split(/\s+/)[0] || "";
-  return (text || "")
-    .replace(/\{\{\s*name\s*\}\}/gi, name || "")
-    .replace(/\{\{\s*first_name\s*\}\}/gi, first);
-}
 
 // Send an email and/or SMS to a candidate from inside the ATS, using the
 // company's configured SMTP + SMS provider, and log it to the candidate's
@@ -50,13 +45,52 @@ export async function messageCandidate(input: {
 
   const { data: cand } = await sb
     .from("candidates")
-    .select("id, name, email, phone")
+    .select("id, name, email, phone, job_id")
     .eq("id", input.candidateId)
     .maybeSingle();
   if (!cand) return { ok: false, error: "Candidate not found." };
 
-  const body = fillName(rawBody, cand.name);
-  const subjectFilled = fillName(input.subject || "", cand.name);
+  // Resolve the job title + client (for {{job_title}} / {{client_name}}) and the
+  // sender's name (for {{sender_name}}) so templates render fully personalised.
+  let jobTitle = "";
+  let clientName = "";
+  if (cand.job_id) {
+    const { data: job } = await sb
+      .from("jobs")
+      .select("title, client_id")
+      .eq("id", cand.job_id)
+      .maybeSingle();
+    jobTitle = job?.title ?? "";
+    if (job?.client_id) {
+      const { data: client } = await sb
+        .from("clients")
+        .select("name")
+        .eq("id", job.client_id)
+        .maybeSingle();
+      clientName = client?.name ?? "";
+    }
+  }
+  const { data: sender } = await sb
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const first = (cand.name || "").trim().split(/\s+/)[0] || "";
+  const vars: Record<string, string> = {
+    name: cand.name || "",
+    candidate_name: cand.name || "",
+    first_name: first,
+    job_title: jobTitle || "the position",
+    client_name: clientName,
+    sender_name: sender?.name || "ScoutforU Team",
+  };
+
+  const body = renderTemplate(rawBody, vars);
+  const subjectFilled = renderTemplate(input.subject || "", vars);
+
+  // Send from the acting recruiter's own mailbox (falls back to the shared
+  // mailbox stamped with their name + reply-to).
+  const mailAccount = await recruiterMailAccount(sb, user.id);
 
   const wantEmail = input.channel === "email" || input.channel === "both";
   const wantSms = input.channel === "sms" || input.channel === "both";
@@ -70,7 +104,7 @@ export async function messageCandidate(input: {
       try {
         const subject = subjectFilled.trim() || "A message regarding your application";
         const html = `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(body)}</div>`;
-        await sendMail({ to: cand.email, subject, html, text: body });
+        await sendMail({ to: cand.email, subject, html, text: body }, mailAccount);
         sent.push("email");
       } catch (e) {
         failed.push("email failed: " + (e as Error).message);

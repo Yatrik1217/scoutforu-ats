@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
+import { renderTemplate } from "@/lib/template-render";
+import { recruiterMailAccount } from "@/lib/user-mail";
 import {
   stageToSlug,
   stageFromSlug,
@@ -119,28 +121,63 @@ async function sendStageAutoEmail(
       .eq("stage", toSlug)
       .maybeSingle();
     if (!rule || !rule.enabled || !rule.template_id || !emailConfigured()) return;
-    const [{ data: tpl }, { data: cand }] = await Promise.all([
-      sb.from("email_templates").select("subject,body").eq("id", rule.template_id).maybeSingle(),
-      sb.from("candidates").select("name,email").eq("id", candidateId).maybeSingle(),
-    ]);
-    if (!tpl || !cand?.email) return;
-    const first = (cand.name || "").trim().split(/\s+/)[0] || "";
-    const fill = (t: string) =>
-      (t || "")
-        .replace(/\{\{\s*name\s*\}\}/gi, cand.name || "")
-        .replace(/\{\{\s*first_name\s*\}\}/gi, first);
-    const esc = (s: string) =>
-      String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
-    const bodyFilled = fill(tpl.body);
-    await sendMail({
-      to: cand.email,
-      subject: fill(tpl.subject) || "An update on your application",
-      html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyFilled)}</div>`,
-      text: bodyFilled,
-    });
     const {
       data: { user },
     } = await sb.auth.getUser();
+    const [{ data: tpl }, { data: cand }, { data: sender }] = await Promise.all([
+      sb.from("email_templates").select("subject,body").eq("id", rule.template_id).maybeSingle(),
+      sb.from("candidates").select("name,email,job_id").eq("id", candidateId).maybeSingle(),
+      user?.id
+        ? sb.from("profiles").select("name").eq("id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    if (!tpl || !cand?.email) return;
+    // Resolve the job title + client for {{job_title}} / {{client_name}}.
+    let jobTitle = "";
+    let clientName = "";
+    if (cand.job_id) {
+      const { data: job } = await sb
+        .from("jobs")
+        .select("title,client_id")
+        .eq("id", cand.job_id)
+        .maybeSingle();
+      jobTitle = job?.title ?? "";
+      if (job?.client_id) {
+        const { data: client } = await sb
+          .from("clients")
+          .select("name")
+          .eq("id", job.client_id)
+          .maybeSingle();
+        clientName = client?.name ?? "";
+      }
+    }
+    const first = (cand.name || "").trim().split(/\s+/)[0] || "";
+    // Every placeholder the templates (and the Settings UI) advertise. Keys are
+    // matched case-insensitively; ANY unknown {{token}} is cleared so a raw
+    // placeholder can never reach a candidate again.
+    const vars: Record<string, string> = {
+      name: cand.name || "",
+      candidate_name: cand.name || "",
+      first_name: first,
+      job_title: jobTitle || "the position",
+      client_name: clientName,
+      sender_name: sender?.name || "ScoutforU Team",
+    };
+    const fill = (t: string) => renderTemplate(t, vars);
+    const esc = (s: string) =>
+      String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
+    const bodyFilled = fill(tpl.body);
+    // Send as the recruiter who moved the stage (own mailbox, else shared+stamped).
+    const mailAccount = await recruiterMailAccount(sb, user?.id);
+    await sendMail(
+      {
+        to: cand.email,
+        subject: fill(tpl.subject) || "An update on your application",
+        html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyFilled)}</div>`,
+        text: bodyFilled,
+      },
+      mailAccount,
+    );
     await sb.from("candidate_notes").insert({
       candidate_id: candidateId,
       author_id: user?.id ?? null,
@@ -983,14 +1020,19 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
           location: form.location ?? "",
           organizer: fromAddress(),
         });
-        await sendMail({
-          to: cand.email,
-          cc: interviewer?.email || undefined,
-          subject: `Interview scheduled${role} — ${whenStr}`,
-          html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyText)}</div>`,
-          text: bodyText,
-          attachments: [{ filename: "interview.ics", content: Buffer.from(ics), contentType: "text/calendar" }],
-        });
+        // Send the invite as the recruiter who scheduled it.
+        const mailAccount = await recruiterMailAccount(sb, user?.id);
+        await sendMail(
+          {
+            to: cand.email,
+            cc: interviewer?.email || undefined,
+            subject: `Interview scheduled${role} — ${whenStr}`,
+            html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(bodyText)}</div>`,
+            text: bodyText,
+            attachments: [{ filename: "interview.ics", content: Buffer.from(ics), contentType: "text/calendar" }],
+          },
+          mailAccount,
+        );
         noteSuffix = " · invite emailed";
       } else if (!cand?.email) {
         noteSuffix = " · no email on candidate (invite not sent)";

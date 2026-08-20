@@ -707,6 +707,17 @@ type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
+export type UserEmailSettingsRow = {
+  user_id: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_pass: string;
+  from_name: string;
+  verified: boolean;
+  updated_at: string;
+};
+
 export type PipelineStageDbRow = {
   id: string;
   client_id: string | null; // null = the Default pipeline
@@ -722,6 +733,7 @@ export type Database = {
   public: {
     Tables: {
       pipeline_stages: Table<PipelineStageDbRow>;
+      user_email_settings: Table<UserEmailSettingsRow>;
       clients: Table<ClientRow>;
       profiles: Table<ProfileRow>;
       jobs: Table<JobRow>;

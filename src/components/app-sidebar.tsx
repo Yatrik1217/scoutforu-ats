@@ -24,6 +24,7 @@ import {
   CalendarDays,
   CalendarCheck,
   BadgeIndianRupee,
+  Mail,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -90,6 +91,10 @@ export function AppSidebar({
     { href: "/my/attendance", label: "My Attendance", icon: CalendarCheck },
     { href: "/my/leave", label: "My Leave", icon: CalendarDays },
     { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
+    // Staff can send candidate emails from their own mailbox.
+    ...(role !== "client"
+      ? [{ href: "/my/email", label: "My Email", icon: Mail } as NavItem]
+      : []),
   ];
 
   const showAdmin = role !== "client";
