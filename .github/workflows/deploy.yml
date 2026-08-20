@@ -22,7 +22,11 @@ jobs:
           script: |
             set -e
             cd /opt/scoutforu-ats
-            git pull --ff-only
+            # Hard-reset to origin instead of `git pull --ff-only`: `npm install`
+            # rewrites package-lock.json each run, leaving the tree dirty, which
+            # made the next fast-forward pull abort. Resetting is self-healing.
+            git fetch origin main
+            git reset --hard origin/main
             npm install
             npm run build
             pm2 reload ats
