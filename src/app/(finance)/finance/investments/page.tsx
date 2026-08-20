@@ -47,6 +47,15 @@ export default async function InvestmentsPage() {
   const dayPct = prevValue > 0 ? dayChange / prevValue : 0;
   const up = gain >= 0;
   const dayUp = dayChange >= 0;
+  // "Value as on" = today (the holding's current worth), IST. The NAV that value
+  // is priced from is the latest AMFI declaration (previous business day until
+  // tonight's NAV publishes) — shown as a sub-note so nothing is misstated.
+  const todayLabel = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
@@ -58,8 +67,15 @@ export default async function InvestmentsPage() {
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         {anyLive && (
-          <span className="rounded-full bg-[#eafaf0] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">
-            Live · NAV as of {asOf ? navDateLabel(asOf) : "—"}
+          <span className="flex flex-col gap-0.5">
+            <span className="w-fit rounded-full bg-[#eafaf0] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">
+              Live · Value as on {todayLabel}
+            </span>
+            {asOf && (
+              <span className="pl-1.5 text-[10px] font-semibold text-[#8a94a6]">
+                NAV {navDateLabel(asOf)}
+              </span>
+            )}
           </span>
         )}
         <RefreshNavsButton />
