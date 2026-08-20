@@ -53,36 +53,110 @@ export async function loadFinance(
 
 export type NavQuote = { nav: number; prevNav: number; navDate: string; name: string };
 
-// Latest + previous NAV for a set of AMFI scheme codes, from api.mfapi.in
-// (a free AMFI mirror). AMFI declares NAVs once a day (late night IST), so we
-// auto-revalidate hourly to pick up a new declaration soon after it lands, and
-// tag the request "navs" so the "Refresh NAVs" button can bust it on demand
-// (see refreshNavs). Failures are skipped, never thrown — a fund without a
-// quote falls back to its stored value.
+const AMFI_MONTHS: Record<string, string> = {
+  Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+  Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+};
+// AMFI prints dates as "19-Aug-2026"; we normalise to "DD-MM-YYYY" (mfapi's
+// format, which the UI already expects) plus a sortable timestamp.
+function parseAmfiDate(s: string): { ddmmyyyy: string; t: number } {
+  const [dd, mon, yyyy] = s.trim().split("-");
+  const mm = AMFI_MONTHS[mon] ?? "01";
+  return { ddmmyyyy: `${dd}-${mm}-${yyyy}`, t: Date.UTC(+yyyy, +mm - 1, +dd) };
+}
+const mfDateMs = (s: string): number => {
+  const [dd, mm, yyyy] = s.split("-");
+  return Date.UTC(+yyyy, +mm - 1, +dd);
+};
+
+// AMFI's official daily file is the authoritative, CURRENT latest NAV for every
+// scheme. api.mfapi.in mirrors it but lags ~a day, so AMFI is the primary
+// source; the mirror is used only for price history and as a fallback.
+async function loadAmfiLatest(
+  wanted: Set<string>,
+): Promise<Map<string, { nav: number; navDate: string; t: number }>> {
+  const map = new Map<string, { nav: number; navDate: string; t: number }>();
+  try {
+    const res = await fetch("https://www.amfiindia.com/spages/NAVAll.txt", {
+      next: { revalidate: 3600, tags: ["navs"] },
+    });
+    if (!res.ok) return map;
+    const text = await res.text();
+    for (const line of text.split("\n")) {
+      const semi = line.indexOf(";");
+      if (semi < 0) continue;
+      const code = line.slice(0, semi);
+      if (!wanted.has(code)) continue;
+      const f = line.split(";");
+      const nav = parseFloat(f[f.length - 2]); // NAV is the second-to-last field
+      const d = parseAmfiDate(f[f.length - 1]); // date is the last field
+      if (!Number.isFinite(nav) || nav <= 0) continue;
+      map.set(code, { nav, navDate: d.ddmmyyyy, t: d.t });
+    }
+  } catch {
+    /* AMFI unreachable — callers fall back to the mirror */
+  }
+  return map;
+}
+
+// Latest + previous NAV for a set of AMFI scheme codes. Primary source is AMFI's
+// official feed (current); api.mfapi.in supplies the previous-day price for
+// "today's change" and is the fallback when AMFI doesn't list a scheme or is
+// down. Both fetches revalidate hourly and are tagged "navs" so the "Refresh
+// NAVs" button can purge them on demand (see refreshNavs). Failures are never
+// thrown — a fund without a quote falls back to its stored value.
 export async function loadNavs(codes: string[]): Promise<Map<string, NavQuote>> {
   const out = new Map<string, NavQuote>();
   const unique = [...new Set(codes.filter(Boolean))];
+  if (unique.length === 0) return out;
+
+  const amfi = await loadAmfiLatest(new Set(unique));
+
   await Promise.all(
     unique.map(async (code) => {
+      // Mirror gives the full price history (used for the previous business
+      // day, and as a complete fallback).
+      let hist: { date: string; nav: string }[] = [];
+      let name = "";
       try {
         const res = await fetch(`https://api.mfapi.in/mf/${code}`, {
           next: { revalidate: 3600, tags: ["navs"] },
         });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          meta?: { scheme_name?: string };
-          data?: { date: string; nav: string }[];
-        };
-        const rows = json.data ?? [];
-        if (rows.length === 0) return;
-        out.set(code, {
-          nav: parseFloat(rows[0].nav) || 0,
-          prevNav: parseFloat(rows[1]?.nav ?? rows[0].nav) || 0,
-          navDate: rows[0].date, // DD-MM-YYYY
-          name: json.meta?.scheme_name ?? "",
-        });
+        if (res.ok) {
+          const json = (await res.json()) as {
+            meta?: { scheme_name?: string };
+            data?: { date: string; nav: string }[];
+          };
+          hist = json.data ?? [];
+          name = json.meta?.scheme_name ?? "";
+        }
       } catch {
-        /* ignore — fall back to stored value */
+        /* ignore — AMFI may still cover it */
+      }
+
+      const a = amfi.get(code);
+      if (a) {
+        // Authoritative latest from AMFI. Previous = the newest history point
+        // strictly BEFORE AMFI's date, so "today's change" is latest vs the
+        // prior business day even while the mirror is a day behind.
+        const prev = hist.find((r) => mfDateMs(r.date) < a.t);
+        out.set(code, {
+          nav: a.nav,
+          prevNav: prev ? parseFloat(prev.nav) || a.nav : a.nav,
+          navDate: a.navDate,
+          name,
+        });
+        return;
+      }
+
+      // AMFI didn't list this scheme (or was unreachable) — use the mirror.
+      if (hist.length) {
+        out.set(code, {
+          nav: parseFloat(hist[0].nav) || 0,
+          prevNav: parseFloat(hist[1]?.nav ?? hist[0].nav) || 0,
+          navDate: hist[0].date, // DD-MM-YYYY
+          name,
+        });
       }
     }),
   );
