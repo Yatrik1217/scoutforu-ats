@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { round2 } from "@/lib/invoice";
 import { computeNextDue, advanceAfterPayment, duePaymentDates, nextDueOnOrAfter } from "@/lib/finance";
@@ -209,10 +209,14 @@ export async function searchFunds(query: string): Promise<FundHit[]> {
   return hits.slice(0, 25);
 }
 
-// Bust the cached NAVs so the Investments page pulls fresh quotes.
+// Bust the cached NAVs so the Investments page pulls fresh quotes. The NAV
+// fetches are tagged "navs" (see loadNavs) — revalidateTag drops those cached
+// responses so the next render re-fetches the latest AMFI NAV; revalidatePath
+// then re-renders the page against the fresh data.
 export async function refreshNavs(): Promise<Result> {
   const { me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can manage Finance." };
+  updateTag("navs"); // immediately purge the tagged NAV fetches (read-your-own-writes)
   revalidatePath("/finance/investments", "page");
   return { ok: true, message: "NAVs refreshed" };
 }

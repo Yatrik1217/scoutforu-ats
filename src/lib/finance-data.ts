@@ -54,9 +54,11 @@ export async function loadFinance(
 export type NavQuote = { nav: number; prevNav: number; navDate: string; name: string };
 
 // Latest + previous NAV for a set of AMFI scheme codes, from api.mfapi.in
-// (a free AMFI mirror). Cached 12h and tagged "navs" so a manual refresh can
-// bust it. Failures are skipped, never thrown — a fund without a quote falls
-// back to its stored value.
+// (a free AMFI mirror). AMFI declares NAVs once a day (late night IST), so we
+// auto-revalidate hourly to pick up a new declaration soon after it lands, and
+// tag the request "navs" so the "Refresh NAVs" button can bust it on demand
+// (see refreshNavs). Failures are skipped, never thrown — a fund without a
+// quote falls back to its stored value.
 export async function loadNavs(codes: string[]): Promise<Map<string, NavQuote>> {
   const out = new Map<string, NavQuote>();
   const unique = [...new Set(codes.filter(Boolean))];
@@ -64,7 +66,7 @@ export async function loadNavs(codes: string[]): Promise<Map<string, NavQuote>> 
     unique.map(async (code) => {
       try {
         const res = await fetch(`https://api.mfapi.in/mf/${code}`, {
-          next: { revalidate: 43200 },
+          next: { revalidate: 3600, tags: ["navs"] },
         });
         if (!res.ok) return;
         const json = (await res.json()) as {
