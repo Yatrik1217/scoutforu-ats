@@ -5,6 +5,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
 import { renderTemplate } from "@/lib/template-render";
 import { recruiterMailAccount } from "@/lib/user-mail";
+import { buildResolver, type PipelineStage } from "@/lib/pipeline-core";
 import {
   stageToSlug,
   stageFromSlug,
@@ -215,11 +216,34 @@ export async function advanceCandidate(id: string): Promise<Result> {
   return res.ok ? { ...res, message: `${data.name} advanced to ${next}` } : res;
 }
 
+// The stage a rejected candidate should land in, resolved from their own
+// pipeline: prefer a "Rejected" stage, then any other lost-outcome stage that
+// isn't "Not Joined", and finally "Not Joined" for pipelines without a Rejected
+// stage (backwards compatible).
+async function rejectStage(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  jobId: string | null | undefined,
+): Promise<{ slug: string; name: string }> {
+  let clientId: string | null = null;
+  if (jobId) {
+    const { data: job } = await sb.from("jobs").select("client_id").eq("id", jobId).maybeSingle();
+    clientId = job?.client_id ?? null;
+  }
+  const { data: rows } = await sb.from("pipeline_stages").select("*").order("position");
+  const stages: PipelineStage[] = buildResolver(rows ?? []).forClient(clientId);
+  const pick =
+    stages.find((s) => s.slug === "rejected") ??
+    stages.find((s) => s.outcome === "lost" && s.slug !== "not_joined") ??
+    stages.find((s) => s.slug === "not_joined") ??
+    stages.find((s) => s.outcome === "lost");
+  return pick ? { slug: pick.slug, name: pick.name } : { slug: "not_joined", name: "Not Joined" };
+}
+
 export async function rejectCandidate(id: string, reason?: string): Promise<Result> {
   const sb = await createClient();
   const { data } = await sb
     .from("candidates")
-    .select("name")
+    .select("name,job_id")
     .eq("id", id)
     .single();
   const cleanReason = (reason ?? "").trim();
@@ -234,11 +258,12 @@ export async function rejectCandidate(id: string, reason?: string): Promise<Resu
       body: `Rejected — reason: ${cleanReason}`,
     });
   }
-  const res = await setStage(id, "Not Joined");
+  const target = await rejectStage(sb, data?.job_id);
+  const res = await setStageBySlug(id, target.slug);
   return res.ok
     ? {
         ...res,
-        message: `${data?.name ?? "Candidate"} marked as Not Joined${cleanReason ? ` (${cleanReason})` : ""}`,
+        message: `${data?.name ?? "Candidate"} marked as ${target.name}${cleanReason ? ` (${cleanReason})` : ""}`,
       }
     : res;
 }
@@ -1076,7 +1101,8 @@ export async function reassignRecruiterWork(input: {
     .from("candidates")
     .update({ recruiter_id: toId })
     .eq("recruiter_id", fromId)
-    .not("stage", "in", "(joined,not_joined)")
+    // Don't hand over already-closed candidates (terminal / lost + joined).
+    .not("stage", "in", "(joined,not_joined,rejected,offer_declined)")
     .select("id");
   if (cErr) return { ok: false, error: cErr.message };
 
