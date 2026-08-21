@@ -95,7 +95,7 @@ export default async function AttendancePage({
 
   // Shared column template for the summary table (adds First in / Last out).
   const sumCols =
-    "grid-cols-[1.15fr_62px_50px_50px_54px_56px_82px_82px_80px_80px_92px]";
+    "grid-cols-[1.1fr_58px_46px_46px_50px_52px_78px_78px_74px_74px_74px_86px]";
   // Latest day's login/logout for an ATS employee (most recent day with a check-in).
   const empLatestTimes = (empRows: AttendanceRow[]) => {
     const withIn = empRows.filter((r) => firstIn(r));
@@ -154,7 +154,7 @@ export default async function AttendancePage({
       />
 
       {/* per-employee summary + the LOP payroll will use */}
-      <div className="mt-[18px] overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
+      <div className="mt-[18px] overflow-x-auto rounded-2xl border border-[#e9edf3] bg-white">
         <div className={`grid ${sumCols} gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]`}>
           <div>Employee</div>
           <div className="text-center">Present</div>
@@ -166,6 +166,7 @@ export default async function AttendancePage({
           <div className="text-center">Last out</div>
           <div className="text-right">Gross hrs</div>
           <div className="text-right">Net hrs</div>
+          <div className="text-right">Break</div>
           <div className="text-right">Loss of pay</div>
         </div>
         {employees.map((e) => {
@@ -229,6 +230,9 @@ export default async function AttendancePage({
               <div className="tf-num text-right text-[12.5px] font-extrabold text-[#16a34a]">
                 {net ? formatDuration(net) : "—"}
               </div>
+              <div className="tf-num text-right text-[12px] font-semibold text-[#e8833a]">
+                {gross - net > 0 ? formatDuration(gross - net) : "—"}
+              </div>
               <div className="tf-num text-right text-[13px] font-extrabold">
                 {lop ? `${lop} day${lop === 1 ? "" : "s"}` : "—"}
               </div>
@@ -286,6 +290,11 @@ export default async function AttendancePage({
             </div>
             <div className="tf-num text-right text-[12.5px] font-extrabold text-[#16a34a]">
               {c.summary.netMin ? formatDuration(c.summary.netMin) : "—"}
+            </div>
+            <div className="tf-num text-right text-[12px] font-semibold text-[#e8833a]">
+              {c.summary.grossMin - c.summary.netMin > 0
+                ? formatDuration(c.summary.grossMin - c.summary.netMin)
+                : "—"}
             </div>
             <div className="tf-num text-right text-[11px] font-semibold text-[#a3acbd]">
               view-only
