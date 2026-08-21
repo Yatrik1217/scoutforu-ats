@@ -31,6 +31,25 @@ export default async function AnalyticsPage() {
   const src = sourceCounts(ws.candidates);
   const srcMax = Math.max(1, ...SOURCES.map((s) => src[s] ?? 0));
 
+  // Recruiter productivity: resumes ADDED (sourced) vs SUBMITTED TO CLIENT
+  // (candidates who ever reached the "Client Submit" stage — from stage history,
+  // so it still counts even if they've since advanced past it).
+  const submittedIds = new Set(
+    ws.events.filter((e) => e.to_stage === "client_submit").map((e) => e.candidate_id),
+  );
+  const recMap = new Map<string, { added: number; submitted: number; color: string }>();
+  for (const c of ws.candidates) {
+    const name = c.recruiterName || "Unassigned";
+    const r = recMap.get(name) ?? { added: 0, submitted: 0, color: c.recruiterColor };
+    r.added++;
+    if (submittedIds.has(c.id)) r.submitted++;
+    recMap.set(name, r);
+  }
+  const recruiterRows = [...recMap.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.submitted - a.submitted || b.added - a.added);
+  const recMaxAdded = Math.max(1, ...recruiterRows.map((r) => r.added));
+
   const kpis = [
     { label: "Offer Accept Rate", value: `${offerAcceptRate(ws.candidates)}%`, delta: "+5% vs last qtr", tone: "pos", href: "/offers" },
     { label: "Avg Time-to-Hire", value: tth ? `${tth}d` : "—", delta: "-3d faster", tone: "pos", href: "/pipeline" },
@@ -156,6 +175,55 @@ export default async function AnalyticsPage() {
               </Link>
             ))}
           </div>
+        </div>
+
+        <div className="col-span-2 rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
+          <div className="mb-1 text-[15.5px] font-extrabold">Recruiter Productivity</div>
+          <div className="mb-4 text-[12px] text-[#8a94a6]">
+            Resumes <b>added</b> (sourced) vs <b>submitted to client</b> (reached the Client Submit stage).
+          </div>
+          <div className="grid grid-cols-[1.4fr_90px_130px_1fr] items-center gap-2 border-b border-[#eef1f6] pb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+            <div>Recruiter</div>
+            <div className="text-center">Added</div>
+            <div className="text-center">Submitted</div>
+            <div>Submitted / Added</div>
+          </div>
+          {recruiterRows.map((r) => (
+            <div
+              key={r.name}
+              className="grid grid-cols-[1.4fr_90px_130px_1fr] items-center gap-2 border-b border-[#f4f6fa] py-2.5 last:border-0"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white"
+                  style={{ background: r.color }}
+                >
+                  {r.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                </span>
+                <span className="truncate text-[13px] font-bold text-[#16203a]">{r.name}</span>
+              </div>
+              <div className="tf-num text-center text-[14px] font-extrabold text-[#42506b]">{r.added}</div>
+              <div className="tf-num text-center text-[14px] font-extrabold text-[#2a6fdb]">
+                {r.submitted || "—"}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-[10px] flex-1 overflow-hidden rounded-full bg-[#f1f4f9]">
+                  <div
+                    className="h-full rounded-full bg-[#2a6fdb]"
+                    style={{ width: `${(r.added / recMaxAdded) * 100}%` }}
+                  />
+                </div>
+                <span className="tf-num w-10 text-right text-[11px] font-bold text-[#8a94a6]">
+                  {r.added ? Math.round((r.submitted / r.added) * 100) : 0}%
+                </span>
+              </div>
+            </div>
+          ))}
+          {recruiterRows.length === 0 && (
+            <div className="py-8 text-center text-[13px] font-semibold text-[#a3acbd]">
+              No candidates yet.
+            </div>
+          )}
         </div>
       </div>
     </div>

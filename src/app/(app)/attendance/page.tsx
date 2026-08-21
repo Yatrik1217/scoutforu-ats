@@ -15,6 +15,9 @@ import {
   netMinutes,
   formatDuration,
   formatShiftTime,
+  firstIn,
+  lastOut,
+  formatClock,
   assessDay,
   APP_TIMEZONE,
   DEFAULT_SHIFT,
@@ -90,6 +93,18 @@ export default async function AttendancePage({
   // Register too. Display-only — never feeds ATS payroll / loss-of-pay.
   const crmRows = await getCrmSalespeopleAttendance(days, todayISO);
 
+  // Shared column template for the summary table (adds First in / Last out).
+  const sumCols =
+    "grid-cols-[1.15fr_62px_50px_50px_54px_56px_82px_82px_80px_80px_92px]";
+  // Latest day's login/logout for an ATS employee (most recent day with a check-in).
+  const empLatestTimes = (empRows: AttendanceRow[]) => {
+    const withIn = empRows.filter((r) => firstIn(r));
+    if (!withIn.length) return { in: "—", out: "—" };
+    const latest = withIn.reduce((a, b) => (a.on_date >= b.on_date ? a : b));
+    const o = lastOut(latest);
+    return { in: formatClock(firstIn(latest)), out: o ? formatClock(o) : "—" };
+  };
+
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -140,13 +155,15 @@ export default async function AttendancePage({
 
       {/* per-employee summary + the LOP payroll will use */}
       <div className="mt-[18px] overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
-        <div className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+        <div className={`grid ${sumCols} gap-2 border-b border-[#eef1f6] bg-[#f8fafc] px-5 py-3 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]`}>
           <div>Employee</div>
           <div className="text-center">Present</div>
           <div className="text-center">Half</div>
           <div className="text-center">Leave</div>
           <div className="text-center">Absent</div>
           <div className="text-center">Late</div>
+          <div className="text-center">First in</div>
+          <div className="text-center">Last out</div>
           <div className="text-right">Gross hrs</div>
           <div className="text-right">Net hrs</div>
           <div className="text-right">Loss of pay</div>
@@ -179,10 +196,11 @@ export default async function AttendancePage({
             const a = assessDay(r, shift);
             return a && a.lateMin > 0;
           }).length;
+          const t = empLatestTimes(mine);
           return (
             <div
               key={e.id}
-              className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0"
+              className={`grid ${sumCols} items-center gap-2 border-b border-[#f4f6fa] px-5 py-3 last:border-0`}
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar name={e.name} size={30} />
@@ -203,6 +221,8 @@ export default async function AttendancePage({
               <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
                 {lateDays || "—"}
               </div>
+              <div className="tf-num text-center text-[12px] font-semibold text-[#42506b]">{t.in}</div>
+              <div className="tf-num text-center text-[12px] font-semibold text-[#42506b]">{t.out}</div>
               <div className="tf-num text-right text-[12.5px] font-bold text-[#2a6fdb]">
                 {gross ? formatDuration(gross) : "—"}
               </div>
@@ -221,10 +241,19 @@ export default async function AttendancePage({
             From CRM · view-only
           </div>
         )}
-        {crmRows.map((c) => (
+        {crmRows.map((c) => {
+          const dts = Object.keys(c.times).sort();
+          const ld = dts[dts.length - 1];
+          const ct = ld
+            ? {
+                in: formatClock(c.times[ld].in),
+                out: c.times[ld].out ? formatClock(c.times[ld].out) : "—",
+              }
+            : { in: "—", out: "—" };
+          return (
           <div
             key={`crm-${c.id}`}
-            className="grid grid-cols-[1.2fr_70px_60px_60px_60px_70px_90px_90px_110px] items-center gap-2 border-b border-[#f4f6fa] bg-[#fcfdff] px-5 py-3 last:border-0"
+            className={`grid ${sumCols} items-center gap-2 border-b border-[#f4f6fa] bg-[#fcfdff] px-5 py-3 last:border-0`}
           >
             <div className="flex min-w-0 items-center gap-2.5">
               <Avatar name={c.name} size={30} />
@@ -250,6 +279,8 @@ export default async function AttendancePage({
             <div className="tf-num text-center text-[13px] font-bold text-[#e8833a]">
               {c.summary.late || "—"}
             </div>
+            <div className="tf-num text-center text-[12px] font-semibold text-[#42506b]">{ct.in}</div>
+            <div className="tf-num text-center text-[12px] font-semibold text-[#42506b]">{ct.out}</div>
             <div className="tf-num text-right text-[12.5px] font-bold text-[#2a6fdb]">
               {c.summary.grossMin ? formatDuration(c.summary.grossMin) : "—"}
             </div>
@@ -260,7 +291,8 @@ export default async function AttendancePage({
               view-only
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <p className="mt-3 text-[12px] text-[#8a94a6]">
         Loss of pay combines <b>absent / half days</b> marked here with <b>approved unpaid leave</b>

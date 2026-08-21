@@ -82,20 +82,29 @@ function sessionsOf(a: CrmAttendance): CrmSession[] {
 }
 
 // Gross = first-in → last-out (minutes); Net = sum of sessions (minutes).
-function spans(a: CrmAttendance) {
+// A session with out=null is still open. On TODAY that means "clocked in now",
+// so it runs to the current time. On a PAST day it means someone forgot to
+// check out — we must NOT count it until now (that inflates to hundreds of
+// hours), so we cap it at that day's shift end.
+function spans(a: CrmAttendance, cfg: CrmConfig, todayISO: string) {
   const s = sessionsOf(a);
   if (!s.length) return { firstIn: null as string | null, grossMin: 0, netMin: 0 };
   const now = Date.now();
+  const isToday = a.date === todayISO;
+  // Shift end on this record's day, in IST.
+  const shiftEndMs = new Date(`${a.date}T${cfg.shiftEnd || "19:00"}:00+05:30`).getTime();
+  const closeOf = (inMs: number) => (isToday ? now : Math.max(inMs, shiftEndMs));
+
   let netMs = 0;
+  let lastOutMs = 0;
   for (const x of s) {
     const inMs = new Date(x.in).getTime();
-    const outMs = x.out ? new Date(x.out).getTime() : now;
+    const outMs = x.out ? new Date(x.out).getTime() : closeOf(inMs);
     netMs += Math.max(0, outMs - inMs);
+    if (outMs > lastOutMs) lastOutMs = outMs;
   }
   const firstIn = s[0].in;
-  const lastRaw = s[s.length - 1].out;
-  const lastMs = lastRaw ? new Date(lastRaw).getTime() : now;
-  const grossMs = Math.max(0, lastMs - new Date(firstIn).getTime());
+  const grossMs = Math.max(0, lastOutMs - new Date(firstIn).getTime());
   return {
     firstIn,
     grossMin: Math.round(grossMs / 60000),
@@ -123,6 +132,7 @@ export type CrmAttnRow = {
   id: string;
   name: string;
   statuses: Record<string, AttendanceStatus>; // date → status (real days only)
+  times: Record<string, { in: string | null; out: string | null }>; // date → login/logout ISO
   summary: {
     present: number;
     halfDay: number;
@@ -159,6 +169,7 @@ function computeUserRow(
   todayISO: string,
 ): CrmAttnRow {
   const statuses: Record<string, AttendanceStatus> = {};
+  const times: Record<string, { in: string | null; out: string | null }> = {};
   const summary = { present: 0, halfDay: 0, leave: 0, absent: 0, late: 0, grossMin: 0, netMin: 0 };
   for (const ds of days) {
     if (ds > todayISO) continue; // not yet due
@@ -167,11 +178,13 @@ function computeUserRow(
     const rec = byUserDate.get(`${u.id}|${ds}`);
     let st: string;
     if (rec) {
-      const sp = spans(rec);
+      const sp = spans(rec, cfg, todayISO);
       st = rec.status || "present";
       if (attnLate(sp.firstIn, cfg)) summary.late++;
       summary.grossMin += sp.grossMin;
       summary.netMin += sp.netMin;
+      const sess = sessionsOf(rec);
+      times[ds] = { in: sp.firstIn, out: sess.length ? sess[sess.length - 1].out : null };
     } else {
       st = statusForDay(ds, cfg);
     }
@@ -183,7 +196,7 @@ function computeUserRow(
     else if (st === "leave") summary.leave++;
     else if (st === "absent") summary.absent++;
   }
-  return { id: String(u.id), name: u.name, statuses, summary };
+  return { id: String(u.id), name: u.name, statuses, times, summary };
 }
 
 function indexAttendance(db: CrmDB): Map<string, CrmAttendance> {

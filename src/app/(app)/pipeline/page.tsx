@@ -5,11 +5,14 @@ import { PipelineClient } from "./pipeline-client";
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; job?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, job } = await searchParams;
   const { ws } = await loadWorkspace();
   const pipelines = await loadPipelines();
+  // Opening the board scoped to one job (from the Jobs page) pre-selects that
+  // job so only its candidates show, in that client's pipeline.
+  const initialJob = job && ws.jobs.some((j) => j.id === job) ? job : "all";
 
   const recruiters = Array.from(
     new Set(ws.candidates.map((c) => c.recruiterName)),
@@ -25,6 +28,7 @@ export default async function PipelinePage({
       jobs={ws.jobs.map((j) => ({ id: j.id, title: j.title, clientId: j.client_id }))}
       recruiters={recruiters}
       query={q ?? ""}
+      initialJob={initialJob}
       defaultStages={pipelines.default}
       clientStages={clientStages}
     />

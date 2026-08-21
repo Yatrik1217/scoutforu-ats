@@ -32,6 +32,7 @@ export function PipelineClient({
   jobs,
   recruiters,
   query,
+  initialJob = "all",
   defaultStages,
   clientStages,
 }: {
@@ -39,13 +40,14 @@ export function PipelineClient({
   jobs: { id: string; title: string; clientId: string | null }[];
   recruiters: string[];
   query: string;
+  initialJob?: string;
   defaultStages: PipelineStage[];
   clientStages: Record<string, PipelineStage[]>;
 }) {
   const router = useRouter();
   const { openDrawer, canWrite, openCandidateForm, role } = useShell();
   const [items, setItems] = useState(candidates);
-  const [filterJob, setFilterJob] = useState("all");
+  const [filterJob, setFilterJob] = useState(initialJob);
   const [filterRec, setFilterRec] = useState("all");
   const [layout, setLayout] = useState<Layout>("board");
   const [activeId, setActiveId] = useState<string | null>(null);

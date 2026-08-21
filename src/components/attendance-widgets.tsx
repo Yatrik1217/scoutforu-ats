@@ -188,6 +188,17 @@ export function AttendanceGrid({
 
   const key = (empId: string, date: string) => `${empId}|${date}`;
   const byKey = new Map(rows.map((r) => [key(r.employee_id, r.on_date), r.status]));
+  // Full rows for login/logout lookups on hover.
+  const rowByKey = new Map(rows.map((r) => [key(r.employee_id, r.on_date), r]));
+  // " · In 10:05 AM · Out 07:12 PM" for a cell, or "" when there are no times.
+  const timeStr = (inISO: string | null, outISO: string | null) => {
+    if (!inISO && !outISO) return "";
+    return ` · In ${formatClock(inISO)} · Out ${outISO ? formatClock(outISO) : "still in"}`;
+  };
+  const empTimeStr = (empId: string, date: string) => {
+    const r = rowByKey.get(key(empId, date));
+    return r ? timeStr(firstIn(r), lastOut(r)) : "";
+  };
 
   const statusOf = (empId: string, date: string): AttendanceStatus | null => {
     const k = key(empId, date);
@@ -288,7 +299,7 @@ export function AttendanceGrid({
                       <button
                         onClick={() => cycle(e.id, d)}
                         disabled={pending}
-                        title={`${e.name} · ${d}${
+                        title={`${e.name} · ${d}${empTimeStr(e.id, d)}${
                           meta
                             ? ` · ${meta.label}`
                             : isHoliday
@@ -345,7 +356,7 @@ export function AttendanceGrid({
                   return (
                     <td key={d} className="border-b border-[#f4f6fa] p-0 text-center">
                       <span
-                        title={`${c.name} · ${d}${meta ? ` · ${meta.label}` : ""} — from CRM (view-only)`}
+                        title={`${c.name} · ${d}${timeStr(c.times[d]?.in ?? null, c.times[d]?.out ?? null)}${meta ? ` · ${meta.label}` : ""} — from CRM (view-only)`}
                         className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold"
                         style={cellStyle}
                       >

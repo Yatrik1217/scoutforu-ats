@@ -92,7 +92,7 @@ export default async function JobsPage() {
               </div>
 
               <div className="mt-[18px] flex gap-[22px] border-t border-[#f0f3f8] pt-4">
-                <Stat value={j.openings} label="Openings" href="/pipeline" />
+                <Stat value={j.openings} label="Openings" href={`/pipeline?job=${j.id}`} />
                 <Stat value={j.applicants_count} label="Applicants" href={`/candidates?job=${j.id}`} />
                 <Stat value={inPipe(j.id)} label="In Pipeline" accent href={`/candidates?job=${j.id}`} />
                 <div className="flex-1" />
@@ -132,7 +132,7 @@ export default async function JobsPage() {
 
               <div className="mt-3.5 flex gap-2">
                 <Link
-                  href="/pipeline"
+                  href={`/pipeline?job=${j.id}`}
                   className="flex-1 rounded-[9px] bg-[#eef4fe] py-2.5 text-center text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
                 >
                   View Pipeline
