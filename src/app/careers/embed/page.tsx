@@ -51,10 +51,10 @@ export default async function CareersEmbedPage() {
             href={`/careers/${j.id}`}
             target="_blank"
             rel="noreferrer"
-            className="group flex items-center gap-4 rounded-[13px] border border-[#e9edf3] bg-white p-4 transition hover:border-[#cbd7ea] hover:shadow-[0_6px_18px_rgba(20,32,58,.08)]"
+            className="group flex items-center gap-4 rounded-[13px] border border-[#e9edf3] bg-white p-4 transition hover:border-[#d9caf7] hover:shadow-[0_6px_18px_rgba(29,2,138,.08)]"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-[14.5px] font-extrabold text-[#16203a]">{j.title}</div>
+              <div className="text-[14.5px] font-extrabold text-[#191331]">{j.title}</div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12px] text-[#6b7686]">
                 {j.dept && (
                   <span className="flex items-center gap-1">
@@ -76,7 +76,7 @@ export default async function CareersEmbedPage() {
             </div>
             <ArrowUpRight
               size={16}
-              className="shrink-0 text-[#2a6fdb] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              className="shrink-0 text-[#7C3AED] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
             />
           </a>
         ))}

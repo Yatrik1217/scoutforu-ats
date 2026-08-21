@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 const field =
-  "w-full rounded-[9px] border border-[#e3e8f0] px-3 py-2.5 text-[14px] outline-none focus:border-[#2a6fdb]";
+  "w-full rounded-[9px] border border-[#e3e8f0] px-3 py-2.5 text-[14px] outline-none focus:border-[#7C3AED]";
 
 export function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle: string }) {
   const [done, setDone] = useState(false);
@@ -39,7 +39,7 @@ export function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle: string
       <div className="mt-4 flex items-center gap-3 rounded-[12px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
         <CheckCircle2 className="text-[#16a34a]" />
         <div>
-          <div className="text-[15px] font-extrabold text-[#16203a]">Application received!</div>
+          <div className="text-[15px] font-extrabold text-[#191331]">Application received!</div>
           <div className="text-[13px] text-[#6b7686]">
             Thanks for applying to {jobTitle}. Our team will be in touch.
           </div>
@@ -74,14 +74,14 @@ export function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle: string
           name="resume"
           type="file"
           accept=".pdf,.doc,.docx"
-          className="mt-1 block w-full text-[13px] text-[#6b7686] file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#eef4fe] file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-[#2a6fdb]"
+          className="mt-1 block w-full text-[13px] text-[#6b7686] file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#EDE7FC] file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-[#7C3AED]"
         />
       </label>
       {error && <div className="text-[12.5px] font-semibold text-[#dc2626]">{error}</div>}
       <button
         type="submit"
         disabled={busy}
-        className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#2a6fdb] py-3 text-[14px] font-bold text-white hover:bg-[#245fc0] disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#7C3AED] py-3 text-[14px] font-bold text-white hover:bg-[#5B21B6] disabled:opacity-60"
       >
         {busy && <Loader2 size={16} className="animate-spin" />}
         {busy ? "Submitting…" : "Submit application"}

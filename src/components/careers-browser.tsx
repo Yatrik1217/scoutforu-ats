@@ -63,25 +63,29 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] text-[#16203a]">
-      {/* Hero */}
-      <div className="relative overflow-hidden bg-[linear-gradient(135deg,#1f5bc0_0%,#2a6fdb_52%,#123f8f_100%)] text-white">
+    <div className="min-h-screen bg-[#f6f5fb] text-[#191331]">
+      {/* Hero — matches the scoutforu.com brand (deep indigo → violet). */}
+      <div className="relative overflow-hidden bg-[linear-gradient(135deg,#160A3C_0%,#1D028A_68%,#5624C5_100%)] text-white">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-32 left-10 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="relative mx-auto max-w-[1000px] px-6 pt-8 pb-32">
           <div className="flex items-center gap-3">
             {org?.logo_url ? (
-              // On a white chip so the logo never gets lost against the hero.
+              // The logo already carries the "ScoutforU" wordmark, so we don't repeat
+              // the name text beside it. White chip keeps the colour logo legible on the hero.
               <span className="inline-flex items-center rounded-[12px] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(0,0,0,.12)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={org.logo_url} alt={name} className="h-9 w-auto max-w-[170px] object-contain" />
+                <img src={org.logo_url} alt={name} className="h-9 w-auto max-w-[190px] object-contain" />
               </span>
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[16px] font-extrabold text-[#2a6fdb]">
-                {name.charAt(0)}
-              </div>
+              // No logo on file — fall back to an initial chip plus the name.
+              <>
+                <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[16px] font-extrabold text-[#7C3AED]">
+                  {name.charAt(0)}
+                </div>
+                <span className="text-[16px] font-extrabold tracking-tight text-white/95">{name}</span>
+              </>
             )}
-            <span className="text-[16px] font-extrabold tracking-tight text-white/95">{name}</span>
           </div>
 
           <div className="mt-12 max-w-[660px]">
@@ -148,9 +152,9 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
               <Link
                 key={j.id}
                 href={`/careers/${j.id}`}
-                className="group relative flex flex-col overflow-hidden rounded-[16px] border border-[#e9edf3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#c3d4f0] hover:shadow-[0_14px_34px_rgba(20,32,58,.10)]"
+                className="group relative flex flex-col overflow-hidden rounded-[16px] border border-[#e9edf3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#d9caf7] hover:shadow-[0_14px_34px_rgba(29,2,138,.10)]"
               >
-                <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1f5bc0,#5b96f0)] opacity-0 transition group-hover:opacity-100" />
+                <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#5B21B6,#7C3AED)] opacity-0 transition group-hover:opacity-100" />
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-[16.5px] font-extrabold leading-snug">{j.title}</h3>
                   <span className="shrink-0 rounded-full bg-[#eafaf0] px-2.5 py-1 text-[10.5px] font-bold text-[#128a3e]">
@@ -180,7 +184,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
                   <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#9aa4b6]">
                     <Clock size={12} /> {since(j.posted_at)}
                   </span>
-                  <span className="flex items-center gap-1 text-[12.5px] font-bold text-[#2a6fdb]">
+                  <span className="flex items-center gap-1 text-[12.5px] font-bold text-[#7C3AED]">
                     View &amp; apply
                     <ArrowUpRight size={15} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </span>
@@ -200,7 +204,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
 
       {/* Drop-your-CV CTA */}
       <div className="mx-auto max-w-[1000px] px-6 pb-14">
-        <div className="flex flex-col items-start gap-4 rounded-[20px] bg-[linear-gradient(135deg,#16203a,#26365a)] p-7 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-start gap-4 rounded-[20px] bg-[linear-gradient(135deg,#160A3C,#3A1E9E)] p-7 text-white sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-[19px] font-extrabold">Don&apos;t see the right role?</div>
             <div className="mt-1 text-[13.5px] text-white/70">
@@ -209,7 +213,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
           </div>
           <a
             href="#top"
-            className="shrink-0 rounded-[12px] bg-white px-6 py-3 text-[14px] font-extrabold text-[#16203a] transition hover:bg-white/90"
+            className="shrink-0 rounded-[12px] bg-white px-6 py-3 text-[14px] font-extrabold text-[#191331] transition hover:bg-white/90"
           >
             Browse all roles
           </a>
@@ -239,7 +243,7 @@ function ViewBtn({
       onClick={onClick}
       title={label}
       className="flex items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[12px] font-bold transition"
-      style={active ? { background: "#eef4fe", color: "#2a6fdb" } : { color: "#8a94a6" }}
+      style={active ? { background: "#EDE7FC", color: "#7C3AED" } : { color: "#8a94a6" }}
     >
       <Icon size={15} />
       <span className="hidden sm:inline">{label}</span>

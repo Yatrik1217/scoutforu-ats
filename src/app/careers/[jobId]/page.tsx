@@ -67,17 +67,17 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8fc]">
+    <div className="min-h-screen bg-[#f6f5fb]">
       <header className="border-b border-[#e9edf3] bg-white">
         <div className="mx-auto max-w-[760px] px-6 py-5">
-          <Link href="/careers" className="flex items-center gap-1.5 text-[13px] font-bold text-[#2a6fdb]">
+          <Link href="/careers" className="flex items-center gap-1.5 text-[13px] font-bold text-[#7C3AED]">
             <ArrowLeft size={15} /> {org?.name || "All roles"}
           </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-[760px] px-6 py-8">
-        <h1 className="text-[26px] font-extrabold text-[#16203a]">{job.title}</h1>
+        <h1 className="text-[26px] font-extrabold text-[#191331]">{job.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#6b7686]">
           {job.dept && (
             <span className="flex items-center gap-1">
@@ -109,7 +109,7 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
         )}
 
         <div className="mt-6 rounded-[14px] border border-[#e9edf3] bg-white p-6">
-          <h2 className="text-[17px] font-extrabold text-[#16203a]">Apply for this role</h2>
+          <h2 className="text-[17px] font-extrabold text-[#191331]">Apply for this role</h2>
           <p className="mt-1 text-[13px] text-[#8a94a6]">Fill in your details and attach your resume.</p>
           <ApplyForm jobId={job.id} jobTitle={job.title} />
         </div>
