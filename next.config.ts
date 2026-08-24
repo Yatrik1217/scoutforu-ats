@@ -9,8 +9,11 @@ const nextConfig: NextConfig = {
   },
   // Resume uploads (PDF/DOCX) flow through a Server Action; raise the body cap.
   experimental: {
-    serverActions: { bodySizeLimit: "10mb" },
+    serverActions: { bodySizeLimit: "16mb" },
   },
+  // pdf.js (used to read password-protected CAS statements) must run as a real
+  // Node module, not be bundled by the compiler.
+  serverExternalPackages: ["pdfjs-dist"],
 };
 
 export default nextConfig;

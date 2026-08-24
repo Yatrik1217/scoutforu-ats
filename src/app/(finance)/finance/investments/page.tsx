@@ -7,6 +7,7 @@ import { StatCard, Card, pct as pctFmt } from "@/components/finance/pieces";
 import { InvestmentModal } from "@/components/finance/investment-modal";
 import { InvestmentActions } from "@/components/finance/investment-actions";
 import { RefreshNavsButton } from "@/components/finance/refresh-navs-button";
+import { CasImport } from "@/components/finance/cas-import";
 import type { FinanceEmiRow } from "@/lib/database.types";
 
 // DD-MM-YYYY (AMFI) → "24 Jul 26"
@@ -80,6 +81,7 @@ export default async function InvestmentsPage() {
         )}
         <RefreshNavsButton />
         <div className="flex-1" />
+        <CasImport />
         <InvestmentModal
           scope="company"
           trigger={
