@@ -12,6 +12,7 @@ import {
   Calendar,
   FileText,
   BarChart3,
+  Activity,
   Search,
   UploadCloud,
   UserCheck,
@@ -73,6 +74,7 @@ export function AppSidebar({
     ...(role === "master_admin"
       ? [
           { href: "/team", label: "Team", icon: UserCheck } as NavItem,
+          { href: "/activity", label: "Daily Activity", icon: Activity } as NavItem,
           { href: "/placements", label: "Placements", icon: HandCoins } as NavItem,
           { href: "/invoices", label: "Invoices", icon: ReceiptIndianRupee } as NavItem,
           { href: "/performance", label: "Performance", icon: Trophy } as NavItem,
