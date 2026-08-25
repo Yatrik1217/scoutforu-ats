@@ -20,8 +20,19 @@ type Row = {
   rating: number;
   source: string | null;
   recruiterName: string;
+  addedOn: string; // created_at ISO
 };
 type Tmpl = { id: string; name: string; subject: string; body: string };
+
+const addedLabel = (iso: string) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "2-digit",
+        timeZone: "Asia/Kolkata",
+      })
+    : "—";
 
 export function CandidatesBulk({
   rows,
@@ -67,7 +78,7 @@ export function CandidatesBulk({
               <th className="w-[42px] p-[13px_0_13px_18px]">
                 <input type="checkbox" checked={allOn} onChange={toggleAll} className="h-4 w-4 cursor-pointer accent-[#2a6fdb]" />
               </th>
-              {["Candidate", "Role", "Stage", "Rating", "Source", "Recruiter", ""].map((h) => (
+              {["Candidate", "Role", "Stage", "Rating", "Source", "Recruiter", "Added", ""].map((h) => (
                 <th key={h} className="p-[13px_18px] text-left text-[11px] font-bold text-[#8a94a6]">
                   {h.toUpperCase()}
                 </th>
@@ -105,6 +116,7 @@ export function CandidatesBulk({
                 <td className="tf-num p-[12px_18px] text-[13px] font-extrabold text-[#b27400]">★ {r.rating.toFixed(1)}</td>
                 <td className="p-[12px_18px] text-[12.5px] font-semibold text-[#42506b]">{r.source}</td>
                 <td className="p-[12px_18px] text-[13px] font-semibold text-[#42506b]">{r.recruiterName}</td>
+                <td className="tf-num whitespace-nowrap p-[12px_18px] text-[12px] font-semibold text-[#8a94a6]">{addedLabel(r.addedOn)}</td>
                 <td className="p-[12px_18px] text-right text-[12px] font-bold text-[#2a6fdb]">View →</td>
               </tr>
             ))}

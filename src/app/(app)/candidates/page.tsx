@@ -155,6 +155,7 @@ export default async function CandidatesPage({
           rating: r.rating,
           source: r.source ?? null,
           recruiterName: r.recruiterName,
+          addedOn: r.created_at,
         }))}
         recruiters={ws.team
           .filter((p) => p.role === "recruiter")
