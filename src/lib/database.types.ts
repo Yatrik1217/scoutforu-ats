@@ -707,6 +707,24 @@ type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Relationships: [];
 };
 
+export type TalentBankRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  exp_years: number;
+  location: string | null;
+  current_designation: string | null;
+  current_company: string | null;
+  skills: string[];
+  category: string;
+  source: string;
+  resume_url: string | null;
+  notes: string;
+  added_by: string | null;
+  created_at: string;
+};
+
 export type UserEmailSettingsRow = {
   user_id: string;
   smtp_host: string;
@@ -733,6 +751,7 @@ export type Database = {
   public: {
     Tables: {
       pipeline_stages: Table<PipelineStageDbRow>;
+      talent_bank: Table<TalentBankRow>;
       user_email_settings: Table<UserEmailSettingsRow>;
       clients: Table<ClientRow>;
       profiles: Table<ProfileRow>;

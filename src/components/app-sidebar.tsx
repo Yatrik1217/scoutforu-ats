@@ -17,6 +17,7 @@ import {
   UploadCloud,
   UserCheck,
   Database,
+  FolderArchive,
   SlidersHorizontal,
   ReceiptIndianRupee,
   HandCoins,
@@ -71,6 +72,7 @@ export function AppSidebar({
 
   const admin: NavItem[] = [
     { href: "/talent", label: "Talent Pool", icon: Database },
+    { href: "/talent-bank", label: "Talent Bank", icon: FolderArchive },
     ...(role === "master_admin"
       ? [
           { href: "/team", label: "Team", icon: UserCheck } as NavItem,
