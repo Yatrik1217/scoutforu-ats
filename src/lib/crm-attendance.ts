@@ -148,14 +148,22 @@ export type CrmAttnRow = {
 export type CrmUserLite = { id: string; name: string; role: string; active: boolean };
 
 // Download + parse the CRM blob. Returns null (never throws) when unreadable.
+// Cached in-process for a few minutes so repeated attendance-register renders
+// don't re-download the blob from Storage on every view (keeps egress low —
+// the CRM is the source of truth and only changes when someone checks in).
+let _crmCache: { db: CrmDB; at: number } | null = null;
+const CRM_CACHE_MS = 5 * 60 * 1000;
 async function loadCrmDb(): Promise<CrmDB | null> {
+  if (_crmCache && Date.now() - _crmCache.at < CRM_CACHE_MS) return _crmCache.db;
   try {
     const svc = createServiceClient();
     const { data, error } = await svc.storage.from(CRM_BUCKET).download(CRM_OBJECT);
-    if (error || !data) return null;
-    return JSON.parse(await data.text()) as CrmDB;
+    if (error || !data) return _crmCache?.db ?? null;
+    const db = JSON.parse(await data.text()) as CrmDB;
+    _crmCache = { db, at: Date.now() };
+    return db;
   } catch {
-    return null;
+    return _crmCache?.db ?? null;
   }
 }
 
