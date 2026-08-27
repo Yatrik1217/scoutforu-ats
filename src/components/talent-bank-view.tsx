@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, FolderOpen, Trash2, FileText } from "lucide-react";
 import { promoteFromTalentBank, deleteTalentBank } from "@/lib/actions/talent-bank";
+import { createClient } from "@/lib/supabase/client";
 import type { TalentBankRow } from "@/lib/database.types";
 
 const CAT_COLOR: Record<string, string> = {
@@ -151,15 +152,23 @@ export function TalentBankView({
                         )}
                       </div>
 
-                      {t.resume_url && t.resume_url.startsWith("http") && (
-                        <a
-                          href={t.resume_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {t.resume_url && (
+                        <button
+                          onClick={async () => {
+                            const path = t.resume_url as string;
+                            const sb = createClient();
+                            const ext = (path.split(".").pop() || "pdf").toLowerCase();
+                            const fname = `${(t.name || "resume").replace(/[^\w .-]+/g, " ").trim() || "resume"}.${ext}`;
+                            const { data, error } = await sb.storage
+                              .from("resumes")
+                              .createSignedUrl(path, 120, { download: fname });
+                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                            else toast.error(error?.message || "Could not open the resume file");
+                          }}
                           className="flex items-center gap-1 text-[12px] font-bold text-[#2a6fdb] hover:underline"
                         >
                           <FileText size={13} /> Resume
-                        </a>
+                        </button>
                       )}
 
                       <select
