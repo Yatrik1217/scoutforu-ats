@@ -31,24 +31,28 @@ export default async function AnalyticsPage() {
   const src = sourceCounts(ws.candidates);
   const srcMax = Math.max(1, ...SOURCES.map((s) => src[s] ?? 0));
 
-  // Recruiter productivity: resumes ADDED (sourced) vs SUBMITTED TO CLIENT
-  // (candidates who ever reached the "Client Submit" stage — from stage history,
-  // so it still counts even if they've since advanced past it).
+  // Recruiter productivity: resumes the recruiter SOURCED vs applicants who came
+  // in on their own via the CAREER site (kept separate — a self-application isn't
+  // the recruiter's sourcing) vs SUBMITTED TO CLIENT (ever reached Client Submit).
   const submittedIds = new Set(
     ws.events.filter((e) => e.to_stage === "client_submit").map((e) => e.candidate_id),
   );
-  const recMap = new Map<string, { added: number; submitted: number; color: string }>();
+  const recMap = new Map<
+    string,
+    { sourced: number; career: number; submitted: number; color: string }
+  >();
   for (const c of ws.candidates) {
     const name = c.recruiterName || "Unassigned";
-    const r = recMap.get(name) ?? { added: 0, submitted: 0, color: c.recruiterColor };
-    r.added++;
+    const r = recMap.get(name) ?? { sourced: 0, career: 0, submitted: 0, color: c.recruiterColor };
+    if ((c.source ?? "") === "Career Site") r.career++;
+    else r.sourced++;
     if (submittedIds.has(c.id)) r.submitted++;
     recMap.set(name, r);
   }
   const recruiterRows = [...recMap.entries()]
     .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.submitted - a.submitted || b.added - a.added);
-  const recMaxAdded = Math.max(1, ...recruiterRows.map((r) => r.added));
+    .sort((a, b) => b.submitted - a.submitted || b.sourced - a.sourced);
+  const recMaxSourced = Math.max(1, ...recruiterRows.map((r) => r.sourced));
 
   const kpis = [
     { label: "Offer Accept Rate", value: `${offerAcceptRate(ws.candidates)}%`, delta: "+5% vs last qtr", tone: "pos", href: "/offers" },
@@ -180,18 +184,20 @@ export default async function AnalyticsPage() {
         <div className="col-span-2 rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-1 text-[15.5px] font-extrabold">Recruiter Productivity</div>
           <div className="mb-4 text-[12px] text-[#8a94a6]">
-            Resumes <b>added</b> (sourced) vs <b>submitted to client</b> (reached the Client Submit stage).
+            <b>Sourced</b> = resumes the recruiter added · <b className="text-[#8b5cf6]">Career</b> =
+            applicants who applied themselves via the career site · <b>Submitted</b> = reached Client Submit.
           </div>
-          <div className="grid grid-cols-[1.4fr_90px_130px_1fr] items-center gap-2 border-b border-[#eef1f6] pb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+          <div className="grid grid-cols-[1.5fr_80px_80px_90px_1fr] items-center gap-2 border-b border-[#eef1f6] pb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
             <div>Recruiter</div>
-            <div className="text-center">Added</div>
+            <div className="text-center">Sourced</div>
+            <div className="text-center">Career</div>
             <div className="text-center">Submitted</div>
-            <div>Submitted / Added</div>
+            <div>Sourced volume</div>
           </div>
           {recruiterRows.map((r) => (
             <div
               key={r.name}
-              className="grid grid-cols-[1.4fr_90px_130px_1fr] items-center gap-2 border-b border-[#f4f6fa] py-2.5 last:border-0"
+              className="grid grid-cols-[1.5fr_80px_80px_90px_1fr] items-center gap-2 border-b border-[#f4f6fa] py-2.5 last:border-0"
             >
               <div className="flex items-center gap-2">
                 <span
@@ -202,7 +208,8 @@ export default async function AnalyticsPage() {
                 </span>
                 <span className="truncate text-[13px] font-bold text-[#16203a]">{r.name}</span>
               </div>
-              <div className="tf-num text-center text-[14px] font-extrabold text-[#42506b]">{r.added}</div>
+              <div className="tf-num text-center text-[14px] font-extrabold text-[#42506b]">{r.sourced || "—"}</div>
+              <div className="tf-num text-center text-[14px] font-extrabold text-[#8b5cf6]">{r.career || "—"}</div>
               <div className="tf-num text-center text-[14px] font-extrabold text-[#2a6fdb]">
                 {r.submitted || "—"}
               </div>
@@ -210,11 +217,11 @@ export default async function AnalyticsPage() {
                 <div className="h-[10px] flex-1 overflow-hidden rounded-full bg-[#f1f4f9]">
                   <div
                     className="h-full rounded-full bg-[#2a6fdb]"
-                    style={{ width: `${(r.added / recMaxAdded) * 100}%` }}
+                    style={{ width: `${(r.sourced / recMaxSourced) * 100}%` }}
                   />
                 </div>
-                <span className="tf-num w-10 text-right text-[11px] font-bold text-[#8a94a6]">
-                  {r.added ? Math.round((r.submitted / r.added) * 100) : 0}%
+                <span className="tf-num w-8 text-right text-[11px] font-bold text-[#8a94a6]">
+                  {r.sourced}
                 </span>
               </div>
             </div>

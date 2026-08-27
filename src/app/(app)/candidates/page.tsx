@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { X } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
-import { stageFromSlug, stageToSlug } from "@/lib/domain";
+import { stageFromSlug, stageToSlug, SOURCES } from "@/lib/domain";
+import { CandidateFilters } from "@/components/candidate-filters";
 import { NewCandidateButton } from "@/components/view-actions";
 import { ExportCsvButton } from "@/components/export-csv";
 import { ShareClientButton } from "@/components/share-client-modal";
@@ -81,6 +82,14 @@ export default async function CandidatesPage({
     <div className="animate-sc-fadein p-[22px_26px_40px]">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex flex-wrap items-center gap-2">
+          <CandidateFilters
+            params={params as Record<string, string | undefined>}
+            sources={[...SOURCES]}
+            recruiters={ws.team
+              .filter((p) => p.role === "recruiter")
+              .map((p) => ({ id: p.id, name: p.name }))}
+            isAdmin={scope.role === "master_admin"}
+          />
           <span className="tf-num text-[13px] font-semibold text-[#8a94a6]">
             {rows.length} candidates
           </span>

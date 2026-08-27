@@ -41,6 +41,9 @@ export default async function ActivityPage({
   };
 
   for (const c of ws.candidates) {
+    // Career-site applicants applied on their own — not the recruiter's sourcing,
+    // so they never count toward "added" here (track them via the Source filter).
+    if ((c.source ?? "") === "Career Site") continue;
     const day = istDay(c.created_at);
     if (daySet.has(day)) push(added, `${c.recruiter_id ?? "none"}|${day}`, { id: c.id, name: c.name });
   }
