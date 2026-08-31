@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseResume, resumeStoragePath } from "@/lib/actions/parse-resume";
+import { parseResume } from "@/lib/actions/parse-resume";
+import { resumeStoragePath } from "@/lib/resume-hash";
 import { createCandidate } from "@/lib/actions/mutations";
 import { categorizeResume } from "@/lib/talent-category";
 
