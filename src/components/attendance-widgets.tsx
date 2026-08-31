@@ -278,22 +278,27 @@ export function AttendanceGrid({
                   const meta = s ? ATTENDANCE_META[s] : null;
                   const isHoliday = !meta && holidaySet.has(d);
                   const isOff = !meta && !isHoliday && offSet.has(d);
+                  // An approved leave day (not manually marked) = On leave.
+                  const onLeave =
+                    !meta && !isHoliday && !isOff && !!leaveSets.get(e.id)?.has(d);
                   // Un-marked past working day (not off/holiday, not on leave) = auto absent.
                   const autoAbsent =
                     !meta &&
                     !isHoliday &&
                     !isOff &&
-                    !(leaveSets.get(e.id)?.has(d)) &&
+                    !onLeave &&
                     isUnmarkedAbsent(d, todayISO, e.joined_on, e.exit_on, offSet);
                   const cellStyle = meta
                     ? { background: meta.color, color: "#fff" }
                     : isHoliday
                       ? { background: "#f1e9ff", color: "#8b5cf6" } // holiday
-                      : autoAbsent
-                        ? { background: "#fdecec", color: "#dc2626" } // faint = auto, not manually set
-                        : isOff
-                          ? { background: "#f1f0f7", color: "#a99fd6" } // weekly off
-                          : { background: "#f1f4f9", color: "#c2cad8" };
+                      : onLeave
+                        ? { background: "#2a6fdb", color: "#fff" } // approved leave
+                        : autoAbsent
+                          ? { background: "#fdecec", color: "#dc2626" } // faint = auto, not manually set
+                          : isOff
+                            ? { background: "#f1f0f7", color: "#a99fd6" } // weekly off
+                            : { background: "#f1f4f9", color: "#c2cad8" };
                   return (
                     <td key={d} className="border-b border-[#f4f6fa] p-0 text-center">
                       <button
@@ -304,16 +309,18 @@ export function AttendanceGrid({
                             ? ` · ${meta.label}`
                             : isHoliday
                               ? " · Holiday"
-                              : autoAbsent
-                                ? " · Absent (no attendance marked)"
-                                : isOff
-                                  ? " · Weekly off"
-                                  : ""
+                              : onLeave
+                                ? " · On leave (approved)"
+                                : autoAbsent
+                                  ? " · Absent (no attendance marked)"
+                                  : isOff
+                                    ? " · Weekly off"
+                                    : ""
                         } — click to change`}
                         className="mx-auto my-1 flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-[9.5px] font-extrabold transition hover:ring-2 hover:ring-[#cbd7ea]"
                         style={cellStyle}
                       >
-                        {meta ? meta.short : isHoliday ? "HO" : autoAbsent ? "A" : isOff ? "W" : "·"}
+                        {meta ? meta.short : isHoliday ? "HO" : onLeave ? "L" : autoAbsent ? "A" : isOff ? "W" : "·"}
                       </button>
                     </td>
                   );
