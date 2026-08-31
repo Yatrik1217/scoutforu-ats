@@ -97,11 +97,36 @@ export function folderFromDesignation(designation?: string): string | null {
     .join(" ");
 }
 
+// A clear job TITLE outranks incidental tool/skill keywords. Someone whose
+// designation is "Business Analyst" is a BA even when their resume lists Figma,
+// SQL, or Power BI (normal BA tools) — without this, a tool keyword hijacks the
+// folder (e.g. "figma" → Design/UX). Keyed on the specific "business analyst"
+// phrasing so plain "…Analyst" developer titles (IT Analyst, Application
+// Developer Analyst) still fall through to the tech rules.
+const DESIGNATION_ROLES: [string, string[]][] = [
+  [
+    "Business Analyst",
+    ["business analyst", "business system analyst", "business systems analyst", "business technical analyst"],
+  ],
+];
+
+function roleFromDesignation(designation?: string): string | null {
+  const d = (designation ?? "").toLowerCase();
+  if (!d) return null;
+  for (const [cat, needles] of DESIGNATION_ROLES)
+    if (needles.some((n) => d.includes(n))) return cat;
+  return null;
+}
+
 export function categorizeResume(input: {
   skills?: string[];
   designation?: string;
   functionalArea?: string;
 }): string {
+  // Title-driven roles win over tool/skill keywords.
+  const byRole = roleFromDesignation(input.designation);
+  if (byRole) return byRole;
+
   const hay = [
     ...(input.skills ?? []),
     input.designation ?? "",
