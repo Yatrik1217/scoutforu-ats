@@ -44,7 +44,13 @@ export function TalentBankUploader() {
           break;
         }
         setLog((l) => [
-          { name: r.name || file.name, status: r.status, msg: r.category ? `→ ${r.category}` : r.message },
+          {
+            name: r.name || file.name,
+            status: r.status,
+            // Newly filed → show the folder it went to; duplicate/error → show
+            // the full message (which already names the folder for duplicates).
+            msg: r.status === "added" && r.category ? `→ ${r.category}` : r.message,
+          },
           ...l,
         ]);
         setTally((t) => ({

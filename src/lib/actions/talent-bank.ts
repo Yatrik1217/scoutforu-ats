@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseResume } from "@/lib/actions/parse-resume";
+import { parseResume, resumeStoragePath } from "@/lib/actions/parse-resume";
 import { createCandidate } from "@/lib/actions/mutations";
 import { categorizeResume } from "@/lib/talent-category";
 
@@ -22,28 +22,61 @@ export type DumpResult = {
 };
 
 export async function dumpResumeToTalentBank(formData: FormData): Promise<DumpResult> {
+  const sb = await createClient();
+
+  // ── FREE dedupe (before any API call) ─────────────────────────────────────
+  // Hash the exact file. If this same file is already filed, we know the person
+  // and their folder without spending a parse — so re-dumping the same resumes
+  // costs nothing.
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { status: "error", name: "", message: "No file uploaded." };
+  const buf = Buffer.from(await file.arrayBuffer());
+  const hashPath = resumeStoragePath(buf, file.name);
+  try {
+    const { data: sameFile } = await sb
+      .from("talent_bank")
+      .select("name,category")
+      .ilike("resume_url", `${hashPath.split(".")[0]}.%`)
+      .limit(1)
+      .maybeSingle();
+    if (sameFile)
+      return {
+        status: "duplicate",
+        name: sameFile.name,
+        category: sameFile.category,
+        message: `Already in Talent Bank · ${sameFile.category} folder — same file, not re-parsed (no charge)`,
+      };
+  } catch {
+    /* pre-check is best-effort — fall through to parse */
+  }
+
   const res = await parseResume(formData);
   if (!res.ok || !res.data)
     return { status: "error", name: "", message: res.error ?? "Parse failed", code: res.code };
   const d = res.data;
   if (!d.name.trim()) return { status: "error", name: "", message: "No name found in the resume" };
 
-  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();
 
-  // De-dupe within the Talent Bank by email or phone.
+  // Secondary dedupe by email or phone (same person, a different/edited file).
   const email = (d.email || "").trim().toLowerCase();
   const phone = (d.phone || "").replace(/\D/g, "").slice(-10);
   if (email || phone.length >= 7) {
-    const { data: existing } = await sb.from("talent_bank").select("id,email,phone");
+    const { data: existing } = await sb.from("talent_bank").select("name,email,phone,category");
     const dup = (existing ?? []).find(
       (t) =>
         (email && (t.email || "").toLowerCase() === email) ||
         (phone.length >= 7 && (t.phone || "").replace(/\D/g, "").slice(-10) === phone),
     );
-    if (dup) return { status: "duplicate", name: d.name, message: `${d.name} is already in the Talent Bank` };
+    if (dup)
+      return {
+        status: "duplicate",
+        name: d.name,
+        category: dup.category,
+        message: `Already in Talent Bank · ${dup.category} folder — same person (${email ? "email" : "phone"} match)`,
+      };
   }
 
   const category = categorizeResume({
