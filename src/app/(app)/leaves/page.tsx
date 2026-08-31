@@ -9,7 +9,7 @@ import {
   LeaveDecisionButtons,
   LeaveStatusBadge,
 } from "@/components/leave-manager";
-import { leaveBalances, onProbation, probationEndsOn } from "@/lib/hr";
+import { LeaveBalancesGrid } from "@/components/leave-balances";
 import { fyStartYear, fyRange } from "@/lib/incentive";
 import type { EmployeeRow, LeaveRequestRow, LeaveTypeRow } from "@/lib/database.types";
 
@@ -155,54 +155,23 @@ export default async function LeavesPage({
       <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
         <div className="text-[15px] font-extrabold">Balances · {range.label}</div>
         <div className="mb-3 text-[12px] font-medium text-[#8a94a6]">
-          Approved leave taken against each employee&apos;s annual quota
+          Approved leave taken against each employee&apos;s annual quota · click anyone for their
+          full timeline
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {employees
+        <LeaveBalancesGrid
+          employees={employees
             .filter((e) => e.status === "active")
-            .map((e) => {
-              const bal = leaveBalances(
-                types,
-                requests.filter((r) => r.employee_id === e.id),
-                range,
-              );
-              return (
-                <div key={e.id} className="rounded-[10px] border border-[#eef1f6] p-3.5">
-                  <div className="mb-2 flex items-center gap-2.5">
-                    <Avatar name={e.name} size={28} />
-                    <span className="text-[12.5px] font-bold text-[#16203a]">{e.name}</span>
-                    {onProbation(e) && (
-                      <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-bold text-[#b45309]">
-                        On probation till {probationEndsOn(e)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {bal.map((b) => (
-                      <div
-                        key={b.type.id}
-                        className="rounded-[8px] bg-[#f8fafc] px-2.5 py-1.5 text-[11px]"
-                        title={`${b.taken} taken of ${b.quota}`}
-                      >
-                        <span className="font-bold text-[#42506b]">{b.type.code}</span>{" "}
-                        <span className="tf-num font-extrabold text-[#16203a]">
-                          {b.type.paid ? b.remaining : b.taken}
-                        </span>
-                        <span className="text-[#a3acbd]">
-                          {b.type.paid ? ` / ${b.quota}` : " taken"}
-                        </span>
-                        {b.overQuota > 0 && (
-                          <span className="ml-1 font-bold text-[#dc2626]">
-                            +{b.overQuota} over
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
+            .map((e) => ({
+              id: e.id,
+              name: e.name,
+              designation: e.designation,
+              joined_on: e.joined_on,
+              probation_months: e.probation_months,
+            }))}
+          requests={requests}
+          types={types}
+          range={range}
+        />
       </div>
     </div>
   );

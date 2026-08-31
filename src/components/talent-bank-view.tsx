@@ -20,6 +20,8 @@ const CAT_COLOR: Record<string, string> = {
   "Data Science / AI": "#6366f1",
   "QA / Testing": "#14b8a6",
   "Sales / BDE": "#0ea5e9",
+  "Business Analyst": "#7c3aed",
+  "Solar / Renewable Energy": "#eab308",
 };
 const colorOf = (c: string) => CAT_COLOR[c] ?? "#64748b";
 
