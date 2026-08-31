@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, CheckCircle2, AlertTriangle, Copy } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertTriangle, Copy, CreditCard } from "lucide-react";
 import { dumpResumeToTalentBank } from "@/lib/actions/talent-bank";
 
 type Line = { name: string; status: "added" | "duplicate" | "error"; msg: string };
@@ -15,11 +15,15 @@ export function TalentBankUploader() {
   const [log, setLog] = useState<Line[]>([]);
   const [tally, setTally] = useState({ added: 0, dup: 0, err: 0 });
   const [drag, setDrag] = useState(false);
+  // A blocking, account-level problem (no API credits / bad key). When set we
+  // stop the batch instead of failing every remaining file the same way.
+  const [blocked, setBlocked] = useState<{ message: string; billing: boolean } | null>(null);
 
   const run = async (files: File[]) => {
     if (!files.length) return;
     setBusy(true);
     setLog([]);
+    setBlocked(null);
     setTally({ added: 0, dup: 0, err: 0 });
     setProgress({ done: 0, total: files.length });
     for (let i = 0; i < files.length; i++) {
@@ -28,6 +32,17 @@ export function TalentBankUploader() {
       fd.append("file", file);
       try {
         const r = await dumpResumeToTalentBank(fd);
+        // Account-level failure — no point trying the remaining files.
+        if (r.status === "error" && (r.code === "billing" || r.code === "auth" || r.code === "config")) {
+          setBlocked({ message: r.message, billing: r.code === "billing" });
+          const left = files.length - i;
+          setLog((l) => [
+            { name: file.name, status: "error", msg: `Stopped — ${left} not attempted` },
+            ...l,
+          ]);
+          setProgress({ done: i, total: files.length });
+          break;
+        }
         setLog((l) => [
           { name: r.name || file.name, status: r.status, msg: r.category ? `→ ${r.category}` : r.message },
           ...l,
@@ -54,6 +69,24 @@ export function TalentBankUploader() {
 
   return (
     <div>
+      {blocked && (
+        <div className="mb-3 flex items-start gap-3 rounded-xl border border-[#f3c4c4] bg-[#fef4f4] p-3.5">
+          <CreditCard size={18} className="mt-0.5 shrink-0 text-[#dc2626]" />
+          <div className="text-[12.5px] leading-relaxed text-[#8a2020]">
+            <div className="font-extrabold text-[#b91c1c]">
+              {blocked.billing ? "Resume parsing is paused — Anthropic API credits are empty" : "Resume parsing is unavailable"}
+            </div>
+            <div className="mt-0.5 font-medium">{blocked.message}</div>
+            {blocked.billing && (
+              <div className="mt-1.5 font-semibold text-[#7a2222]">
+                Open the Anthropic Console → <b>Plans &amp; Billing</b> → <b>Purchase credits</b> (about
+                ₹0.55 per resume, so ~$30 clears a 2,000-resume backlog). Then drop the files again —
+                already-filed and duplicate resumes are skipped for free.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div
         onDragOver={(e) => {
           e.preventDefault();

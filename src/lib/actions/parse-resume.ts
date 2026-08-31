@@ -12,11 +12,54 @@ type Result = {
   data?: ParsedResume;
   resumeUrl?: string;
   error?: string;
+  // A coarse machine code so the UI can react (e.g. halt a bulk dump and show a
+  // "top up credits" banner) instead of just printing a raw error string.
+  code?: "billing" | "auth" | "rate_limit" | "overloaded" | "config";
 };
+
+// Turn a raw Anthropic/SDK error into a plain-English message + a code the UI
+// can branch on. The raw API error for an empty balance is an ugly
+// `400 {"type":"error",..."credit balance is too low"...}` blob — never show
+// that to a recruiter.
+function classifyApiError(e: unknown): {
+  code?: Result["code"];
+  message: string;
+} {
+  const raw = e instanceof Error ? e.message : String(e);
+  const status = (e as { status?: number })?.status;
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("credit balance") ||
+    lower.includes("purchase credits") ||
+    lower.includes("plans & billing") ||
+    lower.includes("billing")
+  )
+    return {
+      code: "billing",
+      message:
+        "Anthropic API credits are exhausted — no resumes can be parsed until the balance is topped up. Add credits in the Anthropic Console → Plans & Billing, then re-run this dump.",
+    };
+  if (status === 401 || lower.includes("authentication") || lower.includes("x-api-key"))
+    return {
+      code: "auth",
+      message: "The resume-parsing API key is invalid or revoked. Check the ANTHROPIC_API_KEY setting.",
+    };
+  if (status === 429 || lower.includes("rate limit"))
+    return {
+      code: "rate_limit",
+      message: "Anthropic rate-limited the batch — wait a minute, then re-run the remaining resumes.",
+    };
+  if (status === 529 || lower.includes("overloaded"))
+    return {
+      code: "overloaded",
+      message: "Anthropic is temporarily overloaded — retry in a moment.",
+    };
+  return { message: "Resume parsing failed. " + raw.slice(0, 160) };
+}
 
 export async function parseResume(formData: FormData): Promise<Result> {
   if (!process.env.ANTHROPIC_API_KEY)
-    return { ok: false, error: "Resume parsing is not configured (missing API key)." };
+    return { ok: false, error: "Resume parsing is not configured (missing API key).", code: "config" };
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, error: "No file uploaded." };
@@ -78,9 +121,7 @@ export async function parseResume(formData: FormData): Promise<Result> {
 
     return { ok: true, data: parsed, resumeUrl };
   } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "Resume parsing failed.",
-    };
+    const { code, message } = classifyApiError(e);
+    return { ok: false, error: message, code };
   }
 }

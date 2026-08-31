@@ -16,11 +16,15 @@ export type DumpResult = {
   name: string;
   category?: string;
   message: string;
+  // Present on API-level failures so the uploader can halt the batch (e.g. no
+  // credits) instead of retrying every remaining file.
+  code?: "billing" | "auth" | "rate_limit" | "overloaded" | "config";
 };
 
 export async function dumpResumeToTalentBank(formData: FormData): Promise<DumpResult> {
   const res = await parseResume(formData);
-  if (!res.ok || !res.data) return { status: "error", name: "", message: res.error ?? "Parse failed" };
+  if (!res.ok || !res.data)
+    return { status: "error", name: "", message: res.error ?? "Parse failed", code: res.code };
   const d = res.data;
   if (!d.name.trim()) return { status: "error", name: "", message: "No name found in the resume" };
 
