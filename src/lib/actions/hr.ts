@@ -23,6 +23,7 @@ import {
 } from "@/lib/hr";
 import { buildClosureStatement, buildRecruiterStats, fyStartYear, fyRange } from "@/lib/incentive";
 import { placementBalance } from "@/lib/placement";
+import { getCrmPersonAttendance } from "@/lib/crm-attendance";
 import type {
   AttendanceRow,
   AttendanceStatus,
@@ -535,14 +536,31 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
     .select("id,status")
     .eq("period_month", period)
     .maybeSingle();
-  if (existing) return { ok: true, id: existing.id, message: "Opening the existing run" };
 
-  const { data: run, error } = await sb
-    .from("payroll_runs")
-    .insert({ period_month: period, created_by: me.id })
-    .select("id")
-    .single();
-  if (error || !run) return { ok: false, error: error?.message || "Could not create the run." };
+  // A finalised or paid run is opened untouched — never rebuild locked numbers.
+  if (existing && existing.status !== "draft")
+    return { ok: true, id: existing.id, message: "Opening the existing run" };
+
+  // Reuse the existing DRAFT run (so we can top it up with employees added since
+  // it was first created) or create a fresh one.
+  let runId = existing?.id ?? "";
+  if (!runId) {
+    const { data: run, error } = await sb
+      .from("payroll_runs")
+      .insert({ period_month: period, created_by: me.id })
+      .select("id")
+      .single();
+    if (error || !run) return { ok: false, error: error?.message || "Could not create the run." };
+    runId = run.id;
+  }
+
+  // Employees that already have a line in this run are left exactly as-is
+  // (preserves any manual adjustments); we only add missing ones.
+  const { data: existingLines } = await sb
+    .from("payroll_lines")
+    .select("employee_id")
+    .eq("run_id", runId);
+  const alreadyLined = new Set((existingLines ?? []).map((l) => l.employee_id));
 
   const monthEnd = toISODate(
     new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0),
@@ -593,19 +611,56 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
   const total = daysInMonth(period);
   const leaveTypes = (types ?? []) as LeaveTypeRow[];
 
-  const rows = ((emps ?? []) as EmployeeRow[]).map((e) => {
-    const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
-    const myAtt = attendance.filter((a) => a.employee_id === e.id);
-    const unmarked = unmarkedAbsentCount({
-      monthDays,
-      markedDates: new Set(myAtt.map((a) => a.on_date)),
-      leaveDates: approvedLeaveDates(mine, period),
-      offDates,
-      joinedOn: e.joined_on,
-      exitOn: e.exit_on,
-      todayISO,
-    });
-    const lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
+  // Only build lines for active employees that don't already have one.
+  const toBuild = ((emps ?? []) as EmployeeRow[]).filter((e) => !alreadyLined.has(e.id));
+  const rows = [];
+  for (const e of toBuild) {
+    let lop: number;
+    // A CRM-sourced employee (e.g. a salesperson who checks in from the CRM)
+    // has no ATS attendance rows, so read their month from the CRM bridge and
+    // dock only real Absent / Half-day days. Falls back to the ATS calculation
+    // if the CRM blob can't be read.
+    let crmLop: number | null = null;
+    if (e.attendance_source === "crm" && e.crm_user_id) {
+      const crm = await getCrmPersonAttendance(e.crm_user_id, monthDays, todayISO);
+      if (crm) {
+        let l = 0;
+        for (const d of monthDays) {
+          if (e.joined_on && d < e.joined_on) continue;
+          if (e.exit_on && d > e.exit_on) continue;
+          if (d > todayISO) continue;
+          const st = crm.statuses[d];
+          if (st === "absent") l += 1;
+          else if (st === "half_day") l += 0.5;
+        }
+        crmLop = round2(l);
+      }
+    }
+    if (crmLop !== null) {
+      lop = crmLop;
+    } else {
+      const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
+      const myAtt = attendance.filter((a) => a.employee_id === e.id);
+      const unmarked = unmarkedAbsentCount({
+        monthDays,
+        markedDates: new Set(myAtt.map((a) => a.on_date)),
+        leaveDates: approvedLeaveDates(mine, period),
+        offDates,
+        joinedOn: e.joined_on,
+        exitOn: e.exit_on,
+        todayISO,
+      });
+      lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
+    }
+    // Prorate a mid-month joiner/leaver: working days in the month when the
+    // person wasn't employed are unpaid. (Only new lines run this — existing
+    // lines are never recomputed — so no current employee's pay changes.)
+    let notEmployed = 0;
+    for (const d of monthDays) {
+      if (offDates.has(d)) continue;
+      if ((e.joined_on && d < e.joined_on) || (e.exit_on && d > e.exit_on)) notEmployed++;
+    }
+    lop = round2(lop + notEmployed);
     const incentive = e.profile_id
       ? incentiveDue({
           earnedThisFY: earned.get(e.profile_id) ?? 0,
@@ -620,8 +675,8 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
       additions: [],
       deductions: [],
     });
-    return {
-      run_id: run.id,
+    rows.push({
+      run_id: runId,
       employee_id: e.id,
       monthly_gross: e.monthly_gross,
       total_days: total,
@@ -631,15 +686,20 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
       additions: [],
       deductions: [],
       net_pay: calc.net,
-    };
-  });
+    });
+  }
 
   if (rows.length) {
     const { error: lineErr } = await sb.from("payroll_lines").insert(rows);
     if (lineErr) return { ok: false, error: lineErr.message };
   }
   refresh();
-  return { ok: true, id: run.id, message: `${monthLabel(period)} payroll created` };
+  const msg = existing
+    ? rows.length
+      ? `Synced — added ${rows.length} employee${rows.length === 1 ? "" : "s"}`
+      : "All employees already in this run"
+    : `${monthLabel(period)} payroll created`;
+  return { ok: true, id: runId, message: msg };
 }
 
 export async function updatePayrollLine(

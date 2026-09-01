@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { X, Save, Plus, Trash2, Lock, Unlock, BadgeIndianRupee, Download } from "lucide-react";
+import { X, Save, Plus, Trash2, Lock, Unlock, BadgeIndianRupee, Download, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { updatePayrollLine, setPayrollStatus, createPayrollRun } from "@/lib/actions/hr";
 import { NumberInput } from "@/components/number-input";
@@ -61,8 +61,24 @@ export function PayrollActions({ run }: { run: PayrollRunRow }) {
   const ghost =
     "flex items-center gap-2 rounded-[10px] border border-[#e6eaf1] bg-white px-4 py-2.5 text-[13px] font-bold text-[#42506b] hover:bg-[#f6f8fb] disabled:opacity-60";
 
+  // Top up a draft run with any employees added after it was created (e.g. a
+  // new hire, or a CRM-linked salesperson). Existing lines are never touched.
+  const sync = () =>
+    start(async () => {
+      const res = await createPayrollRun(run.period_month);
+      if (res.ok) {
+        toast.success(res.message || "Synced");
+        router.refresh();
+      } else toast.error(res.error || "Failed");
+    });
+
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {run.status === "draft" && (
+        <button onClick={sync} disabled={pending} className={ghost} title="Add any employees missing from this run">
+          <RefreshCw size={14} /> Sync employees
+        </button>
+      )}
       {run.status === "draft" && (
         <button onClick={() => act("finalised")} disabled={pending} className={ghost}>
           <Lock size={14} /> Finalise
