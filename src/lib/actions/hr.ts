@@ -630,7 +630,9 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
           if (e.exit_on && d > e.exit_on) continue;
           if (d > todayISO) continue;
           const st = crm.statuses[d];
-          if (st === "absent") l += 1;
+          // Absent = full loss of pay; leave for a CRM salesperson defaults to
+          // LWP (unpaid) — a paid-leave case can be adjusted on the line.
+          if (st === "absent" || st === "leave") l += 1;
           else if (st === "half_day") l += 0.5;
         }
         crmLop = round2(l);
@@ -652,12 +654,12 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
       });
       lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
     }
-    // Prorate a mid-month joiner/leaver: working days in the month when the
-    // person wasn't employed are unpaid. (Only new lines run this — existing
-    // lines are never recomputed — so no current employee's pay changes.)
+    // Prorate a mid-month joiner/leaver by CALENDAR days: every day in the month
+    // before they joined (or after they left) is unpaid — including weekly-offs,
+    // since salary is gross ÷ days-in-month and they weren't employed those days.
+    // (Only new lines run this — existing lines are never recomputed.)
     let notEmployed = 0;
     for (const d of monthDays) {
-      if (offDates.has(d)) continue;
       if ((e.joined_on && d < e.joined_on) || (e.exit_on && d > e.exit_on)) notEmployed++;
     }
     lop = round2(lop + notEmployed);
