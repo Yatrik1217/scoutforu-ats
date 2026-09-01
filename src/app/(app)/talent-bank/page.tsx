@@ -7,16 +7,37 @@ import type { TalentBankRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
+type SB = Awaited<ReturnType<typeof createClient>>;
+
+// Supabase/PostgREST returns at most 1000 rows per request, so once the bank
+// grows past 1000 a plain select silently drops the rest (and the newest-first
+// order means the OLDEST resumes vanish first, shrinking older folders like
+// .NET). Page through every row so the counts and folders are always complete.
+async function loadAllTalent(sb: SB): Promise<TalentBankRow[]> {
+  const PAGE = 1000;
+  const all: TalentBankRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("talent_bank")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    all.push(...(data as TalentBankRow[]));
+    if (data.length < PAGE) break;
+  }
+  return all;
+}
+
 export default async function TalentBankPage() {
   const me = await requireProfile();
   if (me.role === "client") redirect("/overview");
 
   const sb = await createClient();
-  const [{ data: rows }, { data: jobs }] = await Promise.all([
-    sb.from("talent_bank").select("*").order("created_at", { ascending: false }),
+  const [bank, { data: jobs }] = await Promise.all([
+    loadAllTalent(sb),
     sb.from("jobs").select("id,title").in("status", ["open", "hot"]).order("title"),
   ]);
-  const bank = (rows ?? []) as TalentBankRow[];
   const jobList = (jobs ?? []) as { id: string; title: string }[];
 
   return (
