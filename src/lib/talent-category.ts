@@ -101,7 +101,7 @@ const TITLE_ROLES: [string, string[]][] = [
       "react.js developer", "angular developer", "ui developer", "mern stack", "mern developer", "vue developer"],
   ],
   ["Node.js / Backend JS", ["node developer", "node.js developer", "nodejs developer"]],
-  ["Networking", ["network engineer", "network administrator", "noc engineer"]],
+  ["Networking", ["network engineer", "network administrator", "noc engineer", "network support", "network & system"]],
   ["Security", ["security engineer", "cyber security", "cybersecurity", "information security", "soc analyst"]],
   [
     "IT Support",
@@ -114,13 +114,18 @@ const TITLE_ROLES: [string, string[]][] = [
       "tax accountant", "smsf", "bookkeeper", "book keeper", "billing", "company secretary", "auditor",
       "finance executive", "finance manager", "financial analyst", "accounts payable", "accounts receivable"],
   ],
-  ["HR", ["hr executive", "hr manager", "human resource", "recruiter", "talent acquisition", "hr business partner"]],
+  ["HR", ["hr executive", "hr manager", "human resource", "recruiter", "recruitment", "talent acquisition", "hr business partner"]],
   [
     "Sales / BDE",
     ["sales executive", "sales manager", "business development manager", "business development executive",
-      "business development", " bde", "inside sales", "pre-sales", "presales"],
+      "business development", " bde", "inside sales", "pre-sales", "presales", "head of sales", "export manager"],
   ],
-  ["Marketing", ["marketing executive", "digital marketing", "marketing manager", "seo executive", "content writer"]],
+  [
+    "Marketing",
+    ["marketing executive", "digital marketing", "marketing manager", "seo executive", "seo specialist",
+      "seo analyst", "seo ", "smo", "ppc", "social media", "brand manager", "growth marketer",
+      "performance marketing", "content writer", "content strategist"],
+  ],
   ["Customer Success", ["customer success", "customer support executive", "client success"]],
 ];
 
@@ -146,7 +151,6 @@ const RULES: [string, string[]][] = [
   // Programming languages / stacks — a developer's language beats an incidental
   // infra tool (AWS/Kubernetes), so these come before the infra/data rules.
   [".NET", [".net", "dotnet", "c#", "asp.net", "asp net", "vb.net", "blazor", "wpf", "wcf"]],
-  ["PL-SQL / Oracle", ["pl/sql", "plsql", "pl sql", "oracle apex", "oracle forms", "oracle developer", "d2k"]],
   ["Salesforce", ["salesforce", "apex trigger", "visualforce", "lightning web component"]],
   ["Mobile", ["android", "flutter", "react native", "kotlin", "swift", "objective-c"]],
   ["Java", ["core java", "advance java", "spring boot", "spring framework", "spring mvc", "hibernate", "j2ee", "jsp ", "servlet", "struts"]],
@@ -167,6 +171,7 @@ const RULES: [string, string[]][] = [
   ["Business Analyst", ["business analysis", "requirement gathering", "requirements gathering", "brd", "frd", "srs documentation", "user stories", "requirement elicitation", "gap analysis"]],
   // Data / infra buckets last — weakest role signal.
   ["Data Engineering", ["etl", "ssis", "data warehouse"]],
+  ["PL-SQL / Oracle", ["pl/sql", "plsql", "pl sql", "oracle apex", "oracle forms", "oracle developer", "d2k"]],
   ["Database / SQL", ["t-sql", "pl/pgsql", "ssrs", "database administration", "sql server", "mysql", "postgresql", "stored procedures", "query optimization"]],
   [
     "DevOps / Cloud",
@@ -174,9 +179,9 @@ const RULES: [string, string[]][] = [
       " sre", "cloudformation", "helm", "argocd", "openshift", "jenkins", "gitlab ci"],
   ],
   ["QA / Testing", ["selenium", "test automation", "automation testing", "manual testing", "sdet", "cypress", "appium", "quality assurance"]],
-  ["HR", ["recruiter", "talent acquisition", "human resources"]],
+  ["HR", ["recruiter", "recruitment", "talent acquisition", "human resources"]],
   ["Sales / BDE", ["business development", "inside sales", "field sales", "lead generation", "b2b sales"]],
-  ["Marketing", ["digital marketing", "content marketing", "social media marketing"]],
+  ["Marketing", ["digital marketing", "content marketing", "social media", "seo ", "smo", "ppc", "brand management", "performance marketing"]],
   ["Support / Ops", ["customer support", "technical support", "help desk", "bpo", "customer service"]],
 ];
 
