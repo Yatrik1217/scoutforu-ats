@@ -629,6 +629,10 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
           if (e.joined_on && d < e.joined_on) continue;
           if (e.exit_on && d > e.exit_on) continue;
           if (d > todayISO) continue;
+          // Company holidays + weekly-offs (from the ATS holiday list) are paid,
+          // even if the CRM's own config hasn't got them — the ATS list is the
+          // single source of truth for payroll.
+          if (offDates.has(d)) continue;
           const st = crm.statuses[d];
           // Absent = full loss of pay; leave for a CRM salesperson defaults to
           // LWP (unpaid) — a paid-leave case can be adjusted on the line.
