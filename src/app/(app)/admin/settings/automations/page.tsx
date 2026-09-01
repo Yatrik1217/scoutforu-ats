@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { loadWorkspace } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { STAGES } from "@/lib/domain";
+import { STAGES, AUTO_EMAIL_MASTER } from "@/lib/domain";
 import { AutomationsManager } from "@/components/automations-manager";
 
 export default async function AutomationsPage() {
@@ -14,11 +14,14 @@ export default async function AutomationsPage() {
     sb.from("stage_email_rules").select("stage,template_id,enabled"),
   ]);
 
+  const masterOn = (rules ?? []).some((r) => r.stage === AUTO_EMAIL_MASTER && r.enabled);
+
   return (
     <AutomationsManager
       stages={STAGES.map((s) => ({ key: s.key, slug: s.slug, color: s.color }))}
       templates={templates ?? []}
-      rules={rules ?? []}
+      rules={(rules ?? []).filter((r) => r.stage !== AUTO_EMAIL_MASTER)}
+      masterOn={masterOn}
     />
   );
 }

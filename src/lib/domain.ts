@@ -397,3 +397,8 @@ export const SOURCE_COLOR: Record<string, string> = {
   "Career Site": "#8b5cf6",
   Agency: "#06b6d4",
 };
+
+// Sentinel "stage" key used as the master ON/OFF switch for candidate stage
+// auto-emails (stored as a row in stage_email_rules; never a real pipeline
+// stage). A missing/false row means auto-emails are OFF.
+export const AUTO_EMAIL_MASTER = "__auto_email__";

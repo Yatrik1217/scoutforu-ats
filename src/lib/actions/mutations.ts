@@ -10,6 +10,7 @@ import {
   stageToSlug,
   stageFromSlug,
   nextStage,
+  AUTO_EMAIL_MASTER,
   type StageKey,
 } from "@/lib/domain";
 import type {
@@ -116,6 +117,17 @@ async function sendStageAutoEmail(
   toSlug: string,
 ): Promise<void> {
   try {
+    // Master switch — stage auto-emails to candidates are OFF unless the admin
+    // has explicitly turned them on (Settings → Action Triggers). A missing row
+    // means OFF. Calendar-invite emails are a separate, explicit flow and are
+    // never gated by this.
+    const { data: master } = await sb
+      .from("stage_email_rules")
+      .select("enabled")
+      .eq("stage", AUTO_EMAIL_MASTER)
+      .maybeSingle();
+    if (!master?.enabled) return;
+
     const { data: rule } = await sb
       .from("stage_email_rules")
       .select("template_id,enabled")
