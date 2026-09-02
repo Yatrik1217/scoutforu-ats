@@ -52,10 +52,6 @@ export function buildPayslipPdf(opts: {
     pdf.text(contact, textX, y, { size: 9, color: MUTED });
     y += 12;
   }
-  if (org?.gst) {
-    pdf.text(`GSTIN: ${org.gst}`, textX, y, { size: 9, color: MUTED });
-    y += 12;
-  }
   y += 10;
   pdf.line(M, y, right, y, LINE, 1);
   y += 22;
