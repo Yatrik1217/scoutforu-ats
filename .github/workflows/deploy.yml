@@ -8,6 +8,13 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+# Only ONE deploy at a time. A second push waits for the running one to finish
+# instead of overlapping (concurrent git-reset + build + reload on the same
+# directory was corrupting builds and leaving the app un-restarted).
+concurrency:
+  group: deploy-ats-vps
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,16 +25,34 @@ jobs:
           host: 200.141.9.192
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: "15m"
+          command_timeout: "20m"
           script: |
-            set -e
-            cd /opt/scoutforu-ats
-            # Hard-reset to origin instead of `git pull --ff-only`: `npm install`
-            # rewrites package-lock.json each run, leaving the tree dirty, which
-            # made the next fast-forward pull abort. Resetting is self-healing.
-            git fetch origin main
-            git reset --hard origin/main
-            npm install
-            npm run build
-            pm2 reload ats
-            echo "ATS deployed."
+            set -euo pipefail
+            # Serialize on the server too: even if two runs overlap, the second
+            # waits for the file lock rather than building on top of the first.
+            (
+              flock -x -w 1000 200 || { echo "another deploy holds the lock — aborting"; exit 1; }
+
+              cd /opt/scoutforu-ats
+              # Hard-reset instead of `git pull --ff-only`: npm install rewrites
+              # package-lock.json, leaving the tree dirty and aborting a pull.
+              # Resetting is self-healing.
+              git fetch origin main
+              git reset --hard origin/main
+              TARGET=$(git rev-parse --short HEAD)
+              echo "== deploying $TARGET =="
+
+              npm install --no-audit --no-fund
+              npm run build
+
+              # reload picks up the fresh build; if the process is missing (e.g.
+              # after a reboot) start it so a deploy is always self-healing.
+              pm2 reload ats --update-env || pm2 start npm --name ats -- start
+              pm2 save
+
+              # Fail loudly if the app didn't come back online, so a broken deploy
+              # shows red instead of silently serving the old build.
+              sleep 3
+              pm2 describe ats | grep -q "status.*online" || { echo "ats is NOT online after reload"; exit 1; }
+              echo "== ATS live at $TARGET =="
+            ) 200>/opt/scoutforu-ats/.deploy.lock
