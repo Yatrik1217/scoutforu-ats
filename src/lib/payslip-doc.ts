@@ -27,29 +27,35 @@ export function buildPayslipPdf(opts: {
   const right = A4.w - M;
   const logo = opts.logoBytes ? pdf.addImage(opts.logoBytes) : null;
 
-  let y = 64;
-  let textX = M;
-  if (logo) {
-    const lh = 34;
-    const lw = Math.min(120, (logo.width / logo.height) * lh);
-    pdf.drawImage(logo.idx, M, y - 24, lw, lh);
-    textX = M + lw + 14;
-  }
-  pdf.text(org?.name || "ScoutforU", textX, y, { size: 18, font: "bold", color: NAVY });
-  pdf.text("PAYSLIP", right, y, { size: 16, font: "bold", color: BLUE, align: "right" });
-  y += 14;
-  const addr = orgAddressLine(org?.address, org?.city);
-  if (addr) pdf.text(addr, textX, y, { size: 9, color: MUTED });
-  pdf.text(monthLabel(run.period_month), right, y, {
+  // PAYSLIP + month sit top-right, aligned with the top of the header.
+  pdf.text("PAYSLIP", right, 64, { size: 16, font: "bold", color: BLUE, align: "right" });
+  pdf.text(monthLabel(run.period_month), right, 80, {
     size: 10.5,
     font: "bold",
     color: NAVY,
     align: "right",
   });
-  y += 12;
+
+  // Logo on top, company name + details stacked BELOW it, all left-aligned.
+  let y = 52;
+  if (logo) {
+    const lh = 42;
+    const lw = Math.min(170, (logo.width / logo.height) * lh);
+    pdf.drawImage(logo.idx, M, y, lw, lh);
+    y += lh + 14;
+  } else {
+    y = 66;
+  }
+  pdf.text(org?.name || "ScoutforU", M, y, { size: 18, font: "bold", color: NAVY });
+  y += 15;
+  const addr = orgAddressLine(org?.address, org?.city);
+  if (addr) {
+    pdf.text(addr, M, y, { size: 9, color: MUTED });
+    y += 12;
+  }
   const contact = [org?.phone, org?.email, org?.website].filter(Boolean).join("  |  ");
   if (contact) {
-    pdf.text(contact, textX, y, { size: 9, color: MUTED });
+    pdf.text(contact, M, y, { size: 9, color: MUTED });
     y += 12;
   }
   y += 10;
