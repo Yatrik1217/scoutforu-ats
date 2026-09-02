@@ -47,9 +47,13 @@ export function buildPayslipPdf(opts: {
     align: "right",
   });
   y += 12;
-  const contact = [org?.phone, org?.email].filter(Boolean).join("  |  ");
+  const contact = [org?.phone, org?.email, org?.website].filter(Boolean).join("  |  ");
   if (contact) {
     pdf.text(contact, textX, y, { size: 9, color: MUTED });
+    y += 12;
+  }
+  if (org?.gst) {
+    pdf.text(`GSTIN: ${org.gst}`, textX, y, { size: 9, color: MUTED });
     y += 12;
   }
   y += 10;
@@ -73,15 +77,35 @@ export function buildPayslipPdf(opts: {
     pair("UAN", employee.uan || "—", col2, y);
     y += 30;
   }
-  pair(
-    "PAID DAYS",
-    `${Math.max(0, line.total_days - line.lop_days)} of ${line.total_days}`,
-    M,
-    y,
-  );
-  if (employee.bank_account)
-    pair("BANK A/C", `${employee.bank_account}${employee.bank_ifsc ? ` · ${employee.bank_ifsc}` : ""}`, col2, y);
-  y += 34;
+  if (employee.bank_account) {
+    pair("BANK A/C", `${employee.bank_account}${employee.bank_ifsc ? ` · ${employee.bank_ifsc}` : ""}`, M, y);
+    y += 30;
+  }
+
+  // Attendance & pay-basis strip — shows exactly how the month was prorated:
+  // monthly gross, total days, days actually paid, and loss-of-pay (LWP) days.
+  const paidDays = Math.max(0, Math.round((line.total_days - line.lop_days) * 100) / 100);
+  const cells: [string, string][] = [
+    ["MONTHLY GROSS", money(line.monthly_gross)],
+    ["TOTAL DAYS", String(line.total_days)],
+    ["PAID DAYS", String(paidDays)],
+    ["LOSS OF PAY (LWP)", String(line.lop_days)],
+  ];
+  const stripW = right - M + 12;
+  const stripH = 42;
+  pdf.rect(M - 6, y - 10, stripW, stripH, "#f6f8fb");
+  const cw = stripW / cells.length;
+  cells.forEach(([lbl, val], i) => {
+    const cx = M - 6 + cw * i + 12;
+    if (i > 0) pdf.line(M - 6 + cw * i, y - 6, M - 6 + cw * i, y + stripH - 16, LINE, 0.6);
+    pdf.text(lbl, cx, y + 2, { size: 7, color: MUTED });
+    pdf.text(val, cx, y + 18, {
+      size: 12.5,
+      font: "bold",
+      color: i === 3 && line.lop_days > 0 ? "#dc2626" : NAVY,
+    });
+  });
+  y += stripH + 16;
 
   // earnings / deductions table
   const midX = M + (right - M) / 2;
@@ -92,7 +116,9 @@ export function buildPayslipPdf(opts: {
   pdf.text("AMOUNT", right, y + 3, { size: 8.5, font: "bold", color: "#ffffff", align: "right" });
   y += 24;
 
-  const earnings: [string, number][] = [["Basic / Gross (earned)", line.earned_gross]];
+  const earnings: [string, number][] = [
+    [`Earned gross (${paidDays}/${line.total_days} days)`, line.earned_gross],
+  ];
   if (line.incentive > 0) earnings.push(["Incentive", line.incentive]);
   for (const a of line.additions ?? []) earnings.push([a.label || "Addition", a.amount]);
   const deductions: [string, number][] = (line.deductions ?? []).map((d) => [
@@ -147,7 +173,7 @@ export function buildPayslipPdf(opts: {
   if (line.lop_days > 0) {
     y += 8;
     pdf.text(
-      `Loss of pay: ${line.lop_days} day(s) — salary prorated for the month.`,
+      `Salary prorated: paid for ${paidDays} of ${line.total_days} days · ${line.lop_days} day(s) loss of pay (unpaid / LWP).`,
       M,
       y,
       { size: 8.5, color: MUTED },
