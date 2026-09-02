@@ -27,38 +27,29 @@ export function buildPayslipPdf(opts: {
   const right = A4.w - M;
   const logo = opts.logoBytes ? pdf.addImage(opts.logoBytes) : null;
 
-  // PAYSLIP + month sit top-right, aligned with the top of the header.
-  pdf.text("PAYSLIP", right, 64, { size: 16, font: "bold", color: BLUE, align: "right" });
-  pdf.text(monthLabel(run.period_month), right, 80, {
-    size: 10.5,
-    font: "bold",
-    color: NAVY,
-    align: "right",
-  });
-
-  // Logo on top, company name + details stacked BELOW it, all left-aligned.
-  let y = 52;
+  // Small logo top-left; company details right-aligned in the top-right corner.
+  const topY = 56;
+  let logoBottom = topY;
   if (logo) {
-    const lh = 42;
-    const lw = Math.min(170, (logo.width / logo.height) * lh);
-    pdf.drawImage(logo.idx, M, y, lw, lh);
-    y += lh + 14;
-  } else {
-    y = 66;
+    const lh = 30;
+    const lw = Math.min(130, (logo.width / logo.height) * lh);
+    pdf.drawImage(logo.idx, M, topY, lw, lh);
+    logoBottom = topY + lh;
   }
-  pdf.text(org?.name || "ScoutforU", M, y, { size: 18, font: "bold", color: NAVY });
-  y += 15;
+  let ry = topY + 2;
+  pdf.text(org?.name || "ScoutforU", right, ry, { size: 15, font: "bold", color: NAVY, align: "right" });
+  ry += 14;
   const addr = orgAddressLine(org?.address, org?.city);
   if (addr) {
-    pdf.text(addr, M, y, { size: 9, color: MUTED });
-    y += 12;
+    pdf.text(addr, right, ry, { size: 8.5, color: MUTED, align: "right" });
+    ry += 11;
   }
   const contact = [org?.phone, org?.email, org?.website].filter(Boolean).join("  |  ");
   if (contact) {
-    pdf.text(contact, M, y, { size: 9, color: MUTED });
-    y += 12;
+    pdf.text(contact, right, ry, { size: 8.5, color: MUTED, align: "right" });
+    ry += 11;
   }
-  y += 10;
+  let y = Math.max(logoBottom, ry) + 14;
   pdf.line(M, y, right, y, LINE, 1);
   y += 22;
 
@@ -107,7 +98,16 @@ export function buildPayslipPdf(opts: {
       color: i === 3 && line.lop_days > 0 ? "#dc2626" : NAVY,
     });
   });
-  y += stripH + 16;
+  y += stripH + 20;
+
+  // Centered document title, just above the earnings structure table.
+  pdf.text(`PAYSLIP · ${monthLabel(run.period_month).toUpperCase()}`, (M + right) / 2, y, {
+    size: 13,
+    font: "bold",
+    color: BLUE,
+    align: "center",
+  });
+  y += 22;
 
   // earnings / deductions table
   const midX = M + (right - M) / 2;
