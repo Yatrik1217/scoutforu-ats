@@ -642,8 +642,13 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
         crmLop = round2(l);
       }
     }
-    if (crmLop !== null) {
-      lop = crmLop;
+    if (e.attendance_source === "crm" && e.crm_user_id) {
+      // CRM employee: use the CRM loss-of-pay. If the CRM blob couldn't be read
+      // (crmLop null) do NOT fall back to the ATS calc — they have no ATS
+      // attendance, so it would wrongly dock the whole month. Default to no
+      // in-month LOP (mid-month proration below still applies); the admin can
+      // adjust the line if a real absence is missed.
+      lop = crmLop ?? 0;
     } else {
       const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
       const myAtt = attendance.filter((a) => a.employee_id === e.id);

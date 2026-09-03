@@ -350,9 +350,18 @@ export function AttendanceGrid({
                 </td>
                 {days.map((d) => {
                   const s = c.statuses[d] ?? null;
-                  const meta = s ? ATTENDANCE_META[s] : null;
-                  const isHoliday = !meta && holidaySet.has(d);
-                  const isOff = !meta && !isHoliday && offSet.has(d);
+                  // A company holiday / weekly-off (from the ATS list) is a
+                  // non-working day — it must win over the CRM's auto-"absent"
+                  // (the person wasn't due in). A real Present / Half / Leave the
+                  // person actually logged still shows.
+                  const crmMeta =
+                    s === "present" || s === "half_day" || s === "leave"
+                      ? ATTENDANCE_META[s]
+                      : null;
+                  const isHoliday = !crmMeta && holidaySet.has(d);
+                  const isOff = !crmMeta && !isHoliday && offSet.has(d);
+                  const meta =
+                    crmMeta || (!isHoliday && !isOff && s === "absent" ? ATTENDANCE_META.absent : null);
                   const cellStyle = meta
                     ? { background: meta.color, color: "#fff" }
                     : isHoliday
