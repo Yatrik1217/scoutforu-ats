@@ -93,6 +93,16 @@ export default async function AttendancePage({
   // Register too. Display-only — never feeds ATS payroll / loss-of-pay.
   const crmRows = await getCrmSalespeopleAttendance(days, todayISO);
 
+  // A CRM-linked employee (attendance_source 'crm', e.g. Sweta) checks in from
+  // the CRM, so she has no ATS attendance rows — in the editable ATS grid she'd
+  // wrongly show as auto-absent while the CRM section shows her real Present.
+  // Represent her ONCE, from the CRM (the source of truth for her attendance):
+  // keep her out of the main list whenever she already appears in the CRM rows.
+  const crmUserIds = new Set(crmRows.map((c) => String(c.id)));
+  const atsEmployees = employees.filter(
+    (e) => !(e.attendance_source === "crm" && e.crm_user_id && crmUserIds.has(String(e.crm_user_id))),
+  );
+
   // Shared column template for the summary table (adds First in / Last out).
   const sumCols =
     "grid-cols-[1.1fr_58px_46px_46px_50px_52px_78px_78px_74px_74px_74px_86px]";
@@ -142,7 +152,7 @@ export default async function AttendancePage({
       </div>
 
       <AttendanceGrid
-        employees={employees}
+        employees={atsEmployees}
         rows={rows}
         days={days}
         month={monthLabel(period)}
@@ -169,7 +179,7 @@ export default async function AttendancePage({
           <div className="text-right">Break</div>
           <div className="text-right">Loss of pay</div>
         </div>
-        {employees.map((e) => {
+        {atsEmployees.map((e) => {
           const mine = rows.filter((r) => r.employee_id === e.id);
           const s = attendanceSummary(mine);
           // Past working days never marked (and not on approved leave) count as
