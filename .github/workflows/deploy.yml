@@ -43,7 +43,9 @@ jobs:
               echo "== deploying $TARGET =="
 
               npm install --no-audit --no-fund
-              npm run build
+              # Retry once — the Next build occasionally flakes on the runner;
+              # a second attempt clears a transient failure instead of aborting.
+              npm run build || { echo "build failed, retrying once…"; rm -rf .next; npm run build; }
 
               # reload picks up the fresh build; if the process is missing (e.g.
               # after a reboot) start it so a deploy is always self-healing.
