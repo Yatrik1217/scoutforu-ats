@@ -495,7 +495,9 @@ function jobPayload(form: ReqForm) {
 }
 
 // Replace the set of recruiters assigned to a job. The lead (recruiterId) is
-// always included. Delete-then-insert keeps it simple and idempotent.
+// always included. Delete-then-insert keeps it simple and idempotent. Any
+// recruiter NEWLY added (not already on the job) is emailed that they've been
+// assigned — best-effort, so a mail hiccup never blocks the save.
 async function syncJobRecruiters(
   sb: Awaited<ReturnType<typeof createClient>>,
   jobId: string,
@@ -504,9 +506,68 @@ async function syncJobRecruiters(
   const ids = Array.from(
     new Set([form.recruiterId, ...(form.recruiterIds ?? [])].filter(Boolean)),
   ) as string[];
+  const { data: existing } = await sb
+    .from("job_recruiters")
+    .select("recruiter_id")
+    .eq("job_id", jobId);
+  const before = new Set((existing ?? []).map((r) => String(r.recruiter_id)));
   await sb.from("job_recruiters").delete().eq("job_id", jobId);
   if (ids.length)
     await sb.from("job_recruiters").insert(ids.map((rid) => ({ job_id: jobId, recruiter_id: rid })));
+  const added = ids.filter((id) => !before.has(String(id)));
+  if (added.length) await notifyJobAssignment(sb, jobId, added);
+}
+
+// Email each newly-assigned recruiter that they've been put on a job. Never
+// throws — assignment must succeed even if the mailbox is down.
+async function notifyJobAssignment(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  recruiterIds: string[],
+): Promise<void> {
+  try {
+    if (!emailConfigured() || !recruiterIds.length) return;
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    const actingId = String(user?.id ?? "");
+    const [{ data: job }, { data: profs }, { data: org }] = await Promise.all([
+      sb.from("jobs").select("title,client_id,location").eq("id", jobId).maybeSingle(),
+      sb.from("profiles").select("id,name,email,active").in("id", recruiterIds),
+      sb.from("organization").select("name").maybeSingle(),
+    ]);
+    if (!job) return;
+    let client = "";
+    if (job.client_id) {
+      const { data: c } = await sb.from("clients").select("name").eq("id", job.client_id).maybeSingle();
+      client = c?.name ?? "";
+    }
+    const orgName = org?.name || "ScoutforU";
+    const title = job.title || "an opening";
+    const esc = (s: string) =>
+      String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] ?? c);
+    for (const p of profs ?? []) {
+      if (!p.email || p.active === false || String(p.id) === actingId) continue;
+      const first = (p.name || "").trim().split(/\s+/)[0] || "there";
+      const body = `Hi ${first},
+
+You've been assigned to a new opening:
+
+  ${title}${client ? ` — ${client}` : ""}${job.location ? ` · ${job.location}` : ""}
+
+Log in to the ATS to view the requirement and start sourcing candidates.
+
+— ${orgName}`;
+      await sendMail({
+        to: p.email,
+        subject: `You're assigned: ${title}`,
+        html: `<div style="font:14px/1.65 Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">${esc(body)}</div>`,
+        text: body,
+      }).catch(() => {});
+    }
+  } catch {
+    /* best-effort — never block the assignment */
+  }
 }
 
 export async function createRequisition(form: ReqForm): Promise<Result> {
