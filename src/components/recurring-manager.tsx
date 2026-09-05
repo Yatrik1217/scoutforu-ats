@@ -237,7 +237,7 @@ function RecurringModal({
               <input
                 value={f.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="e.g. Acme monthly retainer"
+                placeholder="e.g. monthly retainer"
                 className={input + " mt-1 font-normal"}
               />
             </label>

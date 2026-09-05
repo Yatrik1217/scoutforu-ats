@@ -85,11 +85,11 @@ const RECRUITERS = [
   { email: "shivani.meena@scoutforu.com", name: "Shivani Meena", color: "#8b5cf6" },
 ];
 const CLIENT_USER = {
-  email: "hr@acme.com",
-  name: "Acme Corp Portal",
+  email: "hr@democlient.example",
+  name: "Demo Client Portal",
   role: "client",
   color: "#f59e0b",
-  clientName: "Acme Corp",
+  clientName: "Demo Client",
 };
 
 // The prototype dataset references four demo recruiters; remap their work onto
@@ -103,20 +103,20 @@ const REMAP = {
 const recName = (name) => REMAP[name] ?? name;
 
 const CLIENTS = [
-  { name: "Acme Corp", status: "Active", contact_email: "hr@acme.com" },
+  { name: "Demo Client", status: "Active", contact_email: "hr@democlient.example" },
   { name: "Nimbus Tech", status: "Active", contact_email: "talent@nimbus.tech" },
   { name: "Internal", status: "Active", contact_email: "internal@scoutforu.in" },
 ];
 
 const JOBS = [
-  ["J1", "Senior Frontend Engineer", "Engineering", "Bangalore", "full_time", 4, "Acme Corp", "Aisha Khan", 12, 38, "open", ["React", "TypeScript"]],
+  ["J1", "Senior Frontend Engineer", "Engineering", "Bangalore", "full_time", 4, "Demo Client", "Aisha Khan", 12, 38, "open", ["React", "TypeScript"]],
   ["J2", "Product Designer", "Design", "Remote", "full_time", 2, "Nimbus Tech", "Meera Nair", 8, 27, "open", ["Figma", "UX Research"]],
-  ["J3", "Backend Engineer (Go)", "Engineering", "Pune", "full_time", 3, "Acme Corp", "Rahul Verma", 15, 31, "open", ["Go", "Microservices"]],
+  ["J3", "Backend Engineer (Go)", "Engineering", "Pune", "full_time", 3, "Demo Client", "Rahul Verma", 15, 31, "open", ["Go", "Microservices"]],
   ["J4", "Product Manager", "Product", "Mumbai", "full_time", 1, "Nimbus Tech", "Meera Nair", 6, 44, "hot", ["Roadmapping", "Analytics"]],
-  ["J5", "DevOps Engineer", "Infrastructure", "Remote", "full_time", 2, "Acme Corp", "Rahul Verma", 10, 19, "open", ["AWS", "Kubernetes"]],
+  ["J5", "DevOps Engineer", "Infrastructure", "Remote", "full_time", 2, "Demo Client", "Rahul Verma", 10, 19, "open", ["AWS", "Kubernetes"]],
   ["J6", "Data Scientist", "Data", "Bangalore", "full_time", 2, "Nimbus Tech", "Tom Brooks", 4, 22, "open", ["Python", "ML"]],
   ["J7", "QA Automation Engineer", "Engineering", "Hyderabad", "contract", 2, "Internal", "Tom Brooks", 18, 16, "open", ["Selenium", "CI/CD"]],
-  ["J8", "Engineering Manager", "Engineering", "Bangalore", "full_time", 1, "Acme Corp", "Aisha Khan", 2, 11, "hot", ["Leadership", "Scaling"]],
+  ["J8", "Engineering Manager", "Engineering", "Bangalore", "full_time", 1, "Demo Client", "Aisha Khan", 2, 11, "hot", ["Leadership", "Scaling"]],
 ];
 
 // name, jobCode, stage, rating, exp, loc, source, recruiter, days, salaryLpa

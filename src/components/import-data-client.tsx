@@ -39,7 +39,7 @@ const TABS: Tab[] = [
     ],
     example: [
       "HR Executive", "Human Resources", "Ahmedabad", "2", "3", "5", "1", "3",
-      "Acme Corp", "yashashvi.shah@scoutforu.com", "SFU-101", "open", "Looking for an HR executive…",
+      "Example Client Pvt Ltd", "yashashvi.shah@scoutforu.com", "SFU-101", "open", "Looking for an HR executive…",
     ],
     note: "Status: open, hot or closed. Duplicate reference codes/titles are skipped.",
   },
@@ -48,7 +48,7 @@ const TABS: Tab[] = [
     label: "Clients",
     desc: "Import client companies.",
     headers: ["Name", "City", "Industry", "Contact Email", "Contact Number", "Website", "Address", "Remarks"],
-    example: ["Acme Corp", "Mumbai", "IT Services", "hr@acme.com", "+91 9800000000", "https://acme.com", "BKC, Mumbai", "Key account"],
+    example: ["Example Client Pvt Ltd", "Mumbai", "IT Services", "hr@exampleclient.com", "+91 9800000000", "https://exampleclient.com", "BKC, Mumbai", "Key account"],
     note: "Existing client names are skipped.",
   },
   {
