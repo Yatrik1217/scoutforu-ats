@@ -27,6 +27,7 @@ import {
   deleteInterviewFeedback,
   reviewCandidate,
 } from "@/lib/actions/mutations";
+import { scoreCandidateJd } from "@/lib/actions/jd-score";
 import type {
   CandidateRow,
   StageEventRow,
@@ -59,6 +60,16 @@ export function CandidateDrawer({
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [scoring, startScore] = useTransition();
+  const scoreNow = () =>
+    startScore(async () => {
+      if (!candidateId) return;
+      const res = await scoreCandidateJd(candidateId);
+      if (res.ok && res.match) {
+        toast.success(`Scored ${res.score}/100 vs the JD`);
+        setDetail((d) => (d ? { ...d, cand: { ...d.cand, jd_match: res.match! } } : d));
+      } else toast.error(res.error || "Couldn't score");
+    });
   const [pending, start] = useTransition();
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState("");
@@ -468,6 +479,77 @@ export function CandidateDrawer({
                   </div>
                 ))}
               </div>
+
+              {/* JD match score — AI rates this resume against the opening's JD */}
+              {(() => {
+                const jm = detail.cand.jd_match;
+                const stale = !!jm && !!detail.cand.job_id && jm.jobId !== detail.cand.job_id;
+                const col = (s: number) => (s >= 75 ? "#16a34a" : s >= 50 ? "#e8833a" : "#dc2626");
+                const chip = (t: string, good: boolean) => (
+                  <span
+                    key={t}
+                    className="rounded-md px-2 py-[3px] text-[11px] font-semibold"
+                    style={
+                      good
+                        ? { background: "#e7f6ee", color: "#15934e" }
+                        : { background: "#fdecec", color: "#c0392b" }
+                    }
+                  >
+                    {good ? "✓ " : "✕ "}
+                    {t}
+                  </span>
+                );
+                return (
+                  <div className="mb-[22px] rounded-[12px] border border-[#e9edf3] p-[14px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[13px] font-extrabold text-[#16203a]">
+                        JD Match{detail.jobTitle && detail.jobTitle !== "—" ? ` · ${detail.jobTitle}` : ""}
+                      </div>
+                      {canWrite && (
+                        <button
+                          onClick={scoreNow}
+                          disabled={scoring}
+                          className="rounded-[8px] bg-[#2a6fdb] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[#245fc0] disabled:opacity-60"
+                        >
+                          {scoring ? "Scoring…" : jm ? "Re-score" : "Score vs JD"}
+                        </button>
+                      )}
+                    </div>
+                    {jm ? (
+                      <>
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="tf-num text-[30px] font-extrabold leading-none" style={{ color: col(jm.score) }}>
+                            {jm.score}
+                            <span className="text-[15px] font-bold text-[#9aa4b6]">/100</span>
+                          </div>
+                          {stale && (
+                            <span className="rounded-full bg-[#fff6e5] px-2 py-1 text-[10.5px] font-bold text-[#b45309]">
+                              Opening changed — re-score
+                            </span>
+                          )}
+                        </div>
+                        {jm.summary && (
+                          <div className="mt-1.5 text-[12.5px] text-[#42506b]">{jm.summary}</div>
+                        )}
+                        {jm.matched.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-1.5">
+                            {jm.matched.map((t) => chip(t, true))}
+                          </div>
+                        )}
+                        {jm.missing.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {jm.missing.map((t) => chip(t, false))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="mt-1.5 text-[12px] text-[#8a94a6]">
+                        Not scored yet — rate this resume against the opening&apos;s JD (AI, ~₹0.5, saved so it&apos;s charged once).
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {(() => {
                 const custom = (detail.cand.custom ?? {}) as Record<string, unknown>;

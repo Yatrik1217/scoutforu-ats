@@ -102,6 +102,15 @@ export type JobRow = {
   created_at: string;
 };
 
+export type JdMatch = {
+  score: number; // 0–100 match against the job's JD
+  matched: string[]; // JD requirements the candidate clearly has
+  missing: string[]; // important JD requirements the candidate lacks
+  summary: string; // one-line verdict
+  jobId: string; // the job this score was computed against
+  scoredAt: string; // ISO timestamp
+};
+
 export type CandidateRow = {
   id: string;
   name: string;
@@ -133,6 +142,7 @@ export type CandidateRow = {
   resume_url: string;
   reject_reason: string;
   custom: CustomValues;
+  jd_match: JdMatch | null;
   review_status: ReviewStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
