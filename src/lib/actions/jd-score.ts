@@ -3,6 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { stripHtml } from "@/lib/rich-text";
 import type { JdMatch } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; score?: number; match?: JdMatch };
@@ -59,7 +60,7 @@ export async function scoreCandidateJd(candidateId: string): Promise<Result> {
       messages: [
         {
           role: "user",
-          content: `JOB TITLE: ${job.title}\n\nJOB DESCRIPTION:\n${(job.description || "").slice(0, 6000)}\n\nCANDIDATE:\n${profile}`,
+          content: `JOB TITLE: ${job.title}\n\nJOB DESCRIPTION:\n${stripHtml(job.description || "").slice(0, 6000)}\n\nCANDIDATE:\n${profile}`,
         },
       ],
     });

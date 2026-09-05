@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { RichTextEditor } from "@/components/rich-text";
 import {
   createRequisition,
   updateRequisition,
@@ -24,7 +25,24 @@ import type {
   ProfileRow,
 } from "@/lib/database.types";
 
-const DEPTS = ["Engineering", "Design", "Product", "Data", "Infrastructure"];
+const DEPTS = [
+  "Engineering",
+  "Design",
+  "Product",
+  "Data",
+  "Infrastructure",
+  "Sales",
+  "Business Development",
+  "Marketing",
+  "Human Resources",
+  "Finance & Accounts",
+  "Operations",
+  "Customer Support",
+  "IT & Admin",
+  "Legal & Compliance",
+  "Procurement / Supply Chain",
+  "Other",
+];
 const TYPES: { label: string; value: EmploymentType }[] = [
   { label: "Full-time", value: "full_time" },
   { label: "Contract", value: "contract" },
@@ -347,7 +365,7 @@ export function JobFormModal({
 
           {/* Description */}
           <Section title="Description" />
-          <Field label="Job Description"><textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={4} className={`${fieldCls} resize-y font-medium`} placeholder="Provide job description in detail. Helps job-seekers understand the requirement." /></Field>
+          <Field label="Job Description"><RichTextEditor value={f.description} onChange={(html) => set("description", html)} placeholder="Provide the job description in detail — use the toolbar to bold, italicise or add bullet points. Helps job-seekers understand the requirement." /></Field>
           <div className="grid grid-cols-2 gap-3.5">
             <Field label="Profile Criteria / Required Skills"><textarea value={f.profileCriteria} onChange={(e) => set("profileCriteria", e.target.value)} rows={3} className={`${fieldCls} resize-y font-medium`} placeholder="Must-have skills, compulsory credentials" /></Field>
             <Field label="Benefits"><textarea value={f.benefits} onChange={(e) => set("benefits", e.target.value)} rows={3} className={`${fieldCls} resize-y font-medium`} placeholder="Perks & benefits" /></Field>

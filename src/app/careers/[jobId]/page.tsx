@@ -4,6 +4,7 @@ import { MapPin, Briefcase, ArrowLeft, IndianRupee } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ApplyForm } from "@/components/apply-form";
 import { maskClientName } from "@/lib/careers";
+import { sanitizeRichText } from "@/lib/rich-text";
 
 export const dynamic = "force-dynamic";
 
@@ -103,9 +104,10 @@ export default async function JobPage({ params }: { params: Promise<{ jobId: str
         </div>
 
         {job.description && (
-          <div className="mt-6 whitespace-pre-wrap rounded-[14px] border border-[#e9edf3] bg-white p-6 text-[14px] leading-relaxed text-[#334155]">
-            {job.description}
-          </div>
+          <div
+            className="mt-6 whitespace-pre-wrap rounded-[14px] border border-[#e9edf3] bg-white p-6 text-[14px] leading-relaxed text-[#334155] [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(job.description) }}
+          />
         )}
 
         <div className="mt-6 rounded-[14px] border border-[#e9edf3] bg-white p-6">

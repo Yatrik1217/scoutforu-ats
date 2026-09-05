@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   List as ListIcon,
 } from "lucide-react";
+import { stripHtml } from "@/lib/rich-text";
 
 export type CareerJob = {
   id: string;
@@ -176,7 +177,7 @@ export function CareersBrowser({ org, jobs }: { org: Org; jobs: CareerJob[] }) {
 
                 {j.description && (
                   <p className="mt-3 text-[13px] leading-relaxed text-[#6b7686]">
-                    {snippet(j.description)}
+                    {snippet(stripHtml(j.description))}
                   </p>
                 )}
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
+import { sanitizeRichText } from "@/lib/rich-text";
 import { renderTemplate } from "@/lib/template-render";
 import { recruiterMailAccount } from "@/lib/user-mail";
 import { buildResolver, type PipelineStage } from "@/lib/pipeline-core";
@@ -485,7 +486,7 @@ function jobPayload(form: ReqForm) {
     min_ctc_lpa: form.minCtc || 0,
     max_ctc_lpa: form.maxCtc || 0,
     hide_salary: form.hideSalary,
-    description: form.description,
+    description: sanitizeRichText(form.description || ""),
     profile_criteria: form.profileCriteria,
     benefits: form.benefits,
     walk_in: form.walkIn,
