@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { X } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
+import { loadPipelines } from "@/lib/pipeline";
 import { stageFromSlug, stageToSlug, SOURCES } from "@/lib/domain";
 import { CandidateFilters } from "@/components/candidate-filters";
 import { NewCandidateButton } from "@/components/view-actions";
@@ -35,6 +36,7 @@ export default async function CandidatesPage({
   const params = await searchParams;
   const { q, stage, source, recruiter, job, review } = params;
   const { ws, scope } = await loadWorkspace();
+  const pipelines = await loadPipelines();
   const query = (q ?? "").trim().toLowerCase();
 
   const rows = ws.candidates.filter((c) => {
@@ -169,6 +171,7 @@ export default async function CandidatesPage({
         recruiters={ws.team
           .filter((p) => p.role === "recruiter")
           .map((p) => ({ id: p.id, name: p.name }))}
+        moveStages={pipelines.default.map((s) => ({ slug: s.slug, name: s.name }))}
         isAdmin={scope.role === "master_admin"}
       />
     </div>

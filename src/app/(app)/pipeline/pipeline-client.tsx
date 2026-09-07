@@ -102,7 +102,12 @@ export function PipelineClient({
     return { name: st?.name ?? c.stage, color: st?.color ?? "#64748b" };
   };
 
-  const byStage = (slug: string) => filtered.filter((c) => c.stage === slug);
+  // Columns for the current board. A candidate whose stored stage matches NO
+  // column (e.g. a legacy/typo slug) would otherwise vanish — the first column
+  // absorbs those orphans so a candidate is never silently hidden.
+  const validSlugs = new Set(activeStages.map((s) => s.slug));
+  const byStage = (slug: string, isFirst = false) =>
+    filtered.filter((c) => c.stage === slug || (isFirst && !validSlugs.has(c.stage)));
   const active = activeId ? items.find((c) => c.id === activeId) : null;
 
   const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
@@ -220,14 +225,14 @@ export function PipelineClient({
         >
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-[4px_26px_22px]">
             <div className="flex h-full items-start gap-3.5">
-              {activeStages.map((s) => (
+              {activeStages.map((s, i) => (
                 <Column
                   key={s.slug}
                   name={s.name}
                   slug={s.slug}
                   color={s.color}
                   dense={dense}
-                  candidates={byStage(s.slug)}
+                  candidates={byStage(s.slug, i === 0)}
                   stageInfoOf={stageInfoOf}
                   draggable={canWrite}
                   onOpen={openDrawer}

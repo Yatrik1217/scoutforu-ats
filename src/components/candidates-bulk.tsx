@@ -6,7 +6,7 @@ import { Mail, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, StageBadge } from "@/components/bits";
 import { useShell } from "@/components/shell-provider";
-import { STAGES, type StageKey } from "@/lib/domain";
+import { type StageKey } from "@/lib/domain";
 import { listEmailTemplates } from "@/lib/actions/candidate-message";
 import { bulkMoveStage, bulkAssignRecruiter, bulkMessage } from "@/lib/actions/bulk";
 
@@ -37,10 +37,12 @@ const addedLabel = (iso: string) =>
 export function CandidatesBulk({
   rows,
   recruiters,
+  moveStages,
   isAdmin,
 }: {
   rows: Row[];
   recruiters: { id: string; name: string }[];
+  moveStages: { slug: string; name: string }[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -146,8 +148,8 @@ export function CandidatesBulk({
             className="cursor-pointer rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[12.5px] font-bold text-[#42506b]"
           >
             <option value="">Move to stage…</option>
-            {STAGES.map((s) => (
-              <option key={s.slug} value={s.slug}>{s.key}</option>
+            {moveStages.map((s) => (
+              <option key={s.slug} value={s.slug}>{s.name}</option>
             ))}
           </select>
           {isAdmin && recruiters.length > 0 && (
