@@ -68,7 +68,7 @@ export default async function OverviewPage() {
     color: string;
     href: string;
   }[] = [
-    { label: "Open Jobs", value: ws.jobs.length, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
+    { label: "Open Jobs", value: ws.jobs.filter((j) => j.status !== "closed").length, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
     { label: "Active Candidates", value: activeCount(ws.candidates), icon: Users, color: "#8b5cf6", href: "/candidates" },
     { label: "Interviews / wk", value: interviewsThisWeek, icon: Calendar, color: "#06b6d4", href: "/interviews" },
     { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), icon: FileText, color: "#f59e0b", href: "/offers" },

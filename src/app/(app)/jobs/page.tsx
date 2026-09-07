@@ -24,12 +24,22 @@ export default async function JobsPage() {
     ).length;
   const clientName = new Map(ws.clients.map((c) => [c.id, c.name]));
 
-  return (
-    <div className="animate-sc-fadein p-[22px_26px_40px]">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {ws.jobs.map((j) => {
-          const dc = DEPT_COLOR[j.dept] ?? "#64748b";
-          return (
+  const activeJobs = ws.jobs.filter((j) => j.status !== "closed");
+  const closedJobs = ws.jobs.filter((j) => j.status === "closed");
+
+  const renderJob = (j: (typeof ws.jobs)[number]) => {
+    const dc = DEPT_COLOR[j.dept] ?? "#64748b";
+    const badge =
+      j.approval_status === "pending"
+        ? { l: "Pending Approval", c: "#b45309", b: "#fffbeb" }
+        : j.approval_status === "rejected"
+          ? { l: "Rejected", c: "#6b7280", b: "#f3f4f6" }
+          : j.status === "closed"
+            ? { l: "Closed", c: "#6b7280", b: "#f3f4f6" }
+            : j.status === "hot"
+              ? { l: "Hot", c: "#ef4444", b: "#fef2f2" }
+              : { l: "Open", c: "#16a34a", b: "#e9f9ef" };
+    return (
             <div
               key={j.id}
               className="rounded-2xl border border-[#e9edf3] bg-white p-5"
@@ -46,32 +56,9 @@ export default async function JobsPage() {
                     <span className="text-[16px] font-extrabold">{j.title}</span>
                     <span
                       className="rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold"
-                      style={{
-                        color:
-                          j.approval_status === "pending"
-                            ? "#b45309"
-                            : j.approval_status === "rejected"
-                              ? "#6b7280"
-                              : j.status === "hot"
-                                ? "#ef4444"
-                                : "#16a34a",
-                        background:
-                          j.approval_status === "pending"
-                            ? "#fffbeb"
-                            : j.approval_status === "rejected"
-                              ? "#f3f4f6"
-                              : j.status === "hot"
-                                ? "#fef2f2"
-                                : "#e9f9ef",
-                      }}
+                      style={{ color: badge.c, background: badge.b }}
                     >
-                      {j.approval_status === "pending"
-                        ? "Pending Approval"
-                        : j.approval_status === "rejected"
-                          ? "Rejected"
-                          : j.status === "hot"
-                            ? "Hot"
-                            : "Open"}
+                      {badge.l}
                     </span>
                   </div>
                   <div className="mt-0.5 text-[12.5px] font-medium text-[#8a94a6]">
@@ -142,9 +129,38 @@ export default async function JobsPage() {
                 </ScheduleButton>
               </div>
             </div>
-          );
-        })}
+    );
+  };
+
+  return (
+    <div className="animate-sc-fadein p-[22px_26px_40px]">
+      <div className="mb-4 flex items-baseline gap-3">
+        <h1 className="font-display text-[22px] font-extrabold tracking-tight text-[#16203a]">
+          Jobs
+        </h1>
+        <span className="text-[13px] font-semibold text-[#8a94a6]">
+          {activeJobs.length} active{closedJobs.length ? ` · ${closedJobs.length} closed` : ""}
+        </span>
       </div>
+
+      {activeJobs.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{activeJobs.map(renderJob)}</div>
+      ) : (
+        <div className="rounded-2xl border border-[#e9edf3] bg-white py-14 text-center text-[13px] font-semibold text-[#a3acbd]">
+          No active jobs right now.
+        </div>
+      )}
+
+      {closedJobs.length > 0 && (
+        <>
+          <div className="mb-3 mt-9 text-[12px] font-extrabold uppercase tracking-wide text-[#8a94a6]">
+            Closed jobs ({closedJobs.length})
+          </div>
+          <div className="grid grid-cols-1 gap-4 opacity-70 md:grid-cols-2">
+            {closedJobs.map(renderJob)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
