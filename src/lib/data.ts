@@ -43,8 +43,13 @@ export type Workspace = {
   profileById: Map<string, ProfileRow>;
 };
 
-export async function getWorkspace(scope: EffectiveScope): Promise<Workspace> {
-  const sb = await createClient();
+export async function getWorkspace(
+  scope: EffectiveScope,
+  sbOverride?: Awaited<ReturnType<typeof createClient>>,
+): Promise<Workspace> {
+  // A caller with no request session (e.g. the daily-digest cron) can pass a
+  // service-role client so RLS-protected tables can still be read.
+  const sb = sbOverride ?? (await createClient());
   const [clients, jobs, team, candidates, interviews, offers, events, settings, jobRecs] =
     await Promise.all([
       sb.from("clients").select("*").order("name"),
