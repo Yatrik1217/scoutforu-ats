@@ -89,7 +89,7 @@ function recruiterCard(m: RecruiterMetric): string {
       ${band("Pipeline", [
         statCell(m.active, "Active", BLUE),
         statCell(m.openings.length, "Openings", INK),
-        statCell(m.interviews, "Interviews", PURPLE),
+        statCell(m.interviewing, "Interviewing", PURPLE),
         statCell(m.hires, "Hires", GREEN),
       ])}
 
@@ -154,7 +154,7 @@ export function renderDigest(metrics: RecruiterMetric[], asOf: string): string {
         <!-- footer -->
         <tr><td style="padding:4px 8px 8px;">
           <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:600;color:#aab2c0;line-height:1.5;">
-            “Stalled” = active candidates sitting in one stage more than ${STALL_DAYS} days. Conversion % is measured over everyone each recruiter has handled. Openings are credited to whoever submitted the candidate, so a shared role appears for each contributor. Open <b>ATS → Recruiting Team</b> for the interactive view.
+            “Stalled” = active candidates sitting in one stage more than ${STALL_DAYS} days. Conversion is measured over everyone each recruiter has handled: “to interview” counts every candidate moved to the client-interview stage or beyond (not just ATS-scheduled interviews). Openings are credited to whoever submitted the candidate, so a shared role appears for each contributor. Open <b>ATS → Recruiting Team</b> for the interactive view.
           </div>
         </td></tr>
 

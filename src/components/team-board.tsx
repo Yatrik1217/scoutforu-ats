@@ -22,7 +22,7 @@ export type RecruiterCard = {
   isActive: boolean;
   activeCount: number;
   stalledCount: number;
-  interviews: number;
+  interviewing: number;
   hires: number;
   pct: number;
   barColor: string;
@@ -89,7 +89,7 @@ export function TeamBoard({
             </div>
             <div className="mt-[18px] flex gap-2.5">
               <Tile value={t.activeCount} label="Active" color="#2a6fdb" />
-              <Tile value={t.interviews} label="Interviews" color="#8b5cf6" />
+              <Tile value={t.interviewing} label="Interviewing" color="#8b5cf6" />
               <Tile value={t.hires} label="Hires" color="#16a34a" />
             </div>
 

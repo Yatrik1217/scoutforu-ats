@@ -15,7 +15,7 @@ export default async function TeamPage() {
       isActive: m.isActive,
       activeCount: m.active,
       stalledCount: m.stalled,
-      interviews: m.interviews,
+      interviewing: m.interviewing,
       hires: m.hires,
       pct,
       barColor: pct > 80 ? "#ef4444" : pct > 55 ? "#f59e0b" : "#16a34a",

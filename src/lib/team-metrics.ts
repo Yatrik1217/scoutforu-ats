@@ -1,9 +1,22 @@
 import type { Workspace } from "@/lib/data";
+import { stageFromSlug, stageIndex } from "@/lib/domain";
 
 // One place that computes recruiter workload/performance, so the Recruiting Team
 // page and the daily digest email always show the same numbers.
+//
+// Interview activity is measured by PIPELINE STAGE, not by rows in the
+// `interviews` table: client HR usually runs the interview directly, so we
+// rarely schedule one inside the ATS. A candidate counts as "reached interview"
+// once they are moved to the "Interview" (client interview) stage or beyond.
 
 export const STALL_DAYS = 10; // active candidate idle in a stage longer than this = "stalled"
+
+const IDX_INTERVIEW = stageIndex("Interview"); // client-interview stage
+const IDX_OFFER = stageIndex("Offered");
+const IDX_NOT_JOINED = stageIndex("Not Joined");
+
+// Interview stages a candidate can currently sit in (client + practical rounds).
+const INTERVIEW_STAGE_KEYS = new Set(["Interview", "Practical Interview"]);
 
 export type OpeningMetric = {
   jobId: string;
@@ -22,7 +35,7 @@ export type RecruiterMetric = {
   isActive: boolean;
   active: number;
   stalled: number;
-  interviews: number; // interviews where this person is the interviewer (matches the tile)
+  interviewing: number; // active candidates currently at a client/practical interview stage
   hires: number;
   week: { submitted: number; interviews: number; offers: number; hires: number };
   conv: { handled: number; interviewPct: number; offerPct: number; hirePct: number };
@@ -37,6 +50,33 @@ export function recruiterMetrics(ws: Workspace): RecruiterMetric[] {
   const now = Date.now();
   const weekAgo = now - 7 * 86_400_000;
   const ms = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
+
+  // ---- Stage history (from stage_events) ----
+  // peakIdx: the furthest positive stage a candidate ever reached (ignores the
+  //   negative "Not Joined" terminal, so a post-interview rejection still counts
+  //   as having reached interview).
+  // enteredInterviewWk / enteredOfferWk: candidates who moved INTO the client
+  //   interview / offer stage within the last 7 days.
+  const peakIdx = new Map<string, number>();
+  const enteredInterviewWk = new Set<string>();
+  const enteredOfferWk = new Set<string>();
+  for (const e of ws.events) {
+    const key = stageFromSlug(e.to_stage);
+    const idx = stageIndex(key);
+    if (idx < 0 || idx === IDX_NOT_JOINED) continue;
+    if (idx > (peakIdx.get(e.candidate_id) ?? -1)) peakIdx.set(e.candidate_id, idx);
+    if (ms(e.created_at) >= weekAgo) {
+      if (key === "Interview") enteredInterviewWk.add(e.candidate_id);
+      if (key === "Offered") enteredOfferWk.add(e.candidate_id);
+    }
+  }
+  // A candidate's effective peak also accounts for their current stage, in case
+  // stage history is missing for older rows.
+  const effPeak = (candId: string, currentKey: string) => {
+    const cur = stageIndex(stageFromSlug(currentKey));
+    const curPos = cur === IDX_NOT_JOINED ? -1 : cur;
+    return Math.max(peakIdx.get(candId) ?? -1, curPos);
+  };
 
   return recruiters.map((t) => {
     const owned = ws.candidates.filter((c) => c.recruiter_id === t.id);
@@ -86,29 +126,23 @@ export function recruiterMetrics(ws: Workspace): RecruiterMetric[] {
 
     const active = mine.length;
     const stalled = mine.filter((c) => c.days > STALL_DAYS).length;
-    const interviews = ws.interviews.filter((i) => i.interviewer_id === t.id).length;
+    const interviewing = mine.filter((c) => INTERVIEW_STAGE_KEYS.has(c.stageKey)).length;
     const hires = owned.filter((c) => c.stageKey === "Joined").length;
 
     const week = {
       submitted: owned.filter((c) => ms(c.created_at) >= weekAgo).length,
-      interviews: ws.interviews.filter(
-        (i) => ownedIds.has(i.candidate_id) && ms(i.created_at) >= weekAgo,
-      ).length,
-      offers: ws.offers.filter(
-        (o) => ownedIds.has(o.candidate_id) && ms(o.sent_at) >= weekAgo,
-      ).length,
+      interviews: owned.filter((c) => enteredInterviewWk.has(c.id)).length,
+      offers: owned.filter((c) => enteredOfferWk.has(c.id)).length,
       hires: owned.filter(
         (c) => c.stageKey === "Joined" && ms(c.entered_stage_at) >= weekAgo,
       ).length,
     };
 
-    const interviewedIds = new Set(
-      ws.interviews.filter((i) => ownedIds.has(i.candidate_id)).map((i) => i.candidate_id),
-    );
-    const offeredIds = new Set(
-      ws.offers.filter((o) => ownedIds.has(o.candidate_id)).map((o) => o.candidate_id),
-    );
+    // Conversion over everyone this recruiter has handled, measured by how far
+    // each candidate progressed in the pipeline (stage-based, not ATS interviews).
     const handled = owned.length;
+    const reachedInterview = owned.filter((c) => effPeak(c.id, c.stage) >= IDX_INTERVIEW).length;
+    const reachedOffer = owned.filter((c) => effPeak(c.id, c.stage) >= IDX_OFFER).length;
     const rate = (n: number) => (handled ? Math.round((n / handled) * 100) : 0);
 
     return {
@@ -117,13 +151,13 @@ export function recruiterMetrics(ws: Workspace): RecruiterMetric[] {
       isActive: !!t.active,
       active,
       stalled,
-      interviews,
+      interviewing,
       hires,
       week,
       conv: {
         handled,
-        interviewPct: rate(interviewedIds.size),
-        offerPct: rate(offeredIds.size),
+        interviewPct: rate(reachedInterview),
+        offerPct: rate(reachedOffer),
         hirePct: rate(hires),
       },
       openings,
