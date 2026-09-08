@@ -106,6 +106,7 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 - **Top up AI credits:** console.anthropic.com → Plans & Billing → Purchase credits (or enable auto-reload). ~₹0.3–0.5 per resume parsed/scored.
 - **Restart an app:** `ssh root@200.141.9.192 "pm2 reload ats"` (or `crm`).
 - **Read app logs:** `ssh root@200.141.9.192 "pm2 logs ats --lines 100"`.
+- **Daily recruiting summary email:** a VPS cron hits `GET /api/cron/team-digest?key=$CRON_SECRET` at **7:00 AM IST** (01:30 UTC) and emails a per-recruiter summary (active load, stalled >10d, this-week velocity, conversion %, top openings). Recipients = `DIGEST_TO` in `/opt/scoutforu-ats/.env.local` (currently the owner's email) or, if unset, all active master admins. Change the time with `crontab -e`; change recipients by editing `DIGEST_TO` then `pm2 reload ats`. Log: `/var/log/team-digest.log`. Send a test now: `curl "https://ats.scoutforu.com/api/cron/team-digest?key=<CRON_SECRET>"`.
 
 ---
 
