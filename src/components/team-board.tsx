@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { X, Briefcase, ChevronRight } from "lucide-react";
+import { X, Briefcase, ChevronRight, AlertTriangle } from "lucide-react";
 import { Avatar } from "@/components/bits";
 
 export type OpeningBreakdown = {
@@ -12,6 +12,7 @@ export type OpeningBreakdown = {
   clientName: string | null;
   status: "open" | "hot" | "closed";
   active: number; // active candidates this recruiter is working on this opening
+  stalled: number; // of those, how many are idle past the stall threshold
   stages: { name: string; n: number }[];
 };
 
@@ -20,19 +21,24 @@ export type RecruiterCard = {
   name: string;
   isActive: boolean;
   activeCount: number;
+  stalledCount: number;
   interviews: number;
   hires: number;
   pct: number;
   barColor: string;
   openings: OpeningBreakdown[];
+  week: { submitted: number; interviews: number; offers: number; hires: number };
+  conv: { handled: number; interviewPct: number; offerPct: number; hirePct: number };
 };
 
 export function TeamBoard({
   recruiters,
   asOf,
+  stallDays,
 }: {
   recruiters: RecruiterCard[];
   asOf: string;
+  stallDays: number;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = recruiters.find((r) => r.id === openId) ?? null;
@@ -52,7 +58,17 @@ export function TeamBoard({
             <div className="flex items-center gap-3.5">
               <Avatar name={t.name} size={46} />
               <div className="flex-1">
-                <div className="text-[15.5px] font-extrabold">{t.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[15.5px] font-extrabold">{t.name}</span>
+                  {t.stalledCount > 0 && (
+                    <span
+                      className="flex items-center gap-1 rounded-full bg-[#fdecec] px-2 py-0.5 text-[10.5px] font-bold text-[#dc2626]"
+                      title={`${t.stalledCount} candidate(s) idle over ${stallDays} days`}
+                    >
+                      <AlertTriangle size={11} strokeWidth={2.5} /> {t.stalledCount} stalled
+                    </span>
+                  )}
+                </div>
                 <div className="text-[12px] font-semibold text-[#8a94a6]">
                   Recruiter ·{" "}
                   <span className="text-[#2a6fdb]">
@@ -76,6 +92,20 @@ export function TeamBoard({
               <Tile value={t.interviews} label="Interviews" color="#8b5cf6" />
               <Tile value={t.hires} label="Hires" color="#16a34a" />
             </div>
+
+            {/* This week */}
+            <div className="mt-3 rounded-[11px] bg-[#f7f9fc] p-[10px_12px]">
+              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">
+                This week
+              </div>
+              <div className="flex items-center justify-between">
+                <WeekStat n={t.week.submitted} label="Submitted" />
+                <WeekStat n={t.week.interviews} label="Interviews" />
+                <WeekStat n={t.week.offers} label="Offers" />
+                <WeekStat n={t.week.hires} label="Hires" />
+              </div>
+            </div>
+
             <div className="mt-4">
               <div className="mb-1.5 flex justify-between text-[11.5px] font-semibold text-[#8a94a6]">
                 <span>Workload</span>
@@ -95,7 +125,14 @@ export function TeamBoard({
         ))}
       </div>
 
-      {open && <OpeningsModal rec={open} asOf={asOf} onClose={() => setOpenId(null)} />}
+      {open && (
+        <OpeningsModal
+          rec={open}
+          asOf={asOf}
+          stallDays={stallDays}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </>
   );
 }
@@ -103,10 +140,12 @@ export function TeamBoard({
 function OpeningsModal({
   rec,
   asOf,
+  stallDays,
   onClose,
 }: {
   rec: RecruiterCard;
   asOf: string;
+  stallDays: number;
   onClose: () => void;
 }) {
   return (
@@ -115,7 +154,7 @@ function OpeningsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-[560px] max-w-full flex-col rounded-[18px] bg-white shadow-2xl"
+        className="flex max-h-[88vh] w-[580px] max-w-full flex-col rounded-[18px] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -135,6 +174,31 @@ function OpeningsModal({
           >
             <X size={20} />
           </button>
+        </div>
+
+        {/* this week + conversion */}
+        <div className="grid grid-cols-2 gap-3 border-b border-[#eef1f6] p-[16px_22px]">
+          <div className="rounded-[12px] bg-[#f7f9fc] p-[12px_14px]">
+            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">
+              This week (7 days)
+            </div>
+            <div className="flex justify-between">
+              <WeekStat n={rec.week.submitted} label="Submitted" />
+              <WeekStat n={rec.week.interviews} label="Interviews" />
+              <WeekStat n={rec.week.offers} label="Offers" />
+              <WeekStat n={rec.week.hires} label="Hires" />
+            </div>
+          </div>
+          <div className="rounded-[12px] bg-[#f7f9fc] p-[12px_14px]">
+            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">
+              Conversion · {rec.conv.handled} handled
+            </div>
+            <div className="flex justify-between">
+              <ConvStat pct={rec.conv.interviewPct} label="Interview" color="#8b5cf6" />
+              <ConvStat pct={rec.conv.offerPct} label="Offer" color="#d9730d" />
+              <ConvStat pct={rec.conv.hirePct} label="Hire" color="#16a34a" />
+            </div>
+          </div>
         </div>
 
         {/* openings list */}
@@ -167,6 +231,14 @@ function OpeningsModal({
                       {o.status === "closed" && (
                         <span className="shrink-0 rounded-full bg-[#f1f4f9] px-2 py-0.5 text-[10px] font-bold text-[#8a94a6]">
                           Closed
+                        </span>
+                      )}
+                      {o.stalled > 0 && (
+                        <span
+                          className="flex shrink-0 items-center gap-1 rounded-full bg-[#fdecec] px-2 py-0.5 text-[10px] font-bold text-[#dc2626]"
+                          title={`${o.stalled} idle over ${stallDays} days`}
+                        >
+                          <AlertTriangle size={10} strokeWidth={2.5} /> {o.stalled}
                         </span>
                       )}
                     </div>
@@ -223,6 +295,26 @@ function Tile({
         {value}
       </div>
       <div className="text-[10.5px] font-semibold text-[#8a94a6]">{label}</div>
+    </div>
+  );
+}
+
+function WeekStat({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="text-center">
+      <div className="tf-num text-[16px] font-extrabold text-[#16203a]">{n}</div>
+      <div className="text-[9.5px] font-semibold text-[#9aa4b6]">{label}</div>
+    </div>
+  );
+}
+
+function ConvStat({ pct, label, color }: { pct: number; label: string; color: string }) {
+  return (
+    <div className="text-center">
+      <div className="tf-num text-[16px] font-extrabold" style={{ color }}>
+        {pct}%
+      </div>
+      <div className="text-[9.5px] font-semibold text-[#9aa4b6]">{label}</div>
     </div>
   );
 }
