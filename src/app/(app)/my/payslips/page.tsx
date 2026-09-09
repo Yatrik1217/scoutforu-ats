@@ -19,15 +19,17 @@ export default async function MyPayslipsPage() {
 
   // Only MY lines. As admin, RLS returns every employee's payroll lines, so
   // this must filter explicitly or the page would show the whole team's pay.
-  // Only PAID runs are a payslip — a draft or finalised-but-unpaid run is still
-  // being worked on and must never show to the employee (this is their view).
+  // A payslip is visible once its run has left DRAFT (finalised or paid) — a
+  // draft is still being worked on and must never show to the employee. Marking
+  // a run finalised (not yet paid) makes it visible; reverting paid→finalised
+  // keeps it visible, so a payment can be corrected without it disappearing.
   const [{ data: lineData }, { data: runData }] = employee
     ? await Promise.all([
         sb.from("payroll_lines").select("*").eq("employee_id", employee.id),
         sb
           .from("payroll_runs")
           .select("*")
-          .eq("status", "paid")
+          .in("status", ["finalised", "paid"])
           .order("period_month", { ascending: false }),
       ])
     : [{ data: [] as PayrollLineRow[] }, { data: [] as PayrollRunRow[] }];
@@ -62,7 +64,7 @@ export default async function MyPayslipsPage() {
           My Payslips
         </h1>
         <p className="text-[13px] text-[#8a94a6]">
-          {lines.length} payslip{lines.length === 1 ? "" : "s"} · {money(ytd)} received in total
+          {lines.length} payslip{lines.length === 1 ? "" : "s"} · {money(ytd)} in total
         </p>
       </div>
 

@@ -13,8 +13,8 @@ import type {
 export const dynamic = "force-dynamic";
 
 // Payslip PDF. The admin (master_admin) can render any line for any run; an
-// employee can render only their own line, and only once the run is PAID — a
-// draft or finalised-but-unpaid run is still being worked on and must not be
+// employee can render only their own line, and only once the run has left
+// DRAFT (finalised or paid) — a draft is still being worked on and must not be
 // downloadable by the employee, even by guessing the URL.
 export async function GET(
   _req: Request,
@@ -43,11 +43,12 @@ export async function GET(
     ]);
   if (!run || !employee) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Non-admins may only download their OWN payslip, and only when it is paid.
+  // Non-admins may only download their OWN payslip, and only once the run has
+  // left draft (finalised or paid).
   const isAdmin = (profile as { role?: string } | null)?.role === "master_admin";
   if (!isAdmin) {
     const ownsLine = (employee as EmployeeRow).profile_id === user.id;
-    if (!ownsLine || (run as PayrollRunRow).status !== "paid") {
+    if (!ownsLine || (run as PayrollRunRow).status === "draft") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
   }
