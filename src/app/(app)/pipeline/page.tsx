@@ -25,7 +25,12 @@ export default async function PipelinePage({
   return (
     <PipelineClient
       candidates={ws.candidates}
-      jobs={ws.jobs.map((j) => ({ id: j.id, title: j.title, clientId: j.client_id }))}
+      jobs={ws.jobs.map((j) => ({
+        id: j.id,
+        title: j.title,
+        clientId: j.client_id,
+        status: j.status,
+      }))}
       recruiters={recruiters}
       query={q ?? ""}
       initialJob={initialJob}

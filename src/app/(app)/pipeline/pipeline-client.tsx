@@ -37,7 +37,7 @@ export function PipelineClient({
   clientStages,
 }: {
   candidates: EnrichedCandidate[];
-  jobs: { id: string; title: string; clientId: string | null }[];
+  jobs: { id: string; title: string; clientId: string | null; status: "open" | "hot" | "closed" }[];
   recruiters: string[];
   query: string;
   initialJob?: string;
@@ -62,10 +62,45 @@ export function PipelineClient({
     useSensor(KeyboardSensor),
   );
 
+  // Openings filter: review only the active (open/hot) roles by default, so a
+  // closed opening's leftover candidates don't clutter a team review. If the
+  // page was opened for a specific closed role, start on "All" so it still shows.
+  const [openingStatus, setOpeningStatus] = useState<"active" | "inactive" | "all">(() =>
+    initialJob !== "all" && jobs.find((j) => j.id === initialJob)?.status === "closed"
+      ? "all"
+      : "active",
+  );
+  const statusOf = useMemo(() => new Map(jobs.map((j) => [j.id, j.status])), [jobs]);
+  const jobMatchesOpening = (jobId: string | null) => {
+    if (openingStatus === "all") return true;
+    const st = jobId ? statusOf.get(jobId) : undefined;
+    if (!st) return false; // unmapped or deleted-job candidate → only under "All"
+    return openingStatus === "active" ? st !== "closed" : st === "closed";
+  };
+  // Roles listed in the dropdown follow the same openings filter.
+  const visibleJobs = useMemo(
+    () =>
+      jobs.filter((j) =>
+        openingStatus === "all"
+          ? true
+          : openingStatus === "active"
+            ? j.status !== "closed"
+            : j.status === "closed",
+      ),
+    [jobs, openingStatus],
+  );
+  // If the selected role is hidden by a status switch, fall back to All Roles.
+  useEffect(() => {
+    if (filterJob !== "all" && !visibleJobs.some((j) => j.id === filterJob)) {
+      setFilterJob("all");
+    }
+  }, [visibleJobs, filterJob]);
+
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
       items.filter((c) => {
+        if (!jobMatchesOpening(c.job_id)) return false;
         if (filterJob !== "all" && c.job_id !== filterJob) return false;
         if (filterRec !== "all" && c.recruiterName !== filterRec) return false;
         if (
@@ -79,7 +114,7 @@ export function PipelineClient({
           return false;
         return true;
       }),
-    [items, filterJob, filterRec, q],
+    [items, filterJob, filterRec, q, openingStatus, statusOf],
   );
 
   // The stage list that governs the board columns: follows the selected job's
@@ -146,13 +181,44 @@ export function PipelineClient({
     <div className="flex h-full flex-col">
       {/* toolbar */}
       <div className="flex shrink-0 items-center gap-3 p-[16px_26px]">
+        <div className="flex gap-0.5 rounded-[10px] bg-[#eef1f6] p-[3px]">
+          {(
+            [
+              ["active", "Active"],
+              ["inactive", "Inactive"],
+              ["all", "All"],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setOpeningStatus(val)}
+              className="rounded-[8px] px-3 py-1.5 text-[12.5px] font-bold transition"
+              style={
+                openingStatus === val
+                  ? { background: "#fff", color: "#2a6fdb", boxShadow: "0 1px 3px rgba(20,40,80,.12)" }
+                  : { color: "#7a8696" }
+              }
+              title={
+                val === "active"
+                  ? "Only open/hot openings"
+                  : val === "inactive"
+                    ? "Only closed openings"
+                    : "Every opening"
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <select
           value={filterJob}
           onChange={(e) => setFilterJob(e.target.value)}
           className="cursor-pointer rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[13px] font-semibold text-[#42506b]"
         >
-          <option value="all">All Roles</option>
-          {jobs.map((j) => (
+          <option value="all">
+            All Roles{openingStatus !== "all" ? ` (${visibleJobs.length})` : ""}
+          </option>
+          {visibleJobs.map((j) => (
             <option key={j.id} value={j.id}>
               {j.title}
             </option>
