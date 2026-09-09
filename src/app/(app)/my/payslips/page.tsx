@@ -19,10 +19,16 @@ export default async function MyPayslipsPage() {
 
   // Only MY lines. As admin, RLS returns every employee's payroll lines, so
   // this must filter explicitly or the page would show the whole team's pay.
+  // Only PAID runs are a payslip — a draft or finalised-but-unpaid run is still
+  // being worked on and must never show to the employee (this is their view).
   const [{ data: lineData }, { data: runData }] = employee
     ? await Promise.all([
         sb.from("payroll_lines").select("*").eq("employee_id", employee.id),
-        sb.from("payroll_runs").select("*").order("period_month", { ascending: false }),
+        sb
+          .from("payroll_runs")
+          .select("*")
+          .eq("status", "paid")
+          .order("period_month", { ascending: false }),
       ])
     : [{ data: [] as PayrollLineRow[] }, { data: [] as PayrollRunRow[] }];
   const runs = (runData ?? []) as PayrollRunRow[];
