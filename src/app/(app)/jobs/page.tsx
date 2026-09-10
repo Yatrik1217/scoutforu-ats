@@ -20,7 +20,7 @@ export default async function JobsPage() {
     scope.role === "master_admin" || (scope.role === "recruiter" && !!me?.is_approver);
   const inPipe = (jobId: string) =>
     ws.candidates.filter(
-      (c) => c.job_id === jobId && c.stageKey !== "Not Joined",
+      (c) => c.job_id === jobId && c.stageOutcome !== "lost",
     ).length;
   const clientName = new Map(ws.clients.map((c) => [c.id, c.name]));
 

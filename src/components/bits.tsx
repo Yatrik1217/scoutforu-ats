@@ -44,14 +44,25 @@ export function RecBadge({ name, color }: { name: string; color: string }) {
   );
 }
 
-export function StageBadge({ stage }: { stage: StageKey }) {
-  const c = stageColor(stage);
+// `name`/`color` override the canonical label+color so custom pipeline stages
+// (e.g. "1st Technical Round", "Rejected") render correctly; callers that only
+// pass `stage` keep the built-in look.
+export function StageBadge({
+  stage,
+  name,
+  color,
+}: {
+  stage: StageKey;
+  name?: string;
+  color?: string;
+}) {
+  const c = color ?? stageColor(stage);
   return (
     <span
       className="inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold"
       style={{ color: c, background: hexA(c, 0.12) }}
     >
-      {stage}
+      {name ?? stage}
     </span>
   );
 }

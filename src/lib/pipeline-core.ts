@@ -93,6 +93,18 @@ export const stageColorOf = (stages: PipelineStage[], slug: string) =>
 export const isTerminalStage = (stages: PipelineStage[], slug: string) =>
   (stageBySlug(stages, slug)?.outcome ?? "in_progress") !== "in_progress";
 
+// Whether a stage is an interview round (client/HR/technical/practical/managerial).
+// Interviews are usually run by the client rather than scheduled in the ATS, so
+// "in interview" is read from the pipeline stage, not the interviews table.
+const INTERVIEW_RE = /interview|technical|practical|round|managerial/i;
+export function isInterviewStage(stage: {
+  slug: string;
+  name: string;
+  outcome: StageOutcome;
+}): boolean {
+  return stage.outcome === "in_progress" && INTERVIEW_RE.test(`${stage.slug} ${stage.name}`);
+}
+
 // Next stage by position that isn't a "lost" outcome (null if none) — the
 // forward path a candidate advances along.
 export function nextStageSlug(stages: PipelineStage[], slug: string): string | null {

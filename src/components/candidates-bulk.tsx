@@ -17,6 +17,8 @@ type Row = {
   location: string | null;
   jobTitle: string;
   stageKey: StageKey;
+  stageName: string;
+  stageColor: string;
   rating: number;
   source: string | null;
   recruiterName: string;
@@ -114,7 +116,7 @@ export function CandidatesBulk({
                   </div>
                 </td>
                 <td className="p-[12px_18px] text-[13px] font-semibold text-[#42506b]">{r.jobTitle}</td>
-                <td className="p-[12px_18px]"><StageBadge stage={r.stageKey} /></td>
+                <td className="p-[12px_18px]"><StageBadge stage={r.stageKey} name={r.stageName} color={r.stageColor} /></td>
                 <td className="tf-num p-[12px_18px] text-[13px] font-extrabold text-[#b27400]">★ {r.rating.toFixed(1)}</td>
                 <td className="p-[12px_18px] text-[12.5px] font-semibold text-[#42506b]">{r.source}</td>
                 <td className="p-[12px_18px] text-[13px] font-semibold text-[#42506b]">{r.recruiterName}</td>

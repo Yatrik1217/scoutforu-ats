@@ -18,9 +18,24 @@ import {
   daysInStage,
   type StageKey,
 } from "@/lib/domain";
+import {
+  buildResolver,
+  isInterviewStage,
+  type PipelineResolver,
+  type PipelineStageRow,
+  type StageOutcome,
+} from "@/lib/pipeline-core";
 
 export type EnrichedCandidate = CandidateRow & {
   stageKey: StageKey;
+  // Resolved against the candidate's ACTUAL pipeline (Default or client override)
+  // — the canonical stageKey above collapses custom slugs to "Sourced", so all
+  // aggregate/analytics logic must use these instead.
+  stageName: string;
+  stageColor: string;
+  stageOutcome: StageOutcome; // in_progress | won | lost
+  stagePosition: number;
+  stageIsInterview: boolean;
   jobTitle: string;
   jobDept: string;
   clientId: string | null;
@@ -41,6 +56,7 @@ export type Workspace = {
   byId: Map<string, EnrichedCandidate>;
   jobById: Map<string, JobRow>;
   profileById: Map<string, ProfileRow>;
+  pipeline: PipelineResolver;
 };
 
 export async function getWorkspace(
@@ -50,7 +66,7 @@ export async function getWorkspace(
   // A caller with no request session (e.g. the daily-digest cron) can pass a
   // service-role client so RLS-protected tables can still be read.
   const sb = sbOverride ?? (await createClient());
-  const [clients, jobs, team, candidates, interviews, offers, events, settings, jobRecs] =
+  const [clients, jobs, team, candidates, interviews, offers, events, settings, jobRecs, pipeRows] =
     await Promise.all([
       sb.from("clients").select("*").order("name"),
       sb.from("jobs").select("*").order("posted_at", { ascending: false }),
@@ -64,7 +80,9 @@ export async function getWorkspace(
         .order("created_at", { ascending: false }),
       sb.from("app_settings").select("*").maybeSingle(),
       sb.from("job_recruiters").select("job_id,recruiter_id"),
+      sb.from("pipeline_stages").select("*").order("position"),
     ]);
+  const pipeline = buildResolver((pipeRows.data ?? []) as PipelineStageRow[]);
 
   const profileById = new Map<string, ProfileRow>(
     (team.data ?? []).map((p) => [p.id, p]),
@@ -118,9 +136,21 @@ export async function getWorkspace(
   const enriched: EnrichedCandidate[] = candRows.map((c) => {
     const job = c.job_id ? jobById.get(c.job_id) : undefined;
     const rec = c.recruiter_id ? profileById.get(c.recruiter_id) : undefined;
+    // Resolve the candidate's stage in its OWN pipeline (client override or
+    // Default) so custom stages classify correctly instead of collapsing to
+    // "Sourced" via the canonical map.
+    const stages = pipeline.forClient(job?.client_id ?? null);
+    const st = stages.find((s) => s.slug === c.stage);
     return {
       ...c,
       stageKey: stageFromSlug(c.stage),
+      stageName: st?.name ?? stageFromSlug(c.stage),
+      stageColor: st?.color ?? "#64748b",
+      stageOutcome:
+        st?.outcome ??
+        (c.stage === "joined" ? "won" : c.stage === "not_joined" ? "lost" : "in_progress"),
+      stagePosition: st?.position ?? 0,
+      stageIsInterview: st ? isInterviewStage(st) : false,
       jobTitle: job?.title ?? "—",
       jobDept: job?.dept ?? "",
       clientId: job?.client_id ?? null,
@@ -142,6 +172,7 @@ export async function getWorkspace(
     byId: new Map(enriched.map((c) => [c.id, c])),
     jobById,
     profileById,
+    pipeline,
   };
 }
 
@@ -187,10 +218,20 @@ export function stageCount(candidates: EnrichedCandidate[], key: StageKey) {
   return candidates.filter((c) => c.stageKey === key).length;
 }
 
+// Active = still in progress in its pipeline (excludes won/lost outcomes such
+// as Joined/Rejected/Not Joined) and not parked on hold.
 export function activeCount(candidates: EnrichedCandidate[]) {
-  return candidates.filter(
-    (c) => c.stageKey !== "Joined" && c.stageKey !== "Not Joined",
-  ).length;
+  return candidates.filter((c) => c.stageOutcome === "in_progress" && !c.on_hold).length;
+}
+
+// Candidates currently sitting in an interview round (client/HR/technical/…).
+export function inInterviewCount(candidates: EnrichedCandidate[]) {
+  return candidates.filter((c) => c.stageIsInterview && !c.on_hold).length;
+}
+
+// Won hires (a pipeline's "won" outcome — e.g. Joined).
+export function hiresCount(candidates: EnrichedCandidate[]) {
+  return candidates.filter((c) => c.stageOutcome === "won").length;
 }
 
 // Avg time in each stage (days) from consecutive stage events per candidate.

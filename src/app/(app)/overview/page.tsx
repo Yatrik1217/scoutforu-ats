@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDistanceToNow, format, isThisWeek } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import {
   Briefcase,
   Users,
@@ -11,20 +11,14 @@ import {
 } from "lucide-react";
 import {
   loadWorkspace,
-  funnelCounts,
   activeCount,
-  stageCount,
+  inInterviewCount,
+  hiresCount,
 } from "@/lib/data";
 import { getProfile } from "@/lib/auth";
 import { ShieldCheck } from "lucide-react";
-import {
-  PIPELINE_STAGES,
-  DEPT_COLOR,
-  hexA,
-  stageFromSlug,
-  stageToSlug,
-} from "@/lib/domain";
-import { Avatar, TypePill, typeLabelFromEnum } from "@/components/bits";
+import { DEPT_COLOR, hexA } from "@/lib/domain";
+import { Avatar } from "@/components/bits";
 
 function avgTimeToHire(events: { candidate_id: string; to_stage: string; created_at: string }[]) {
   const byCand = new Map<string, typeof events>();
@@ -55,11 +49,19 @@ export default async function OverviewPage() {
   const me = await getProfile();
   const canReview = me?.role === "master_admin" || !!me?.is_approver;
   const pendingReviews = ws.candidates.filter((c) => c.review_status === "pending").length;
-  const counts = funnelCounts(ws.candidates);
-  const fmax = Math.max(1, ...counts);
-  const interviewsThisWeek = ws.interviews.filter((i) =>
-    isThisWeek(new Date(i.scheduled_at), { weekStartsOn: 1 }),
-  ).length;
+
+  // Funnel over the REAL pipeline stages (Default set), excluding lost outcomes
+  // (rejected / declined / not-joined leave the funnel). Counts by actual slug,
+  // so custom stages no longer collapse into "Sourced".
+  const funnelStages = ws.pipeline.default.filter((s) => s.outcome !== "lost");
+  const funnel = funnelStages.map((s) => ({
+    name: s.name,
+    color: s.color,
+    slug: s.slug,
+    count: ws.candidates.filter((c) => c.stage === s.slug && !c.on_hold).length,
+  }));
+  const fmax = Math.max(1, ...funnel.map((f) => f.count));
+  const offersOut = ws.candidates.filter((c) => c.stage === "offered" && !c.on_hold).length;
 
   const metrics: {
     label: string;
@@ -70,13 +72,22 @@ export default async function OverviewPage() {
   }[] = [
     { label: "Open Jobs", value: ws.jobs.filter((j) => j.status !== "closed").length, icon: Briefcase, color: "#2a6fdb", href: "/jobs" },
     { label: "Active Candidates", value: activeCount(ws.candidates), icon: Users, color: "#8b5cf6", href: "/candidates" },
-    { label: "Interviews / wk", value: interviewsThisWeek, icon: Calendar, color: "#06b6d4", href: "/interviews" },
-    { label: "Offers Out", value: stageCount(ws.candidates, "Offered"), icon: FileText, color: "#f59e0b", href: "/offers" },
-    { label: "Hires (Joined)", value: stageCount(ws.candidates, "Joined"), icon: CheckCircle2, color: "#16a34a", href: "/candidates?stage=joined" },
+    { label: "In Interview", value: inInterviewCount(ws.candidates), icon: Calendar, color: "#06b6d4", href: "/pipeline" },
+    { label: "Offers Out", value: offersOut, icon: FileText, color: "#f59e0b", href: "/offers" },
+    { label: "Hires (Joined)", value: hiresCount(ws.candidates), icon: CheckCircle2, color: "#16a34a", href: "/candidates?stage=joined" },
     { label: "Avg Time-to-Hire", value: avgTimeToHire(ws.events), icon: TrendingUp, color: "#0ea5e9", href: "/analytics" },
   ];
 
-  const upcoming = ws.interviews.slice(0, 5);
+  // slug → display name for the activity feed (from the real pipeline).
+  const stageNameOf = new Map(ws.pipeline.default.map((s) => [s.slug, s.name]));
+
+  // Candidates currently in an interview round — shown in the right panel so
+  // reviewers can see WHO is at the client/technical rounds (interviews are run
+  // by the client, not scheduled in the ATS).
+  const stageColorOf = new Map(ws.pipeline.default.map((s) => [s.slug, s.color]));
+  const interviewCands = ws.candidates
+    .filter((c) => c.stageIsInterview && !c.on_hold)
+    .sort((a, b) => b.stagePosition - a.stagePosition || a.name.localeCompare(b.name));
 
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
@@ -140,26 +151,26 @@ export default async function OverviewPage() {
               Open Pipeline →
             </Link>
           </div>
-          {PIPELINE_STAGES.map((s, i) => (
+          {funnel.map((s) => (
             <Link
-              key={s.key}
-              href={`/candidates?stage=${stageToSlug(s.key)}`}
+              key={s.slug}
+              href={`/candidates?stage=${s.slug}`}
               className="-mx-2 mb-[3px] flex items-center gap-3.5 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
             >
-              <div className="w-[130px] shrink-0 text-right text-[12.5px] font-semibold text-[#42506b]">
-                {s.key}
+              <div className="w-[150px] shrink-0 text-right text-[12.5px] font-semibold text-[#42506b]">
+                {s.name}
               </div>
               <div className="h-[26px] flex-1 overflow-hidden rounded-[7px] bg-[#f1f4f9]">
                 <div
                   className="h-full rounded-[7px]"
                   style={{
-                    width: `${Math.max(4, (counts[i] / fmax) * 100)}%`,
+                    width: `${Math.max(4, (s.count / fmax) * 100)}%`,
                     background: `linear-gradient(90deg,${hexA(s.color, 0.85)},${s.color})`,
                   }}
                 />
               </div>
               <div className="tf-num w-8 text-right text-[13px] font-extrabold">
-                {counts[i]}
+                {s.count}
               </div>
             </Link>
           ))}
@@ -167,49 +178,50 @@ export default async function OverviewPage() {
 
         <div className="rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
           <div className="mb-4 flex items-center justify-between">
-            <Link href="/interviews" className="text-[15.5px] font-extrabold hover:text-[#2a6fdb]">
-              Upcoming Interviews
+            <Link href="/pipeline" className="text-[15.5px] font-extrabold hover:text-[#2a6fdb]">
+              In Interview
             </Link>
             <Link
-              href="/interviews"
+              href="/pipeline"
               className="tf-num rounded-full bg-[#eef4fe] px-2.5 py-[3px] text-[11.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
             >
-              {ws.interviews.length} scheduled
+              {interviewCands.length} candidates
             </Link>
           </div>
-          {upcoming.map((iv) => {
-            const c = ws.byId.get(iv.candidate_id);
-            const d = new Date(iv.scheduled_at);
-            return (
+          <div className="max-h-[360px] overflow-y-auto">
+            {interviewCands.slice(0, 12).map((c) => (
               <Link
-                href="/interviews"
-                key={iv.id}
+                href={`/pipeline?job=${c.job_id ?? ""}`}
+                key={c.id}
                 className="-mx-2 flex items-center gap-3 rounded-[10px] border-b border-[#f0f3f8] px-2 py-[11px] last:border-0 hover:bg-[#f6f8fb]"
               >
-                <div className="w-[46px] shrink-0 text-center">
-                  <div className="text-[11px] font-bold text-[#2a6fdb]">
-                    {format(d, "EEE")}
-                  </div>
-                  <div className="tf-num text-[11.5px] font-semibold text-[#8a94a6]">
-                    {format(d, "HH:mm")}
-                  </div>
-                </div>
-                <Avatar name={c?.name ?? "—"} size={34} />
+                <Avatar name={c.name} size={34} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-bold">
-                    {c?.name ?? "—"}
-                  </div>
+                  <div className="truncate text-[13px] font-bold">{c.name}</div>
                   <div className="truncate text-[11.5px] font-medium text-[#8a94a6]">
-                    {c?.jobTitle ?? ""}
+                    {c.jobTitle}
                   </div>
                 </div>
-                <TypePill type={typeLabelFromEnum(iv.type)} />
+                <span
+                  className="shrink-0 rounded-full px-2.5 py-[3px] text-[11px] font-bold"
+                  style={{
+                    background: hexA(stageColorOf.get(c.stage) ?? "#64748b", 0.14),
+                    color: stageColorOf.get(c.stage) ?? "#64748b",
+                  }}
+                >
+                  {c.stageName}
+                </span>
               </Link>
-            );
-          })}
-          {upcoming.length === 0 && (
+            ))}
+          </div>
+          {interviewCands.length > 12 && (
+            <div className="pt-2 text-center text-[11.5px] font-semibold text-[#8a94a6]">
+              + {interviewCands.length - 12} more in interview
+            </div>
+          )}
+          {interviewCands.length === 0 && (
             <div className="py-6 text-center text-[12.5px] font-semibold text-[#a3acbd]">
-              Nothing scheduled.
+              No one in an interview round right now.
             </div>
           )}
         </div>
@@ -252,7 +264,7 @@ export default async function OverviewPage() {
                     {initial ? "added" : "moved"}{" "}
                     <strong className="text-[#16203a]">
                       {cand?.name ?? "a candidate"}
-                      {!initial && ` to ${stageFromSlug(e.to_stage)}`}
+                      {!initial && ` to ${stageNameOf.get(e.to_stage) ?? e.to_stage}`}
                     </strong>
                   </div>
                   <div className="mt-0.5 text-[11px] font-medium text-[#a3acbd]">
@@ -296,7 +308,7 @@ export default async function OverviewPage() {
                 <div className="tf-num text-[14px] font-extrabold">
                   {
                     ws.candidates.filter(
-                      (c) => c.job_id === j.id && c.stageKey !== "Not Joined",
+                      (c) => c.job_id === j.id && c.stageOutcome !== "lost",
                     ).length
                   }
                 </div>

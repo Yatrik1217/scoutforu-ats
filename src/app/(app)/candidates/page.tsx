@@ -2,7 +2,7 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
 import { loadPipelines } from "@/lib/pipeline";
-import { stageFromSlug, stageToSlug, SOURCES } from "@/lib/domain";
+import { stageFromSlug, SOURCES } from "@/lib/domain";
 import { CandidateFilters } from "@/components/candidate-filters";
 import { NewCandidateButton } from "@/components/view-actions";
 import { ExportCsvButton } from "@/components/export-csv";
@@ -47,7 +47,7 @@ export default async function CandidatesPage({
       !c.tags.join(" ").toLowerCase().includes(query)
     )
       return false;
-    if (stage && stageToSlug(c.stageKey) !== stage) return false;
+    if (stage && c.stage !== stage) return false;
     if (source && (c.source ?? "").toLowerCase() !== source.toLowerCase()) return false;
     if (recruiter && c.recruiter_id !== recruiter) return false;
     if (job && c.job_id !== job) return false;
@@ -57,7 +57,11 @@ export default async function CandidatesPage({
 
   // Active-filter chips (label + href that removes just that filter).
   const chips: { key: keyof Params; label: string }[] = [];
-  if (stage) chips.push({ key: "stage", label: `Stage: ${stageFromSlug(stage)}` });
+  if (stage)
+    chips.push({
+      key: "stage",
+      label: `Stage: ${ws.pipeline.default.find((s) => s.slug === stage)?.name ?? stageFromSlug(stage)}`,
+    });
   if (source) chips.push({ key: "source", label: `Source: ${source}` });
   if (recruiter)
     chips.push({
@@ -138,7 +142,7 @@ export default async function CandidatesPage({
               Email: c.email ?? "",
               Phone: c.phone ?? "",
               Role: c.jobTitle,
-              Stage: c.stageKey,
+              Stage: c.stageName,
               Location: c.location ?? "",
               "Experience (yrs)": c.exp_years,
               "Current CTC (LPA)": c.current_ctc_lpa,
@@ -163,6 +167,8 @@ export default async function CandidatesPage({
           location: r.location ?? null,
           jobTitle: r.jobTitle,
           stageKey: r.stageKey,
+          stageName: r.stageName,
+          stageColor: r.stageColor,
           rating: r.rating,
           source: r.source ?? null,
           recruiterName: r.recruiterName,
