@@ -167,8 +167,10 @@ export async function getNavCounts(): Promise<{
   interviews: number;
 }> {
   const sb = await createClient();
+  // "Open Jobs" badge = active openings only (open/hot), matching the Jobs page
+  // which treats status != 'closed' as active. Closed jobs must not inflate it.
   const [jobs, interviews] = await Promise.all([
-    sb.from("jobs").select("id", { count: "exact", head: true }),
+    sb.from("jobs").select("id", { count: "exact", head: true }).neq("status", "closed"),
     sb.from("interviews").select("id", { count: "exact", head: true }),
   ]);
   return { jobs: jobs.count ?? 0, interviews: interviews.count ?? 0 };
