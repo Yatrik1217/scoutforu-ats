@@ -12,8 +12,6 @@ import type {
   AppSettingsRow,
 } from "@/lib/database.types";
 import {
-  STAGES,
-  PIPELINE_STAGES,
   stageFromSlug,
   daysInStage,
   type StageKey,
@@ -208,15 +206,9 @@ export async function getNavCounts(): Promise<{
 }
 
 // ---------- derived analytics (computed from candidates + events) ----------
-export function funnelCounts(candidates: EnrichedCandidate[]) {
-  return PIPELINE_STAGES.map(
-    (s) => candidates.filter((c) => c.stageKey === s.key).length,
-  );
-}
-
-export function stageCount(candidates: EnrichedCandidate[], key: StageKey) {
-  return candidates.filter((c) => c.stageKey === key).length;
-}
+// NOTE: analytics classify by the candidate's resolved pipeline outcome/slug
+// (stageOutcome / stage), never the canonical stageKey — custom stages such as
+// "Rejected" or "1st Technical Round" otherwise collapse to "Sourced".
 
 // Active = still in progress in its pipeline (excludes won/lost outcomes such
 // as Joined/Rejected/Not Joined) and not parked on hold.
@@ -235,9 +227,9 @@ export function hiresCount(candidates: EnrichedCandidate[]) {
 }
 
 // Avg time in each stage (days) from consecutive stage events per candidate.
-export function avgTimeInStage(
-  events: StageEventRow[],
-): Record<StageKey, number> {
+// Avg time in each stage keyed by the REAL stage slug (pipeline-aware), so
+// custom stages aren't collapsed into the canonical map.
+export function avgTimeInStageBySlug(events: StageEventRow[]): Record<string, number> {
   const byCand = new Map<string, StageEventRow[]>();
   for (const e of events) {
     const arr = byCand.get(e.candidate_id) ?? [];
@@ -250,20 +242,18 @@ export function avgTimeInStage(
       (a, b) => +new Date(a.created_at) - +new Date(b.created_at),
     );
     for (let i = 0; i < sorted.length - 1; i++) {
-      const key = stageFromSlug(sorted[i].to_stage);
+      const slug = sorted[i].to_stage;
       const dur =
-        (+new Date(sorted[i + 1].created_at) -
-          +new Date(sorted[i].created_at)) /
+        (+new Date(sorted[i + 1].created_at) - +new Date(sorted[i].created_at)) /
         86_400_000;
-      const t = (totals[key] ??= { sum: 0, n: 0 });
+      const t = (totals[slug] ??= { sum: 0, n: 0 });
       t.sum += dur;
       t.n += 1;
     }
   }
-  const out = {} as Record<StageKey, number>;
-  for (const s of STAGES) {
-    const t = totals[s.key];
-    out[s.key] = t && t.n ? Math.round((t.sum / t.n) * 10) / 10 : 0;
+  const out: Record<string, number> = {};
+  for (const [slug, t] of Object.entries(totals)) {
+    out[slug] = t.n ? Math.round((t.sum / t.n) * 10) / 10 : 0;
   }
   return out;
 }
@@ -298,12 +288,3 @@ export function avgTimeToHireDays(events: StageEventRow[]): number | null {
     : null;
 }
 
-export function offerAcceptRate(candidates: EnrichedCandidate[]) {
-  const offered = candidates.filter((c) =>
-    ["Offered", "Offer Accepted", "Joined"].includes(c.stageKey),
-  ).length;
-  const accepted = candidates.filter((c) =>
-    ["Offer Accepted", "Joined"].includes(c.stageKey),
-  ).length;
-  return offered ? Math.round((accepted / offered) * 100) : 0;
-}

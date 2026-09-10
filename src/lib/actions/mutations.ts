@@ -6,14 +6,9 @@ import { sendMail, emailConfigured, fromAddress } from "@/lib/email";
 import { sanitizeRichText } from "@/lib/rich-text";
 import { renderTemplate } from "@/lib/template-render";
 import { recruiterMailAccount } from "@/lib/user-mail";
-import { buildResolver, type PipelineStage } from "@/lib/pipeline-core";
-import {
-  stageToSlug,
-  stageFromSlug,
-  nextStage,
-  AUTO_EMAIL_MASTER,
-  type StageKey,
-} from "@/lib/domain";
+import { buildResolver, nextStageSlug, type PipelineStage } from "@/lib/pipeline-core";
+import { loadPipelines } from "@/lib/pipeline";
+import { stageToSlug, AUTO_EMAIL_MASTER, type StageKey } from "@/lib/domain";
 import type {
   AppSettingsRow,
   CandidateStage,
@@ -219,14 +214,26 @@ export async function advanceCandidate(id: string): Promise<Result> {
   const sb = await createClient();
   const { data } = await sb
     .from("candidates")
-    .select("stage,name")
+    .select("stage,name,job_id")
     .eq("id", id)
     .single();
   if (!data) return { ok: false, error: "Candidate not found" };
-  const next = nextStage(stageFromSlug(data.stage));
+  // Advance along the candidate's OWN pipeline (client override or Default).
+  let clientId: string | null = null;
+  if (data.job_id) {
+    const { data: job } = await sb
+      .from("jobs")
+      .select("client_id")
+      .eq("id", data.job_id)
+      .maybeSingle();
+    clientId = job?.client_id ?? null;
+  }
+  const stages = (await loadPipelines()).forClient(clientId);
+  const next = nextStageSlug(stages, data.stage);
   if (!next) return { ok: false, error: "Already at the final stage" };
-  const res = await setStage(id, next);
-  return res.ok ? { ...res, message: `${data.name} advanced to ${next}` } : res;
+  const res = await setStageBySlug(id, next);
+  const nextName = stages.find((s) => s.slug === next)?.name ?? next;
+  return res.ok ? { ...res, message: `${data.name} advanced to ${nextName}` } : res;
 }
 
 // The stage a rejected candidate should land in, resolved from their own
@@ -450,10 +457,10 @@ export async function acceptOffer(id: string): Promise<Result> {
     .eq("id", id)
     .single();
   if (!data) return { ok: false, error: "Candidate not found" };
-  const current = stageFromSlug(data.stage);
-  const to: StageKey = current === "Offered" ? "Offer Accepted" : "Joined";
-  const res = await setStage(id, to);
-  return res.ok ? { ...res, message: `${data.name} → ${to}` } : res;
+  // From "offered" accept → "offer_accepted"; from anywhere else → "joined".
+  const to = data.stage === "offered" ? "offer_accepted" : "joined";
+  const res = await setStageBySlug(id, to);
+  return res.ok ? { ...res, message: `${data.name} → ${to.replace("_", " ")}` } : res;
 }
 
 export async function advanceTalent(id: string): Promise<Result> {

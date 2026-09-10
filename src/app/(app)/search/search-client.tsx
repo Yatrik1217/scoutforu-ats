@@ -270,7 +270,7 @@ function Results({ rows }: { rows: EnrichedCandidate[] }) {
               <div className="text-[12px] font-bold text-[#16203a]">{c.exp_years}y exp</div>
               <div className="text-[11px] font-semibold text-[#16a34a]">{fmtSalary(c.expected_ctc_lpa)}</div>
             </div>
-            <StageBadge stage={c.stageKey} />
+            <StageBadge stage={c.stageKey} name={c.stageName} color={c.stageColor} />
           </div>
         ))}
         {rows.length === 0 && (

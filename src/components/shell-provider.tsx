@@ -44,11 +44,13 @@ export function ShellProvider({
   role,
   team,
   clients,
+  stages,
   children,
 }: {
   role: UserRole;
   team: ProfileRow[];
   clients: ClientRow[];
+  stages: { slug: string; name: string }[];
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -132,6 +134,7 @@ export function ShellProvider({
         open={candForm.open}
         candidate={candForm.candidate}
         team={team}
+        stages={stages}
         onClose={() => setCandForm({ open: false, candidate: null })}
       />
       <JobFormModal

@@ -1,35 +1,51 @@
 import Link from "next/link";
 import {
   loadWorkspace,
-  funnelCounts,
-  avgTimeInStage,
+  avgTimeInStageBySlug,
   sourceCounts,
-  offerAcceptRate,
   avgTimeToHireDays,
-  stageCount,
+  hiresCount,
 } from "@/lib/data";
-import {
-  PIPELINE_STAGES,
-  SOURCES,
-  SOURCE_COLOR,
-  hexA,
-  stageToSlug,
-} from "@/lib/domain";
+import { SOURCES, SOURCE_COLOR, hexA } from "@/lib/domain";
 
 export default async function AnalyticsPage() {
   const { ws } = await loadWorkspace();
-  const counts = funnelCounts(ws.candidates);
-  const fmax = Math.max(1, ...counts);
-  const tis = avgTimeInStage(ws.events);
-  const tisVals = PIPELINE_STAGES.map((s) => tis[s.key]);
-  const tisMax = Math.max(1, ...tisVals);
-  const velocity = tisVals.filter((v) => v > 0);
+
+  // Real pipeline stages (Default), excluding lost outcomes — for the funnel and
+  // time-in-stage. Counts by actual slug so custom stages don't collapse.
+  const funnelStages = ws.pipeline.default.filter((s) => s.outcome !== "lost");
+  const funnel = funnelStages.map((s) => ({
+    name: s.name,
+    slug: s.slug,
+    color: s.color,
+    count: ws.candidates.filter((c) => c.stage === s.slug && !c.on_hold).length,
+  }));
+  const fmax = Math.max(1, ...funnel.map((f) => f.count));
+
+  const tisMap = avgTimeInStageBySlug(ws.events);
+  const tis = funnelStages.map((s) => ({
+    name: s.name,
+    slug: s.slug,
+    color: s.color,
+    days: tisMap[s.slug] ?? 0,
+  }));
+  const tisMax = Math.max(1, ...tis.map((t) => t.days));
+  const velocity = tis.map((t) => t.days).filter((v) => v > 0);
   const velAvg = velocity.length
     ? (velocity.reduce((a, b) => a + b, 0) / velocity.length).toFixed(1)
     : "—";
   const tth = avgTimeToHireDays(ws.events);
   const src = sourceCounts(ws.candidates);
   const srcMax = Math.max(1, ...SOURCES.map((s) => src[s] ?? 0));
+
+  // Offer accept rate over the real offer stages.
+  const offered = ws.candidates.filter((c) =>
+    ["offered", "offer_accepted", "offer_declined", "joined"].includes(c.stage),
+  ).length;
+  const accepted = ws.candidates.filter((c) =>
+    ["offer_accepted", "joined"].includes(c.stage),
+  ).length;
+  const acceptRate = offered ? Math.round((accepted / offered) * 100) : 0;
 
   // Recruiter productivity: resumes the recruiter SOURCED vs applicants who came
   // in on their own via the CAREER site (kept separate — a self-application isn't
@@ -55,10 +71,10 @@ export default async function AnalyticsPage() {
   const recMaxSourced = Math.max(1, ...recruiterRows.map((r) => r.sourced));
 
   const kpis = [
-    { label: "Offer Accept Rate", value: `${offerAcceptRate(ws.candidates)}%`, delta: "+5% vs last qtr", tone: "pos", href: "/offers" },
-    { label: "Avg Time-to-Hire", value: tth ? `${tth}d` : "—", delta: "-3d faster", tone: "pos", href: "/pipeline" },
+    { label: "Offer Accept Rate", value: `${acceptRate}%`, delta: `${accepted}/${offered} offers`, tone: "pos", href: "/offers" },
+    { label: "Avg Time-to-Hire", value: tth ? `${tth}d` : "—", delta: "first stage → joined", tone: "pos", href: "/pipeline" },
     { label: "Pipeline Velocity", value: `${velAvg}d`, delta: "per stage", tone: "neutral", href: "/pipeline" },
-    { label: "Total Hires (QTD)", value: stageCount(ws.candidates, "Joined"), delta: "+17%", tone: "pos", href: "/candidates" },
+    { label: "Total Hires", value: hiresCount(ws.candidates), delta: "joined", tone: "pos", href: "/candidates?stage=joined" },
   ] as const;
 
   return (
@@ -127,26 +143,26 @@ export default async function AnalyticsPage() {
           <div className="mb-[18px] text-[15.5px] font-extrabold">
             Avg Time in Stage (days)
           </div>
-          {PIPELINE_STAGES.map((s, i) => (
+          {tis.map((s) => (
             <Link
-              key={s.key}
-              href={`/candidates?stage=${stageToSlug(s.key)}`}
+              key={s.slug}
+              href={`/candidates?stage=${s.slug}`}
               className="-mx-2 mb-[3px] flex items-center gap-3 rounded-[9px] px-2 py-1 hover:bg-[#f6f8fb]"
             >
-              <div className="w-[130px] text-right text-[12px] font-semibold text-[#42506b]">
-                {s.key}
+              <div className="w-[150px] text-right text-[12px] font-semibold text-[#42506b]">
+                {s.name}
               </div>
               <div className="h-5 flex-1 overflow-hidden rounded-md bg-[#f1f4f9]">
                 <div
                   className="h-full rounded-md"
                   style={{
-                    width: `${(tisVals[i] / tisMax) * 100}%`,
+                    width: `${(s.days / tisMax) * 100}%`,
                     background: `linear-gradient(90deg,${hexA(s.color, 0.8)},${s.color})`,
                   }}
                 />
               </div>
               <div className="tf-num w-6 text-right text-[12.5px] font-extrabold">
-                {tisVals[i]}
+                {s.days}
               </div>
             </Link>
           ))}
@@ -156,25 +172,25 @@ export default async function AnalyticsPage() {
           <div className="mb-[18px] text-[15.5px] font-extrabold">
             Conversion Funnel
           </div>
-          <div className="flex h-[180px] items-end gap-2.5">
-            {PIPELINE_STAGES.map((s, i) => (
+          <div className="flex h-[180px] items-end gap-2.5 overflow-x-auto">
+            {funnel.map((s) => (
               <Link
-                key={s.key}
-                href={`/candidates?stage=${stageToSlug(s.key)}`}
-                className="flex h-full flex-1 flex-col items-center justify-end rounded-[9px] hover:bg-[#f6f8fb]"
+                key={s.slug}
+                href={`/candidates?stage=${s.slug}`}
+                className="flex h-full min-w-[54px] flex-1 flex-col items-center justify-end rounded-[9px] hover:bg-[#f6f8fb]"
               >
                 <div className="tf-num mb-1.5 text-[13px] font-extrabold">
-                  {counts[i]}
+                  {s.count}
                 </div>
                 <div
                   className="w-full max-w-[46px] rounded-t-[7px]"
                   style={{
-                    height: `${Math.max(6, (counts[i] / fmax) * 130)}px`,
+                    height: `${Math.max(6, (s.count / fmax) * 130)}px`,
                     background: `linear-gradient(180deg,${s.color},${hexA(s.color, 0.6)})`,
                   }}
                 />
                 <div className="mt-2 text-center text-[10px] font-semibold leading-tight text-[#8a94a6]">
-                  {s.key}
+                  {s.name}
                 </div>
               </Link>
             ))}

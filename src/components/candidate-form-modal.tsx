@@ -17,7 +17,6 @@ import { parseResume } from "@/lib/actions/parse-resume";
 import { useShell } from "@/components/shell-provider";
 import { AlertTriangle } from "lucide-react";
 import {
-  STAGES,
   SOURCES,
   INDIAN_CITIES,
   GENDERS,
@@ -25,8 +24,6 @@ import {
   QUALIFICATIONS,
   FUNCTIONAL_AREAS,
   INDUSTRIES,
-  stageToSlug,
-  stageFromSlug,
 } from "@/lib/domain";
 import type {
   CandidateRow,
@@ -88,11 +85,13 @@ export function CandidateFormModal({
   open,
   candidate,
   team,
+  stages,
   onClose,
 }: {
   open: boolean;
   candidate: CandidateRow | null;
   team: ProfileRow[];
+  stages: { slug: string; name: string }[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -310,7 +309,7 @@ export function CandidateFormModal({
               <AlertTriangle size={18} className="shrink-0 text-[#b27400]" />
               <div className="flex-1 text-[12.5px] font-semibold text-[#7a5b14]">
                 Possible duplicate — <b>{dup.name}</b> is already in your database
-                {" "}(stage: {stageFromSlug(dup.stage)}), matched by {dup.via}.
+                {" "}(stage: {stages.find((s) => s.slug === dup.stage)?.name ?? dup.stage}), matched by {dup.via}.
               </div>
               <button
                 type="button"
@@ -366,9 +365,9 @@ export function CandidateFormModal({
               </Field>
             )}
             <Field label="Stage">
-              <select value={stageToSlug(STAGES.find((s) => s.slug === f.stage)?.key ?? "Sourced")} onChange={(e) => set("stage", e.target.value as CandidateStage)} className={`${fieldCls} cursor-pointer`}>
-                {STAGES.map((s) => (
-                  <option key={s.slug} value={s.slug}>{s.key}</option>
+              <select value={f.stage} onChange={(e) => set("stage", e.target.value as CandidateStage)} className={`${fieldCls} cursor-pointer`}>
+                {stages.map((s) => (
+                  <option key={s.slug} value={s.slug}>{s.name}</option>
                 ))}
               </select>
             </Field>

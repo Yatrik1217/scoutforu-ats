@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { getEffectiveScope } from "@/lib/preview";
 import { getNavCounts } from "@/lib/data";
+import { loadPipelines } from "@/lib/pipeline";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
@@ -16,7 +17,7 @@ export default async function AppLayout({
   // New logins must set their own password before using the app.
   if (profile.must_change_password) redirect("/change-password");
   const sb = await createClient();
-  const [{ data: clients }, { data: team }, counts] = await Promise.all([
+  const [{ data: clients }, { data: team }, counts, pipelines] = await Promise.all([
     sb.from("clients").select("*").order("name"),
     sb
       .from("profiles")
@@ -24,8 +25,11 @@ export default async function AppLayout({
       .neq("role", "client")
       .eq("active", true),
     getNavCounts(),
+    loadPipelines(),
   ]);
   const scope = await getEffectiveScope(profile, clients ?? []);
+  // Real pipeline stages for the "add/edit candidate" form's Stage dropdown.
+  const stageOptions = pipelines.default.map((s) => ({ slug: s.slug, name: s.name }));
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#eef1f6]">
@@ -36,7 +40,7 @@ export default async function AppLayout({
         interviewsCount={counts.interviews}
       />
       <main className="flex min-w-0 flex-1 flex-col">
-        <ShellProvider role={scope.role} team={team ?? []} clients={clients ?? []}>
+        <ShellProvider role={scope.role} team={team ?? []} clients={clients ?? []} stages={stageOptions}>
           <AppTopbar
             effectiveRole={scope.role}
             realRole={scope.realRole}

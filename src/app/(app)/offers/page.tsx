@@ -18,15 +18,14 @@ export default async function OffersPage() {
     .map((o) => ({ offer: o, cand: ws.byId.get(o.candidate_id) }))
     .filter(
       (x) =>
-        x.cand &&
-        (x.cand.stageKey === "Offered" || x.cand.stageKey === "Offer Accepted"),
+        x.cand && (x.cand.stage === "offered" || x.cand.stage === "offer_accepted"),
     );
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
       <div className="grid grid-cols-2 gap-4">
         {cards.map(({ offer, cand }) => {
-          const accepted = cand!.stageKey === "Offer Accepted";
+          const accepted = cand!.stage === "offer_accepted";
           const until = daysUntil(offer.expires_at);
           return (
             <div

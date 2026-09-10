@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import ExcelJS from "exceljs";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { emailConfigured, fromAddress, sendMail, type MailAttachment } from "@/lib/email";
+import { loadPipelines } from "@/lib/pipeline";
 
 type Result = { ok: boolean; error?: string; message?: string };
 
@@ -63,6 +64,9 @@ export async function shareWithClient(input: {
         .join(", ")}. An internal approver must approve them first (or unselect them).`,
     };
 
+  // Real stage display names from the pipeline (falls back to a prettified slug).
+  const stageNameOf = new Map((await loadPipelines()).default.map((s) => [s.slug, s.name]));
+
   // Build the Excel tracker.
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Candidates");
@@ -95,7 +99,7 @@ export async function shareWithClient(input: {
       location: c.location || "",
       email: c.email || "",
       phone: c.phone || "",
-      stage: prettyStage(c.stage),
+      stage: stageNameOf.get(c.stage) ?? prettyStage(c.stage),
       source: c.source || "",
       skills: (c.tags || []).join(", "),
     });
