@@ -4,7 +4,7 @@ import { TalentAdvance } from "@/components/view-actions";
 
 export default async function TalentPage() {
   const { ws } = await loadWorkspace();
-  const sourced = ws.candidates.filter((c) => c.stageKey === "Sourced");
+  const sourced = ws.candidates.filter((c) => c.stage === "sourced");
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
