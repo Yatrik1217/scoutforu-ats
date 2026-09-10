@@ -81,8 +81,10 @@ export function recruiterMetrics(ws: Workspace): RecruiterMetric[] {
   return recruiters.map((t) => {
     const owned = ws.candidates.filter((c) => c.recruiter_id === t.id);
     const ownedIds = new Set(owned.map((c) => c.id));
+    // Active pipeline excludes terminal stages AND parked (on-hold) candidates,
+    // so a frozen/awaiting-client candidate doesn't inflate active or stalled.
     const mine = owned.filter(
-      (c) => c.stageKey !== "Joined" && c.stageKey !== "Not Joined",
+      (c) => c.stageKey !== "Joined" && c.stageKey !== "Not Joined" && !c.on_hold,
     );
 
     // Openings, credited by the submitting recruiter (works for shared reqs).
