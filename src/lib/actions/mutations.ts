@@ -281,6 +281,47 @@ export async function rejectCandidate(id: string, reason?: string): Promise<Resu
     : res;
 }
 
+// Put a candidate on hold (submitted-but-no-update / position paused) or resume
+// them. Holding keeps their stage; it only sets a flag the board uses to hide
+// them from the active columns while still counting them against the opening.
+export async function setCandidateHold(
+  id: string,
+  on: boolean,
+  reason?: string,
+): Promise<Result> {
+  const sb = await createClient();
+  const cleanReason = (reason ?? "").trim();
+  const { data: cand } = await sb.from("candidates").select("name").eq("id", id).single();
+  const { error } = await sb
+    .from("candidates")
+    .update({
+      on_hold: on,
+      hold_reason: on ? cleanReason : "",
+      held_at: on ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  await sb.from("candidate_notes").insert({
+    candidate_id: id,
+    author_id: user?.id ?? null,
+    body: on
+      ? `Put on hold${cleanReason ? ` — ${cleanReason}` : ""}`
+      : "Resumed to the active pipeline",
+  });
+
+  refresh();
+  return {
+    ok: true,
+    message: on
+      ? `${cand?.name ?? "Candidate"} put on hold`
+      : `${cand?.name ?? "Candidate"} resumed`,
+  };
+}
+
 export async function addDisqualifyReason(label: string): Promise<Result> {
   const clean = label.trim();
   if (!clean) return { ok: false, error: "Reason is empty" };

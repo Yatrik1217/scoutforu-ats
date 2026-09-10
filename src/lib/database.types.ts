@@ -146,6 +146,9 @@ export type CandidateRow = {
   review_status: ReviewStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  on_hold: boolean;
+  hold_reason: string;
+  held_at: string | null;
   entered_stage_at: string;
   created_at: string;
 };

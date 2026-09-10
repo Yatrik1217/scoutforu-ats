@@ -7,7 +7,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText, Check } from "lucide-react";
+import { X, ArrowRight, Mail, Calendar, Pencil, Trash2, FileText, Check, PauseCircle, Play } from "lucide-react";
 import { CandidateMessageModal } from "@/components/candidate-message-modal";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -26,6 +26,7 @@ import {
   addInterviewFeedback,
   deleteInterviewFeedback,
   reviewCandidate,
+  setCandidateHold,
 } from "@/lib/actions/mutations";
 import { scoreCandidateJd } from "@/lib/actions/jd-score";
 import type {
@@ -265,6 +266,25 @@ export function CandidateDrawer({
       }
     });
 
+  const doHold = () => {
+    const onHold = !!detail?.cand.on_hold;
+    const reason = onHold
+      ? ""
+      : prompt("Why is this on hold? e.g. awaiting client update, position paused (optional)") ?? "";
+    start(async () => {
+      const res = await setCandidateHold(candidateId, !onHold, reason);
+      if (res.ok) {
+        toast.success(res.message ?? "Done");
+        setDetail((d) =>
+          d
+            ? { ...d, cand: { ...d.cand, on_hold: !onHold, hold_reason: onHold ? "" : reason.trim() } }
+            : d,
+        );
+        router.refresh();
+      } else toast.error(res.error ?? "Action failed");
+    });
+  };
+
   const doReview = (status: "approved" | "rejected") => {
     const note =
       status === "rejected"
@@ -398,6 +418,22 @@ export function CandidateDrawer({
                   </button>
                 )}
               </div>
+
+              {detail.cand.on_hold && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-[12px] border border-[#f5d9a8] bg-[#fff7ea] p-[12px_14px]">
+                  <PauseCircle size={17} className="mt-0.5 shrink-0 text-[#b45309]" />
+                  <div>
+                    <div className="text-[12.5px] font-bold text-[#b45309]">
+                      On hold — hidden from the active board
+                    </div>
+                    <div className="text-[12px] text-[#8a6d3b]">
+                      {detail.cand.hold_reason
+                        ? detail.cand.hold_reason
+                        : "Parked awaiting an update. Use Resume to bring them back."}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {!!detail.cand.review_status && detail.cand.review_status !== "none" && (
                 <div
@@ -787,6 +823,23 @@ export function CandidateDrawer({
                   className="flex items-center justify-center rounded-[11px] border border-[#eadfe0] bg-[#fafafa] px-3 py-3 text-[#9aa4b6] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:opacity-60"
                 >
                   <Trash2 size={16} />
+                </button>
+                <button
+                  disabled={pending}
+                  onClick={doHold}
+                  title={
+                    detail.cand.on_hold
+                      ? "Resume to the active pipeline"
+                      : "Park this candidate (awaiting client / position on hold)"
+                  }
+                  className={
+                    detail.cand.on_hold
+                      ? "flex items-center justify-center gap-1.5 rounded-[11px] border border-[#bbe3c9] bg-[#eafaf0] px-3 py-3 text-[13px] font-bold text-[#16a34a] hover:bg-[#dcf5e6] disabled:opacity-60"
+                      : "flex items-center justify-center gap-1.5 rounded-[11px] border border-[#f5d9a8] bg-[#fff7ea] px-3 py-3 text-[13px] font-bold text-[#b45309] hover:bg-[#fdeecb] disabled:opacity-60"
+                  }
+                >
+                  {detail.cand.on_hold ? <Play size={15} /> : <PauseCircle size={15} />}
+                  {detail.cand.on_hold ? "Resume" : "Hold"}
                 </button>
                 <button
                   disabled={pending}

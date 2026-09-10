@@ -16,7 +16,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Briefcase, Clock, LayoutGrid, Rows3, Table2 } from "lucide-react";
+import { Briefcase, Clock, LayoutGrid, PauseCircle, Rows3, Table2 } from "lucide-react";
 import { hexA } from "@/lib/domain";
 import type { PipelineStage } from "@/lib/pipeline";
 import { Avatar, RecBadge, RatingChip } from "@/components/bits";
@@ -96,8 +96,15 @@ export function PipelineClient({
     }
   }, [visibleJobs, filterJob]);
 
+  // "On Hold" view: held candidates are hidden from the active board (so reviews
+  // stay clean) but still counted against their opening via a toggle chip.
+  const [showHold, setShowHold] = useState(false);
+
   const q = query.trim().toLowerCase();
-  const filtered = useMemo(
+  // Everything matching the job / recruiter / opening / search filters, whether
+  // held or not. `filtered` is the active board (held excluded); `heldItems` is
+  // the parked list shown when the On Hold chip is active.
+  const inScope = useMemo(
     () =>
       items.filter((c) => {
         if (!jobMatchesOpening(c.job_id)) return false;
@@ -116,6 +123,9 @@ export function PipelineClient({
       }),
     [items, filterJob, filterRec, q, openingStatus, statusOf],
   );
+  const filtered = useMemo(() => inScope.filter((c) => !c.on_hold), [inScope]);
+  const heldItems = useMemo(() => inScope.filter((c) => c.on_hold), [inScope]);
+  const holdCount = heldItems.length;
 
   // The stage list that governs the board columns: follows the selected job's
   // client pipeline; the "All roles" view uses the Default.
@@ -239,9 +249,24 @@ export function PipelineClient({
           </select>
         )}
         <span className="tf-num text-[12.5px] font-semibold text-[#8a94a6]">
-          {filtered.length} candidates
+          {showHold ? `${heldItems.length} on hold` : `${filtered.length} candidates`}
         </span>
-        {canWrite && (
+        {(holdCount > 0 || showHold) && (
+          <button
+            onClick={() => setShowHold((v) => !v)}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold transition"
+            style={
+              showHold
+                ? { background: "#f59e0b", color: "#fff" }
+                : { background: "#fff5e6", color: "#b45309" }
+            }
+            title="Candidates parked awaiting a client update or a paused role"
+          >
+            <PauseCircle size={14} strokeWidth={2.4} />
+            {showHold ? "Viewing on hold" : `On hold (${holdCount})`}
+          </button>
+        )}
+        {canWrite && !showHold && (
           <button
             onClick={() => openCandidateForm(null)}
             className="flex items-center gap-1.5 rounded-[9px] bg-[#eef4fe] px-3 py-2 text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
@@ -279,7 +304,21 @@ export function PipelineClient({
         </div>
       </div>
 
-      {layout === "table" ? (
+      {showHold ? (
+        heldItems.length ? (
+          <PipelineTable rows={heldItems} stageInfoOf={stageInfoOf} onOpen={openDrawer} />
+        ) : (
+          <div className="mx-[26px] rounded-[14px] border border-dashed border-[#e3e8f0] bg-white py-16 text-center">
+            <PauseCircle size={26} className="mx-auto text-[#c3ccdb]" />
+            <div className="mt-2 text-[13px] font-semibold text-[#8a94a6]">
+              Nothing on hold for this view.
+            </div>
+            <div className="mt-1 text-[12px] text-[#a3acbd]">
+              Open a candidate and choose “Put on hold” to park them here.
+            </div>
+          </div>
+        )
+      ) : layout === "table" ? (
         <PipelineTable rows={filtered} stageInfoOf={stageInfoOf} onOpen={openDrawer} />
       ) : (
         <DndContext
