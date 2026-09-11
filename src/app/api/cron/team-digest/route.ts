@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, sent: false, reason: "email not configured" });
   }
 
-  const sb = createServiceClient();
   const scope: EffectiveScope = {
     role: "master_admin",
     realRole: "master_admin",
@@ -36,8 +35,24 @@ export async function GET(req: NextRequest) {
     userId: "cron",
     scopeLabel: "cron",
   };
-  const ws = await getWorkspace(scope, sb);
-  const metrics = recruiterMetrics(ws);
+
+  // getWorkspace turns a failed read into empty data (?? []), which would make a
+  // transient DB hiccup look like a real all-zero day. Load, and if no recruiters
+  // resolve (never true in normal operation), retry once, then SKIP rather than
+  // send a false report.
+  let ws = await getWorkspace(scope, createServiceClient());
+  let metrics = recruiterMetrics(ws);
+  if (metrics.length === 0) {
+    ws = await getWorkspace(scope, createServiceClient());
+    metrics = recruiterMetrics(ws);
+  }
+  if (metrics.length === 0) {
+    return NextResponse.json({
+      ok: false,
+      sent: false,
+      reason: "no recruiters resolved (likely a transient read failure) — skipped to avoid a false all-zero report",
+    });
+  }
 
   // Recipients.
   const envTo = (process.env.DIGEST_TO || "")
