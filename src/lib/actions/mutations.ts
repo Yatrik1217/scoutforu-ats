@@ -8,7 +8,7 @@ import { renderTemplate } from "@/lib/template-render";
 import { recruiterMailAccount } from "@/lib/user-mail";
 import { buildResolver, nextStageSlug, type PipelineStage } from "@/lib/pipeline-core";
 import { loadPipelines } from "@/lib/pipeline";
-import { stageToSlug, AUTO_EMAIL_MASTER, type StageKey } from "@/lib/domain";
+import { AUTO_EMAIL_MASTER } from "@/lib/domain";
 import type {
   AppSettingsRow,
   CandidateStage,
@@ -57,12 +57,6 @@ async function setStageBySlug(id: string, toSlug: string): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };
-}
-
-// Back-compat wrapper for callers that work in default StageKey terms
-// (advance/reject/join etc.).
-async function setStage(id: string, to: StageKey): Promise<Result> {
-  return setStageBySlug(id, stageToSlug(to));
 }
 
 // Internal approver signs off (or sends back) a submitted profile.
@@ -461,19 +455,6 @@ export async function acceptOffer(id: string): Promise<Result> {
   const to = data.stage === "offered" ? "offer_accepted" : "joined";
   const res = await setStageBySlug(id, to);
   return res.ok ? { ...res, message: `${data.name} → ${to.replace("_", " ")}` } : res;
-}
-
-export async function advanceTalent(id: string): Promise<Result> {
-  const sb = await createClient();
-  const { data } = await sb
-    .from("candidates")
-    .select("name")
-    .eq("id", id)
-    .single();
-  const res = await setStage(id, "Screening");
-  return res.ok
-    ? { ...res, message: `${data?.name ?? "Candidate"} moved to Screening` }
-    : res;
 }
 
 export type ReqForm = {

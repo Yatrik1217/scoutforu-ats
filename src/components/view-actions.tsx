@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   acceptOffer,
-  advanceTalent,
+  advanceCandidate,
   deleteJob,
   setUserActive,
   updateSetting,
@@ -177,17 +177,17 @@ export function OfferActions({
   );
 }
 
-export function TalentAdvance({ id }: { id: string }) {
+export function TalentAdvance({ id, nextLabel }: { id: string; nextLabel: string | null }) {
   const router = useRouter();
   const { canWrite } = useShell();
   const [pending, start] = useTransition();
-  if (!canWrite) return null;
+  if (!canWrite || !nextLabel) return null;
   return (
     <button
       disabled={pending}
       onClick={() =>
         start(async () => {
-          const res = await advanceTalent(id);
+          const res = await advanceCandidate(id);
           if (res.ok) {
             toast.success(res.message ?? "Moved");
             router.refresh();
@@ -196,7 +196,7 @@ export function TalentAdvance({ id }: { id: string }) {
       }
       className="mt-3.5 w-full rounded-[9px] bg-[#eef4fe] py-2.5 text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd] disabled:opacity-60"
     >
-      Move to Screening →
+      Move to {nextLabel} →
     </button>
   );
 }
