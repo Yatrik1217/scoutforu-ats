@@ -1,6 +1,6 @@
 # ScoutforU — ATS + CRM Handover & Operations Guide
 
-_Last updated: September 2026. This is the single reference for running, fixing, and
+_Last updated: 14 September 2026. This is the single reference for running, fixing, and
 extending the two systems. Give it to any developer you hire._
 
 ---
@@ -30,6 +30,7 @@ Both apps run on **one Hostinger VPS** and share **one Supabase project**.
 | **Domains / DNS** | `scoutforu.com` DNS (Hostinger). `ats.` and `crm.` subdomains point to the VPS; MX records point to **Zoho** for email — do not remove MX. |
 | **Email** | Zoho mailboxes. Shared sender `career@scoutforu.com`. Recruiters can send from their own mailbox (ATS → My Email). |
 | **Anthropic API** | Pay-as-you-go credits (console.anthropic.com → Plans & Billing). Used ONLY for resume parsing, JD-match scoring, and candidate-email rendering. ~₹0.3–0.5 per resume/score. Keep a small balance or enable auto-reload. |
+| **App config** | ATS reads `/opt/scoutforu-ats/.env.local` on the VPS (Next.js env). Keys: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `SMTP_*` (Zoho), `CRON_SECRET` (daily-digest auth), `DIGEST_TO` (digest recipient). After editing it, `pm2 reload ats`. |
 | **Backups** | Nightly VPS backups of both Supabase blobs exist (see the crontab on the VPS). |
 
 **Recurring cost after you stop using Claude Code:** VPS (already prepaid) + Supabase (free) + Anthropic (only when you parse/score — usage-based, tiny). The apps do **not** need Claude Code to keep running.
@@ -63,7 +64,7 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 ## 4. Database & migrations
 
 ### ATS (Supabase Postgres)
-- Schema changes live in `supabase/migrations/*.sql` (numbered, e.g. `0052_...`).
+- Schema changes live in `supabase/migrations/*.sql` (numbered; latest is `0053_candidate_on_hold.sql`).
 - **⚠️ Migrations are NOT auto-applied.** After deploying code that needs a new column/table, open **Supabase → SQL Editor**, paste the migration SQL, and run it. If a feature "doesn't save," a migration is usually the missing step.
 - Row-Level Security (RLS) governs who sees what: `master_admin` sees everything; a recruiter sees only their assigned jobs/candidates; a client sees only their own.
 
@@ -86,6 +87,36 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 - **Attendance/payroll:** staff check in themselves; unmarked past working days = Absent; holidays (`holidays` table) and weekly-offs are paid. A CRM-linked employee (`attendance_source='crm'`) has their attendance read live from the CRM and is shown once, view-only.
 - **Careers:** public jobs come from a curated `public_jobs` view (client names redacted). JD supports rich text (bold/italic/lists), stored as sanitized HTML.
 
+### 5.1 Recruiting analytics & workflow (added Sep 2026)
+
+All of the below were added/hardened in this round. They share the pipeline-aware
+model above (`stageOutcome`/`stageName`), and the shared metric math lives in
+`src/lib/team-metrics.ts` so every surface agrees.
+
+- **Recruiting Team page** (`/team`, admin only): click a recruiter to drill into
+  every opening they've **submitted candidates to** (a shared requisition shows on
+  each contributor's card, scoped to their own submissions). Each card also shows
+  **stalled** (active candidates idle in one stage > 10 days), **this-week velocity**
+  (submitted / interviews / offers / hires), and **conversion** (to-interview /
+  to-offer / to-hire %, measured by furthest pipeline stage reached).
+- **On Hold** (candidate drawer → "Hold"): parks a candidate that's submitted with
+  no client update, or whose role is paused. They **keep their stage** but drop out
+  of the active board (so reviews stay clean) and are counted against their opening
+  via the pipeline board's **"On hold" chip**. One-click **Resume** restores them.
+  Excluded from Active/stalled everywhere. Columns: `candidates.on_hold` /
+  `hold_reason` / `held_at` (migration `0053`).
+- **Pipeline openings filter** (`/pipeline`): an **Active / Inactive / All** toggle
+  (default Active) limits both the role dropdown and the board to open (vs closed)
+  requisitions, so a review only covers live roles.
+- **Talent Pool** (`/talent`): the **pre-submission bench** — every in-progress,
+  not-on-hold candidate **before the Client Submit stage** (i.e. Sourced / Screening),
+  newest first, with a stage badge. This is where career-site applicants land so they
+  don't pile up unseen; the card button advances each to its real next stage.
+- **Daily digest email** — see §7 (runbooks) for the schedule and how to change it.
+- **Data health-check** — `node scripts/audit.mjs` (from the repo root) runs a
+  read-only audit against the live DB: stage integrity, orphaned/duplicate records,
+  and reconciles every dashboard number. Run it whenever a number looks off.
+
 ## 6. CRM — how it's built
 
 - **Framework:** Express (`app.js` = routes, `server.js` = start). SPA front-end in `public/index.html` (hash-router).
@@ -107,7 +138,11 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 - **Top up AI credits:** console.anthropic.com → Plans & Billing → Purchase credits (or enable auto-reload). ~₹0.3–0.5 per resume parsed/scored.
 - **Restart an app:** `ssh root@200.141.9.192 "pm2 reload ats"` (or `crm`).
 - **Read app logs:** `ssh root@200.141.9.192 "pm2 logs ats --lines 100"`.
-- **Daily recruiting summary email:** a VPS cron hits `GET /api/cron/team-digest?key=$CRON_SECRET` at **7:00 AM IST** (01:30 UTC) and emails a per-recruiter summary (active load, stalled >10d, this-week velocity, conversion %, top openings). Recipients = `DIGEST_TO` in `/opt/scoutforu-ats/.env.local` (currently the owner's email) or, if unset, all active master admins. Change the time with `crontab -e`; change recipients by editing `DIGEST_TO` then `pm2 reload ats`. Log: `/var/log/team-digest.log`. Send a test now: `curl "https://ats.scoutforu.com/api/cron/team-digest?key=<CRON_SECRET>"`.
+- **Daily recruiting summary email:** a VPS cron hits `GET /api/cron/team-digest?key=$CRON_SECRET` at **10:30 AM IST** (`0 5 * * *`, i.e. 05:00 UTC) and emails a per-recruiter summary (active load, stalled >10d, this-week velocity, conversion %, top openings). Recipients = `DIGEST_TO` in `/opt/scoutforu-ats/.env.local` (currently `yatrik@scoutforu.com`) or, if unset, all active master admins. Change the time with `crontab -e`; change recipients by editing `DIGEST_TO` then `pm2 reload ats`. Log: `/var/log/team-digest.log`. Send a test now: `curl "https://ats.scoutforu.com/api/cron/team-digest?key=<CRON_SECRET>"`. It **won't send an all-zero report** on a transient DB read failure (it retries once, then skips that day).
+- **Put a candidate on hold / resume:** open the candidate → **Hold** (add a reason) → they leave the active board but stay against their opening (Pipeline → "On hold" chip). **Resume** puts them back at their stage.
+- **Review only active openings:** Pipeline → the **Active / Inactive / All** toggle (defaults to Active).
+- **Run the data health-check:** from the repo root, `node scripts/audit.mjs` — prints stage integrity, orphans, duplicates, overdue jobs, and reconciles every dashboard number against the DB. Quick DB sanity check: in Supabase → SQL Editor, `select stage, count(*) from candidates group by stage order by count(*) desc;` — every dashboard total should reconcile to this.
+- **If a deploy built but isn't live:** the auto-deploy occasionally builds without reloading the app. Force it: `ssh root@200.141.9.192 "pm2 reload ats"`. (Bad builds never reload, so this is safe.)
 
 ---
 
@@ -121,6 +156,10 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 - **Talent Bank folders** are auto-named from job title/skills; a handful of niche resumes land in "Other" — that's expected.
 - **CRM blob is last-write-wins** — heavy concurrent editing could drop a change. Fine at your scale.
 - **Anthropic credit empty** → resume parsing / JD scoring stops with a clear "top up credits" banner; nothing else breaks.
+- **Payslips are employee-visible only once the run is Finalised or Paid** — a Draft payroll run never shows on an employee's "My Payslips" (nor via the PDF URL). So a new month in Draft is invisible to staff until you Finalise/Mark-as-paid; reverting Paid→Finalised keeps it visible.
+- **On-hold candidates are excluded from Active/stalled everywhere** (Overview, Recruiting Team, digest). They only appear via the Pipeline "On hold" chip. So "Active" can drop when you park people — that's intended.
+- **`stageKey` is a legacy trap.** It maps to the fixed 9-stage enum and collapses any custom stage to "Sourced". Never classify by it — use `stageOutcome`/`stage` (see §5). This was the root cause of earlier "wrong dashboard numbers"; it's now removed from the codebase.
+- **Deploy reload can lag.** The build lands but pm2 sometimes doesn't reload immediately; `pm2 reload ats` forces it (§7).
 
 ---
 
@@ -130,7 +169,10 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 |---|---|
 | A code change isn't live | §3 — check VPS HEAD vs your commit; check the reconciler log; manual deploy |
 | Feature saves nothing / errors about a missing column | An un-run migration (§4) |
-| A candidate isn't on the board | Their stage slug, or they have no job (deleted job) — see §8 |
+| A candidate isn't on the board | They may be **on hold** (Pipeline → "On hold" chip), or the openings filter is on Active while their role is closed — switch to All. Or they have no job (deleted job) — see §8 |
+| A dashboard number looks wrong | Run `node scripts/audit.mjs`; compare to `select stage, count(*) …` in Supabase. Ensure the code classifies by `stageOutcome`, not `stageKey` (§5, §8) |
+| Employee can't see this month's payslip | The run is still Draft — Finalise / Mark as paid (§8) |
+| Daily digest email didn't arrive | Check `/var/log/team-digest.log`; a transient read failure is skipped (not sent as zeros). Re-send with the curl in §7 |
 | Resume parse / JD score fails | Anthropic credit balance (console → Billing) |
 | Candidate/assignment email didn't send | Zoho mailbox config (ATS → My Email / Settings); the shared `career@` SMTP |
 | CRM shows stale data | The CRM caches the blob in memory — `pm2 reload crm` forces a fresh read |
