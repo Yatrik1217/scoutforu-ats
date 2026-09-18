@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { rateLimit, ipFrom } from "@/lib/rate-limit";
+import { extractFromFile } from "@/lib/ai/extract";
+import type { CandidateRow } from "@/lib/database.types";
 
 // Public job application from the careers page → creates a candidate in Sourced.
 // No auth: uses the service role (RLS-bypassing) but only ever inserts a
@@ -93,6 +95,9 @@ async function handleApply(req: NextRequest) {
     txt: "text/plain",
   };
   let resumeUrl = "";
+  let resumeBuf: Buffer | null = null;
+  let resumeName = "";
+  let resumeType = "";
   const file = form.get("resume");
   if (file instanceof File && file.size > 0 && file.size <= 8 * 1024 * 1024) {
     const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -102,7 +107,12 @@ async function handleApply(req: NextRequest) {
         const path = `${crypto.randomUUID()}.${ext}`;
         const buf = Buffer.from(await file.arrayBuffer());
         const { error } = await sb.storage.from("resumes").upload(path, buf, { contentType });
-        if (!error) resumeUrl = path;
+        if (!error) {
+          resumeUrl = path;
+          resumeBuf = buf;
+          resumeName = file.name;
+          resumeType = contentType;
+        }
       } catch {
         /* resume optional */
       }
@@ -132,6 +142,36 @@ async function handleApply(req: NextRequest) {
   const message = s("message");
   if (message)
     await sb.from("candidate_notes").insert({ candidate_id: created.id, author_id: null, body: `Applied via Career Site: ${message}` });
+
+  // Best-effort: parse the résumé so the applicant arrives with real skills,
+  // designation, experience & CTC — otherwise they sit in the pool as a blank
+  // record and score poorly. Only fills fields the applicant left empty; never
+  // blocks the "thank you" on a parser hiccup. This endpoint is IP rate-limited,
+  // which bounds the parsing cost.
+  if (resumeBuf) {
+    try {
+      const parsed = await extractFromFile(resumeBuf, resumeName, resumeType);
+      if (parsed) {
+        const patch: Record<string, unknown> = {};
+        if (parsed.skills?.length) patch.tags = parsed.skills;
+        if (parsed.currentDesignation) patch.current_designation = parsed.currentDesignation;
+        if (parsed.currentCompany && !s("currentCompany")) patch.current_company = parsed.currentCompany;
+        if (parsed.expYears && !(Number.isFinite(expYears) && expYears > 0)) patch.exp_years = parsed.expYears;
+        if (parsed.currentCtc) patch.current_ctc_lpa = parsed.currentCtc;
+        if (parsed.expectedCtc) { patch.expected_ctc_lpa = parsed.expectedCtc; patch.salary_lpa = parsed.expectedCtc; }
+        if (parsed.noticePeriod) patch.notice_period_days = parsed.noticePeriod;
+        if (parsed.location && !s("location")) patch.location = parsed.location;
+        if (parsed.function) patch.function = parsed.function;
+        if (parsed.industry) patch.industry = parsed.industry;
+        if (parsed.graduation) patch.graduation = parsed.graduation;
+        if (parsed.postGraduation) patch.post_graduation = parsed.postGraduation;
+        if (Object.keys(patch).length)
+          await sb.from("candidates").update(patch as unknown as Partial<CandidateRow>).eq("id", created.id);
+      }
+    } catch {
+      /* parsing is best-effort — the application is already saved */
+    }
+  }
 
   return NextResponse.json({ ok: true, status: "created" });
 }

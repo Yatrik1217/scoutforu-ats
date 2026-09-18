@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { stripHtml } from "@/lib/rich-text";
+import { resumeToContent } from "@/lib/ai/extract";
 import type { JdMatch } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; score?: number; match?: JdMatch };
@@ -23,7 +24,7 @@ export async function scoreCandidateJd(candidateId: string): Promise<Result> {
   const sb = await createClient();
   const { data: cand } = await sb
     .from("candidates")
-    .select("id,name,job_id,tags,current_designation,current_company,exp_years,function,industry")
+    .select("id,name,job_id,tags,current_designation,current_company,exp_years,function,industry,resume_url")
     .eq("id", candidateId)
     .maybeSingle();
   if (!cand) return { ok: false, error: "Candidate not found." };
@@ -50,19 +51,39 @@ export async function scoreCandidateJd(candidateId: string): Promise<Result> {
     .filter(Boolean)
     .join("\n");
 
+  // Read the ACTUAL resume file (PDF/DOCX/text) so scoring works even when the
+  // structured skills weren't parsed (e.g. career-site applicants). Best-effort
+  // — falls back to the structured profile if the file is missing/unreadable.
+  let resumeContent: Anthropic.ContentBlockParam[] | null = null;
+  if (cand.resume_url) {
+    try {
+      const { data: file } = await sb.storage.from("resumes").download(cand.resume_url);
+      if (file) {
+        const buf = Buffer.from(await file.arrayBuffer());
+        const c = await resumeToContent(buf, cand.resume_url);
+        if (c) resumeContent = c as Anthropic.ContentBlockParam[];
+      }
+    } catch {
+      /* resume optional — fall back to the structured profile */
+    }
+  }
+
   let parsed: { score?: unknown; matched?: unknown; missing?: unknown; summary?: unknown };
   try {
     const client = new Anthropic();
+    const jdText = `JOB TITLE: ${job.title}\n\nJOB DESCRIPTION:\n${stripHtml(job.description || "").slice(0, 6000)}\n\nCANDIDATE PROFILE (structured — may be sparse):\n${profile}\n\n${
+      resumeContent
+        ? "The candidate's full résumé is attached above — use it as the primary evidence of skills and experience (the structured profile can be incomplete). "
+        : ""
+    }Score strictly against the JD.`;
+    const userContent: Anthropic.ContentBlockParam[] = resumeContent
+      ? [...resumeContent, { type: "text", text: jdText }]
+      : [{ type: "text", text: jdText }];
     const msg = await client.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 700,
       system: SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: `JOB TITLE: ${job.title}\n\nJOB DESCRIPTION:\n${stripHtml(job.description || "").slice(0, 6000)}\n\nCANDIDATE:\n${profile}`,
-        },
-      ],
+      messages: [{ role: "user", content: userContent }],
     });
     const tb = msg.content.find((b) => b.type === "text");
     const out = tb && "text" in tb ? tb.text : "";

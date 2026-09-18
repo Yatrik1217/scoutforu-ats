@@ -99,24 +99,24 @@ export async function extractFromContent(
   return coerce(JSON.parse(jsonStr.slice(start, end + 1)));
 }
 
-// Extract candidate fields from an actual resume file buffer (PDF/DOCX/text).
-// PDFs go straight to Claude as a document; other formats are converted first.
-export async function extractFromFile(
+// Turn a resume file buffer into Anthropic message content blocks the model can
+// read directly: a PDF becomes a document block; DOCX/text is extracted to text.
+// Returns null when there's nothing usable. Shared by the parser and the JD
+// scorer so both actually SEE the resume, not just a skills list.
+export async function resumeToContent(
   buf: Buffer,
   filename: string,
-  mime: string,
-): Promise<ParsedResume | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+  mime = "",
+): Promise<Anthropic.MessageParam["content"] | null> {
   const name = (filename || "").toLowerCase();
   try {
     if (name.endsWith(".pdf") || mime === "application/pdf") {
-      return await extractFromContent([
+      return [
         {
           type: "document",
           source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") },
         },
-        { type: "text", text: "Parse this resume into the JSON object." },
-      ]);
+      ];
     }
     let text = "";
     if (name.endsWith(".docx") || /wordprocessingml/i.test(mime)) {
@@ -126,12 +126,25 @@ export async function extractFromFile(
     }
     text = text.slice(0, 60000).trim();
     if (!text) return null;
-    return await extractFromContent([
-      { type: "text", text: `Parse this resume into the JSON object.\n\nRESUME:\n${text}` },
-    ]);
+    return [{ type: "text", text: `RESUME:\n${text}` }];
   } catch {
     return null;
   }
+}
+
+// Extract candidate fields from an actual resume file buffer (PDF/DOCX/text).
+export async function extractFromFile(
+  buf: Buffer,
+  filename: string,
+  mime: string,
+): Promise<ParsedResume | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  const content = await resumeToContent(buf, filename, mime);
+  if (!content) return null;
+  return await extractFromContent([
+    ...(content as Anthropic.ContentBlockParam[]),
+    { type: "text", text: "Parse this resume into the JSON object." },
+  ]);
 }
 
 // Extract candidate fields from plain profile text (Resdex page, pasted text …).
