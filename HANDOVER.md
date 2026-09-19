@@ -82,8 +82,9 @@ ssh root@200.141.9.192 "cd /opt/scoutforu-crm && git fetch origin main && git re
 - **All dashboards/analytics are pipeline-aware.** `getWorkspace` resolves each candidate's real stage and attaches `stageName`, `stageColor`, `stageOutcome` (`in_progress`/`won`/`lost`), `stagePosition`, and `stageIsInterview`. **Always classify by these (or the raw `stage` slug), never by the legacy `stageKey`** — `stageKey` maps to the fixed 9-stage enum and collapses any custom slug (e.g. `rejected`, `client_submit`, `technical_round_1`) to "Sourced". "Active" = `stageOutcome === "in_progress"` and not on hold; "hired" = `won`; interview rounds = `stageIsInterview`. The digest/Recruiting-Team/Overview/Analytics all follow this.
 - **Key server actions** (`src/lib/actions/`): `mutations.ts` (candidates, jobs, stages, job-assignment emails), `hr.ts` (attendance, payroll, holidays, leave), `talent-bank.ts`, `jd-score.ts`, `finance.ts`, `automations.ts`, `parse-resume.ts` (+ `ai/extract.ts`).
 - **AI features** use `claude-haiku-4-5` via `@anthropic-ai/sdk`:
-  - **Resume parsing** (Talent Bank + bulk upload) — `parse-resume.ts`.
-  - **JD-match score** — `jd-score.ts` (on-demand button on a candidate, cached in `candidates.jd_match`).
+  - **Resume parsing** (Talent Bank + bulk upload) — `parse-resume.ts`. Career-site applications (`/api/careers/apply`) also best-effort parse the uploaded resume on submit, filling skills/designation/experience/CTC on empty fields (IP rate-limited to bound cost).
+  - **JD-match score** — `jd-score.ts` (on-demand button on a candidate, cached in `candidates.jd_match`). It downloads and reads the candidate's **actual resume file** as the primary evidence (PDF sent as a document block; DOCX/text extracted), falling back to the structured profile only when there's no file — so a candidate with unparsed skills still scores correctly.
+  - **Match resumes to an opening** — `match.ts` (`suggestMatchesForJob`). The Jobs page "Find matches" button ranks every candidate not already on that job (pool + bank) by how many of the opening's keywords/skills appear in their profile — free keyword overlap, no AI. `assignCandidateToJob` pulls a match onto the opening.
 - **Attendance/payroll:** staff check in themselves; unmarked past working days = Absent; holidays (`holidays` table) and weekly-offs are paid. A CRM-linked employee (`attendance_source='crm'`) has their attendance read live from the CRM and is shown once, view-only.
 - **Careers:** public jobs come from a curated `public_jobs` view (client names redacted). JD supports rich text (bold/italic/lists), stored as sanitized HTML.
 
@@ -135,6 +136,7 @@ model above (`stageOutcome`/`stageName`), and the shared metric math lives in
 - **Close a job:** open the job → it moves to the "Closed jobs" section; active count drops.
 - **Assign a recruiter to a job:** edit the requisition → the newly-added recruiter is emailed automatically.
 - **Run payroll:** ATS → Payroll → pick the month → "Sync employees" adds anyone missing (e.g. a new hire or CRM salesperson) → adjust a line if needed → Finalise → Mark as paid. Payslip has the logo + attendance breakdown.
+- **Find matching resumes for an opening:** ATS → Jobs → open the job card → **Find matches**. Ranks pool + bank resumes by skill/keyword overlap; "Assign here" moves one onto the opening. (Needs the job to have keywords or a JD.)
 - **Top up AI credits:** console.anthropic.com → Plans & Billing → Purchase credits (or enable auto-reload). ~₹0.3–0.5 per resume parsed/scored.
 - **Restart an app:** `ssh root@200.141.9.192 "pm2 reload ats"` (or `crm`).
 - **Read app logs:** `ssh root@200.141.9.192 "pm2 logs ats --lines 100"`.
