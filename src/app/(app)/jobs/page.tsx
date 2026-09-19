@@ -7,6 +7,7 @@ import { RecBadge } from "@/components/bits";
 import { ScheduleButton, JobMenu } from "@/components/view-actions";
 import { JobApprovalActions } from "@/components/job-approval";
 import { JobPublish } from "@/components/job-publish";
+import { JobMatches } from "@/components/job-matches";
 
 function ago(iso: string) {
   const d = Math.floor((Date.now() - +new Date(iso)) / 86_400_000);
@@ -127,6 +128,7 @@ export default async function JobsPage() {
                 <ScheduleButton className="flex-1 rounded-[9px] border border-[#e6eaf1] bg-[#f6f8fb] py-2.5 text-[12.5px] font-bold text-[#42506b] hover:bg-[#eef1f6]">
                   Schedule
                 </ScheduleButton>
+                {j.status !== "closed" && <JobMatches jobId={j.id} jobTitle={j.title} />}
               </div>
             </div>
     );
