@@ -9,6 +9,7 @@ import { useShell } from "@/components/shell-provider";
 import {
   suggestMatchesForJob,
   assignCandidateToJob,
+  assignBankResumeToJob,
   type CandidateMatch,
 } from "@/lib/actions/match";
 
@@ -43,6 +44,7 @@ function MatchModal({
   const [assigning, startAssign] = useTransition();
   const [loaded, setLoaded] = useState(false);
   const [matches, setMatches] = useState<CandidateMatch[]>([]);
+  const [scanned, setScanned] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
   // Load on first render.
@@ -50,18 +52,22 @@ function MatchModal({
     startLoad(async () => {
       const res = await suggestMatchesForJob(jobId);
       setLoaded(true);
-      if (res.ok) setMatches(res.matches ?? []);
+      if (res.ok) { setMatches(res.matches ?? []); setScanned(res.scanned ?? 0); }
       else setErr(res.error ?? "Could not find matches.");
     });
   }
 
   const assign = (m: CandidateMatch) => {
-    if (!confirm(`Move ${m.name} onto "${jobTitle}"? They'll start at the first stage of this opening.`)) return;
+    const where = m.source === "bank" ? "from the Talent Bank" : "off their current opening";
+    if (!confirm(`Add ${m.name} to "${jobTitle}" (${where})? They'll start at the first stage.`)) return;
     startAssign(async () => {
-      const res = await assignCandidateToJob(m.id, jobId);
+      const res =
+        m.source === "bank"
+          ? await assignBankResumeToJob(m.id, jobId)
+          : await assignCandidateToJob(m.id, jobId);
       if (res.ok) {
         toast.success(res.message ?? "Added");
-        setMatches((list) => list.filter((x) => x.id !== m.id));
+        setMatches((list) => list.filter((x) => !(x.id === m.id && x.source === m.source)));
         router.refresh();
       } else toast.error(res.error ?? "Could not add");
     });
@@ -81,7 +87,7 @@ function MatchModal({
             <div className="text-[16px] font-extrabold text-[#16203a]">Matching resumes</div>
             <div className="text-[12.5px] font-semibold text-[#8a94a6]">
               for <span className="text-[#42506b]">{jobTitle}</span>
-              {loaded && !err ? ` · ${matches.length} candidate${matches.length === 1 ? "" : "s"} from your pool & bank` : ""}
+              {loaded && !err ? ` · ${matches.length} match${matches.length === 1 ? "" : "es"} from ${scanned.toLocaleString("en-IN")} resumes (pool + bank), scanned instantly` : ""}
             </div>
           </div>
           <button onClick={onClose} className="text-[#8a94a6] hover:text-[#42506b]"><X size={20} /></button>
@@ -107,15 +113,21 @@ function MatchModal({
                 <div className="flex items-center gap-3">
                   <Avatar name={m.name} size={38} />
                   <div className="min-w-0 flex-1">
-                    <button
-                      onClick={() => { onClose(); openDrawer(m.id); }}
-                      className="truncate text-left text-[14px] font-bold text-[#16203a] hover:text-[#2a6fdb]"
-                    >
-                      {m.name}
-                    </button>
+                    {m.source === "pipeline" ? (
+                      <button
+                        onClick={() => { onClose(); openDrawer(m.id); }}
+                        className="truncate text-left text-[14px] font-bold text-[#16203a] hover:text-[#2a6fdb]"
+                      >
+                        {m.name}
+                      </button>
+                    ) : (
+                      <span className="truncate text-[14px] font-bold text-[#16203a]">{m.name}</span>
+                    )}
                     <div className="truncate text-[11.5px] font-semibold text-[#8a94a6]">
                       {m.designation || "—"} · {m.expYears}y ·{" "}
-                      {m.onHold ? (
+                      {m.source === "bank" ? (
+                        <span className="font-bold text-[#2a6fdb]">Talent Bank · {m.stageName}</span>
+                      ) : m.onHold ? (
                         <span className="text-[#b45309]">on hold</span>
                       ) : (
                         <>currently: {m.currentJobTitle} <span className="text-[#aab2c0]">({m.stageName})</span></>
