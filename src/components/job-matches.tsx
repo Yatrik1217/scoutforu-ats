@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { Sparkles, X, Star, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -40,22 +40,48 @@ function MatchModal({
 }) {
   const router = useRouter();
   const { openDrawer } = useShell();
-  const [loading, startLoad] = useTransition();
   const [assigning, startAssign] = useTransition();
-  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [matches, setMatches] = useState<CandidateMatch[]>([]);
   const [scanned, setScanned] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+  const loading = status === "loading";
 
-  // Load on first render.
-  if (!loaded && !loading) {
-    startLoad(async () => {
-      const res = await suggestMatchesForJob(jobId);
-      setLoaded(true);
-      if (res.ok) { setMatches(res.matches ?? []); setScanned(res.scanned ?? 0); }
-      else setErr(res.error ?? "Could not find matches.");
-    });
-  }
+  // Kicks off the async fetch. State is only set AFTER the await (never
+  // synchronously inside the effect), so it can't cascade renders.
+  const load = useCallback(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await suggestMatchesForJob(jobId);
+        if (!alive) return;
+        if (res.ok) {
+          setMatches(res.matches ?? []);
+          setScanned(res.scanned ?? 0);
+          setStatus("done");
+        } else {
+          setErr(res.error ?? "Could not find matches.");
+          setStatus("error");
+        }
+      } catch {
+        if (!alive) return;
+        // Almost always a stale tab after a deploy (old server-action id).
+        setErr("This page is out of date — please refresh (⌘/Ctrl + Shift + R) and try again.");
+        setStatus("error");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [jobId]);
+
+  useEffect(() => load(), [load]);
+
+  const retry = () => {
+    setStatus("loading");
+    setErr(null);
+    load();
+  };
 
   const assign = (m: CandidateMatch) => {
     const where = m.source === "bank" ? "from the Talent Bank" : "off their current opening";
@@ -87,7 +113,7 @@ function MatchModal({
             <div className="text-[16px] font-extrabold text-[#16203a]">Matching resumes</div>
             <div className="text-[12.5px] font-semibold text-[#8a94a6]">
               for <span className="text-[#42506b]">{jobTitle}</span>
-              {loaded && !err ? ` · ${matches.length} match${matches.length === 1 ? "" : "es"} from ${scanned.toLocaleString("en-IN")} resumes (pool + bank), scanned instantly` : ""}
+              {status === "done" ? ` · ${matches.length} match${matches.length === 1 ? "" : "es"} from ${scanned.toLocaleString("en-IN")} resumes (pool + bank), scanned instantly` : ""}
             </div>
           </div>
           <button onClick={onClose} className="text-[#8a94a6] hover:text-[#42506b]"><X size={20} /></button>
@@ -97,12 +123,18 @@ function MatchModal({
           {loading && (
             <div className="py-16 text-center text-[13px] font-semibold text-[#8a94a6]">Screening resumes…</div>
           )}
-          {err && (
-            <div className="m-2 rounded-[12px] border border-[#fde68a] bg-[#fffbeb] p-4 text-[13px] font-semibold text-[#92400e]">
-              {err}
+          {status === "error" && (
+            <div className="m-2 rounded-[12px] border border-[#fde68a] bg-[#fffbeb] p-4 text-center">
+              <div className="text-[13px] font-semibold text-[#92400e]">{err}</div>
+              <button
+                onClick={retry}
+                className="mt-3 rounded-[9px] bg-[#2a6fdb] px-4 py-2 text-[12.5px] font-bold text-white hover:bg-[#1f5bc0]"
+              >
+                Retry
+              </button>
             </div>
           )}
-          {loaded && !err && matches.length === 0 && (
+          {status === "done" && matches.length === 0 && (
             <div className="py-16 text-center text-[13px] font-semibold text-[#a3acbd]">
               No matching resumes found in the pool or bank.
             </div>

@@ -64,6 +64,7 @@ export async function suggestMatchesForJob(jobId: string): Promise<{
   scanned?: number;
   matches?: CandidateMatch[];
 }> {
+  try {
   const { ws } = await loadWorkspace();
   const job = ws.jobs.find((j) => j.id === jobId);
   if (!job) return { ok: false, error: "Opening not found." };
@@ -105,17 +106,39 @@ export async function suggestMatchesForJob(jobId: string): Promise<{
     }));
 
   // Talent Bank — page through ALL rows (PostgREST caps a plain select at 1000).
+  // Read via a direct, UNCOMPRESSED PostgREST fetch (Accept-Encoding: identity):
+  // a large gzipped response can trip a Node 22 undici decompression bug through
+  // Next's patched fetch, which would otherwise crash the whole action. Uses the
+  // signed-in user's token so RLS still applies. Fault-tolerant: a failed page
+  // just stops paging rather than throwing.
   const sb = await createClient();
   const bankRows: TalentBankRow[] = [];
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb
-      .from("talent_bank")
-      .select("id,name,skills,current_designation,current_company,exp_years,category,resume_url")
-      .range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
-    bankRows.push(...(data as TalentBankRow[]));
-    if (data.length < PAGE) break;
+  try {
+    const {
+      data: { session },
+    } = await sb.auth.getSession();
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (base && anon) {
+      const headers: Record<string, string> = {
+        apikey: anon,
+        Authorization: `Bearer ${session?.access_token ?? anon}`,
+        "Accept-Encoding": "identity",
+      };
+      const cols = "id,name,skills,current_designation,current_company,exp_years,category,resume_url";
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const url = `${base}/rest/v1/talent_bank?select=${cols}&order=created_at.desc&limit=${PAGE}&offset=${from}`;
+        const r = await fetch(url, { headers, cache: "no-store" });
+        if (!r.ok) break;
+        const rows = (await r.json()) as TalentBankRow[];
+        if (!Array.isArray(rows) || rows.length === 0) break;
+        bankRows.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+    }
+  } catch {
+    /* bank read is best-effort — still return pipeline matches */
   }
   const bank: CandidateMatch[] = bankRows
     .map((b) => ({ b, matched: scoreAgainst(terms, [...(b.skills || []), b.current_designation, b.current_company, b.category]) }))
@@ -146,6 +169,12 @@ export async function suggestMatchesForJob(jobId: string): Promise<{
     scanned: ws.candidates.length + bankRows.length,
     matches,
   };
+  } catch (e) {
+    return {
+      ok: false,
+      error: "Couldn't run the match: " + (e instanceof Error ? e.message : String(e)).slice(0, 140),
+    };
+  }
 }
 
 // Pull a matched PIPELINE candidate onto this opening (fresh at first stage).
