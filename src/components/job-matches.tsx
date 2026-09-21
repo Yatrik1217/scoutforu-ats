@@ -44,6 +44,7 @@ function MatchModal({
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [matches, setMatches] = useState<CandidateMatch[]>([]);
   const [scanned, setScanned] = useState(0);
+  const [termCount, setTermCount] = useState(0);
   const [err, setErr] = useState<string | null>(null);
   const loading = status === "loading";
 
@@ -58,6 +59,7 @@ function MatchModal({
         if (res.ok) {
           setMatches(res.matches ?? []);
           setScanned(res.scanned ?? 0);
+          setTermCount(res.termCount ?? 0);
           setStatus("done");
         } else {
           setErr(res.error ?? "Could not find matches.");
@@ -113,7 +115,7 @@ function MatchModal({
             <div className="text-[16px] font-extrabold text-[#16203a]">Matching resumes</div>
             <div className="text-[12.5px] font-semibold text-[#8a94a6]">
               for <span className="text-[#42506b]">{jobTitle}</span>
-              {status === "done" ? ` · ${matches.length} match${matches.length === 1 ? "" : "es"} from ${scanned.toLocaleString("en-IN")} resumes (pool + bank), scanned instantly` : ""}
+              {status === "done" ? ` · top ${matches.length} of ${scanned.toLocaleString("en-IN")} resumes, matched on ${termCount} JD skill${termCount === 1 ? "" : "s"} (instant)` : ""}
             </div>
           </div>
           <button onClick={onClose} className="text-[#8a94a6] hover:text-[#42506b]"><X size={20} /></button>
@@ -166,8 +168,11 @@ function MatchModal({
                       )}
                     </div>
                   </div>
-                  <span className="tf-num flex shrink-0 items-center gap-1 rounded-full bg-[#eef4fe] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2a6fdb]">
-                    {m.score} match{m.score === 1 ? "" : "es"}
+                  <span
+                    className="tf-num flex shrink-0 items-center gap-1 rounded-full bg-[#eef4fe] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2a6fdb]"
+                    title={`${m.score} of ${termCount} JD skills matched`}
+                  >
+                    {m.score}/{termCount} skills
                   </span>
                   {m.rating > 0 && (
                     <span className="tf-num flex shrink-0 items-center gap-[3px] text-[11px] font-extrabold text-[#b27400]">

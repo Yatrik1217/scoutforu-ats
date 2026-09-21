@@ -1,10 +1,11 @@
 "use server";
 
+import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { loadWorkspace } from "@/lib/data";
 import { stripHtml } from "@/lib/rich-text";
-import type { CandidateRow, TalentBankRow } from "@/lib/database.types";
+import type { CandidateRow, JobRow, TalentBankRow } from "@/lib/database.types";
 
 export type CandidateMatch = {
   source: "pipeline" | "bank";
@@ -53,6 +54,32 @@ const scoreAgainst = (terms: string[], hayParts: (string | null | undefined)[]) 
   return terms.filter((t) => hay.includes(t));
 };
 
+// Pull the concrete required skills/tech out of a JD with one cheap Haiku call.
+// Returns 10-18 short lowercase skill strings, or [] on any problem.
+async function extractJdSkills(title: string, jd: string): Promise<string[]> {
+  if (!process.env.ANTHROPIC_API_KEY || !jd.trim()) return [];
+  try {
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 400,
+      system: `Extract the concrete technical skills, technologies, tools, frameworks, platforms and databases REQUIRED by this job. Return ONLY a JSON array of 10-18 short skill strings — lowercase, no duplicates, most important first, each 1-3 words. Prefer specific tech (e.g. ".net","c#","asp.net core","entity framework","azure","sql server","microservices","rest api","ci/cd","rabbitmq","redis","kubernetes"). Exclude generic words like developer, engineer, team, communication, years.`,
+      messages: [{ role: "user", content: `JOB TITLE: ${title}\n\nJOB DESCRIPTION:\n${jd.slice(0, 6000)}` }],
+    });
+    const tb = msg.content.find((b) => b.type === "text");
+    const out = tb && "text" in tb ? tb.text : "";
+    const s = out.indexOf("[");
+    const e = out.lastIndexOf("]");
+    if (s < 0 || e < 0) return [];
+    const arr = JSON.parse(out.slice(s, e + 1));
+    return Array.isArray(arr)
+      ? [...new Set(arr.map((x) => String(x).trim().toLowerCase()).filter((x) => x.length >= 2))].slice(0, 20)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 // Rank candidates (pipeline) AND the Talent Bank by how many of the opening's
 // skill terms appear in each résumé/profile. Pure keyword overlap — no AI — so
 // it stays instant across thousands of resumes.
@@ -68,22 +95,31 @@ export async function suggestMatchesForJob(jobId: string): Promise<{
   const { ws } = await loadWorkspace();
   const job = ws.jobs.find((j) => j.id === jobId);
   if (!job) return { ok: false, error: "Opening not found." };
+  const sb = await createClient();
 
-  const terms = jobTerms({
-    title: job.title,
-    designation: job.designation,
-    keywords: job.keywords,
-    functional_area: job.functional_area,
-  });
-  // Fall back to JD text only if there are no keywords/title terms at all.
-  if (!terms.length) {
-    for (const w of stripHtml(job.description || "").split(/[\s,()/]+/).slice(0, 60)) {
-      const t = w.trim().toLowerCase();
-      if (t.length >= 3 && !STOP.has(t)) terms.push(t);
+  // Build the SKILL keyword set that matching is driven by (not the designation).
+  // Start with the recruiter's keywords; if that's thin (<10), pull the required
+  // skills straight out of the JD with one Haiku call and cache the enriched set
+  // back onto the job so we never re-charge for the same JD.
+  const kwOf = (s: string) =>
+    [...new Set((s || "").split(/[,\n;|/]+/).map((t) => t.trim().toLowerCase()).filter((t) => t.length >= 2 && !STOP.has(t)))];
+  let terms = kwOf(job.keywords);
+  const jd = stripHtml(job.description || "");
+  if (terms.length < 10 && jd) {
+    const ai = await extractJdSkills(job.title, jd);
+    if (ai.length) {
+      terms = [...new Set([...terms, ...ai])];
+      try {
+        await sb.from("jobs").update({ keywords: terms.join(", ") } as unknown as Partial<JobRow>).eq("id", jobId);
+      } catch {
+        /* cache write is best-effort */
+      }
     }
   }
+  // Last resort if there are still no skills at all: use title/designation words.
+  if (!terms.length) terms = jobTerms({ title: job.title, designation: job.designation, keywords: job.keywords, functional_area: job.functional_area });
   if (!terms.length)
-    return { ok: false, error: "This opening has no keywords/skills to match on — add keywords or a JD to the job first." };
+    return { ok: false, error: "This opening has no JD or keywords to match on — add a job description or keywords first." };
 
   // Pipeline candidates (not already on this job, not already hired).
   const pipeline: CandidateMatch[] = ws.candidates
@@ -111,7 +147,6 @@ export async function suggestMatchesForJob(jobId: string): Promise<{
   // Next's patched fetch, which would otherwise crash the whole action. Uses the
   // signed-in user's token so RLS still applies. Fault-tolerant: a failed page
   // just stops paging rather than throwing.
-  const sb = await createClient();
   const bankRows: TalentBankRow[] = [];
   try {
     const {
