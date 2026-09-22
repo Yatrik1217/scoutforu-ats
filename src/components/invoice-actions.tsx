@@ -281,8 +281,12 @@ function SendModal({
 
 function PaymentModal({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => void }) {
   const balance = balanceDue(invoice);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  // Fee portion of the bill (TDS is on the professional fee, not the GST).
+  const feeFrac = invoice.total > 0 ? (invoice.total - invoice.tax_amount) / invoice.total : 1;
   const [f, setF] = useState<PaymentForm>({
     amount: balance,
+    tds: 0,
     paidOn: new Date().toISOString().slice(0, 10),
     method: "bank_transfer",
     reference: "",
@@ -290,6 +294,13 @@ function PaymentModal({ invoice, onClose }: { invoice: InvoiceRow; onClose: () =
   });
   const [pending, start] = useTransition();
   const router = useRouter();
+  const settling = r2((Number(f.amount) || 0) + (Number(f.tds) || 0));
+
+  // Client deducted 10% TDS on the fee & paid the rest, full & final.
+  const applyTds10 = () => {
+    const tds = r2(balance * feeFrac * 0.1);
+    setF((p) => ({ ...p, tds, amount: r2(balance - tds) }));
+  };
 
   const save = () =>
     start(async () => {
@@ -303,15 +314,31 @@ function PaymentModal({ invoice, onClose }: { invoice: InvoiceRow; onClose: () =
 
   return (
     <Modal title={`Record payment — ${invoice.invoice_no}`} onClose={onClose}>
-      <div className="mb-3 rounded-[10px] bg-[#f0fdf4] px-4 py-3 text-[13px] font-bold text-[#166534]">
-        Balance due: {money(balance)}
+      <div className="mb-3 flex items-center justify-between rounded-[10px] bg-[#f0fdf4] px-4 py-3 text-[13px] font-bold text-[#166534]">
+        <span>Balance due: {money(balance)}</span>
+        <button
+          type="button"
+          onClick={applyTds10}
+          className="rounded-[8px] bg-white px-2.5 py-1 text-[11.5px] font-bold text-[#166534] ring-1 ring-[#bbe3c9] hover:bg-[#eafaf0]"
+          title="Client withheld 10% TDS on the fee and remitted the rest"
+        >
+          Apply 10% TDS
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className={lbl}>
-          Amount received <span className="text-[#dc2626]">*</span>
+          Amount received (bank) <span className="text-[#dc2626]">*</span>
           <NumberInput
             value={f.amount}
             onChange={(n) => setF((p) => ({ ...p, amount: n }))}
+            className={input + " mt-1 font-normal"}
+          />
+        </label>
+        <label className={lbl}>
+          TDS deducted by client
+          <NumberInput
+            value={f.tds}
+            onChange={(n) => setF((p) => ({ ...p, tds: n }))}
             className={input + " mt-1 font-normal"}
           />
         </label>
@@ -355,13 +382,20 @@ function PaymentModal({ invoice, onClose }: { invoice: InvoiceRow; onClose: () =
           className={input + " mt-1 font-normal"}
         />
       </label>
+      {(Number(f.tds) || 0) > 0 && (
+        <div className="mt-3 rounded-[10px] bg-[#f7f9fc] px-4 py-2.5 text-[12.5px] font-semibold text-[#42506b]">
+          Settles <span className="tf-num font-extrabold text-[#16203a]">{money(settling)}</span> of the bill
+          {" · "}Net to bank <span className="tf-num font-bold">{money(Number(f.amount) || 0)}</span>
+          {" · "}TDS credit <span className="tf-num font-bold text-[#2a6fdb]">{money(Number(f.tds) || 0)}</span>
+        </div>
+      )}
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-[9px] px-4 py-2 text-[13px] font-bold text-[#8a94a6] hover:bg-[#f1f4f9]">
           Cancel
         </button>
         <button
           onClick={save}
-          disabled={pending || !f.amount}
+          disabled={pending || (!f.amount && !f.tds)}
           className="flex items-center gap-2 rounded-[9px] bg-[#16a34a] px-5 py-2 text-[13px] font-bold text-white hover:bg-[#15803d] disabled:opacity-60"
         >
           <IndianRupee size={14} /> {pending ? "Saving…" : "Record payment"}

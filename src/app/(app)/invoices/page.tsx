@@ -94,6 +94,24 @@ export default async function InvoicesDashboard() {
   const agingMax = Math.max(1, ...aging);
   const AGING_COLORS = ["#16a34a", "#f59e0b", "#e8833a", "#ef4444", "#b91c1c"];
 
+  // Collections by client — net actually received in the bank vs TDS the client
+  // withheld (advance tax, recoverable). Built from every recorded payment.
+  const invById = new Map(invoices.map((i) => [i.id, i]));
+  const collMap = new Map<string, { name: string; net: number; tds: number }>();
+  for (const p of payments) {
+    const inv = invById.get(p.invoice_id);
+    if (!inv) continue;
+    const name = inv.bill_to_name || "—";
+    const key = inv.client_id || name;
+    const cur = collMap.get(key) ?? { name, net: 0, tds: 0 };
+    cur.net += p.amount;
+    cur.tds += p.tds_amount || 0;
+    collMap.set(key, cur);
+  }
+  const collections = [...collMap.values()].sort((a, b) => b.net + b.tds - (a.net + a.tds));
+  const collNet = collections.reduce((s, c) => s + c.net, 0);
+  const collTds = collections.reduce((s, c) => s + c.tds, 0);
+
   // Upcoming expected payments (open, soonest due first).
   const upcoming = [...open].sort((a, b) =>
     (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"),
@@ -246,6 +264,52 @@ export default async function InvoicesDashboard() {
           </div>
         </div>
       </div>
+
+      {/* collections by client (net of TDS) */}
+      {collections.length > 0 && (
+        <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
+          <div className="mb-1 text-[15.5px] font-extrabold">Collections by Client</div>
+          <div className="mb-4 text-[12px] font-medium text-[#8a94a6]">
+            Net actually received in the bank vs the 10% TDS each client withheld (advance tax — recoverable when you file)
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] border-collapse">
+              <thead>
+                <tr className="border-b border-[#eef1f6] text-[10.5px] font-bold uppercase tracking-wide text-[#8a94a6]">
+                  <th className="py-2 text-left">Client</th>
+                  <th className="py-2 text-right">Gross settled</th>
+                  <th className="py-2 text-right">TDS withheld</th>
+                  <th className="py-2 text-right">Net in bank</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collections.slice(0, 12).map((c) => (
+                  <tr key={c.name} className="border-b border-[#f4f6fa]">
+                    <td className="py-2.5 text-[13px] font-bold text-[#16203a]">{c.name}</td>
+                    <td className="tf-num py-2.5 text-right text-[13px] font-semibold text-[#42506b]">
+                      {money(c.net + c.tds)}
+                    </td>
+                    <td className="tf-num py-2.5 text-right text-[13px] font-bold text-[#2a6fdb]">
+                      {c.tds ? money(c.tds) : "—"}
+                    </td>
+                    <td className="tf-num py-2.5 text-right text-[13px] font-extrabold text-[#16a34a]">
+                      {money(c.net)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-[#eef1f6] text-[13px] font-extrabold text-[#16203a]">
+                  <td className="py-2.5">Total</td>
+                  <td className="tf-num py-2.5 text-right">{money(collNet + collTds)}</td>
+                  <td className="tf-num py-2.5 text-right text-[#2a6fdb]">{money(collTds)}</td>
+                  <td className="tf-num py-2.5 text-right text-[#16a34a]">{money(collNet)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* recent + upcoming */}
       <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.55fr_1fr] gap-[18px]">

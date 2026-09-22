@@ -203,7 +203,12 @@ export function buildInvoicePdf(opts: {
   pdf.text(money(inv.total), right, y + 2, { size: 11, font: "bold", color: BLUE, align: "right" });
   y += 24;
   if (inv.amount_paid > 0) {
-    trow("Payments received", `- ${money(inv.amount_paid)}`, { color: "#16a34a" });
+    if (inv.tds_amount > 0) {
+      trow("Amount received", `- ${money(inv.amount_paid - inv.tds_amount)}`, { color: "#16a34a" });
+      trow("TDS deducted", `- ${money(inv.tds_amount)}`, { color: "#2a6fdb" });
+    } else {
+      trow("Payments received", `- ${money(inv.amount_paid)}`, { color: "#16a34a" });
+    }
     trow("Balance due", money(balanceDue(inv)), { bold: true });
   }
 
@@ -223,7 +228,7 @@ export function buildInvoicePdf(opts: {
     y += 14;
     for (const p of payments) {
       pdf.text(
-        `${fmtDate(p.paid_on)}  -  ${money(p.amount)}${p.reference ? `  -  Ref: ${p.reference}` : ""}`,
+        `${fmtDate(p.paid_on)}  -  ${money(p.amount)}${p.tds_amount > 0 ? `  (+ ${money(p.tds_amount)} TDS)` : ""}${p.reference ? `  -  Ref: ${p.reference}` : ""}`,
         M,
         y,
         { size: 9, color: "#42506b" },

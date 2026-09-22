@@ -329,7 +329,8 @@ export type InvoiceRow = {
   discount_amount: number;
   tax_amount: number;
   total: number;
-  amount_paid: number;
+  amount_paid: number; // gross discharged = net received + TDS withheld
+  tds_amount: number; // total TDS withheld by the client across payments
   notes: string;
   terms: string;
   public_token: string;
@@ -356,7 +357,8 @@ export type InvoiceItemRow = {
 export type InvoicePaymentRow = {
   id: string;
   invoice_id: string;
-  amount: number;
+  amount: number; // net received in the bank
+  tds_amount: number; // TDS the client withheld for this payment
   paid_on: string;
   method: PaymentMethod;
   reference: string;

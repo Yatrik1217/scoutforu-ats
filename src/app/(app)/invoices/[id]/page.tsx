@@ -259,7 +259,13 @@ export default async function InvoiceDetailPage({
                 </div>
                 {inv.amount_paid > 0 && (
                   <>
-                    <TotalRow label="Payments received" value={`- ${money(inv.amount_paid)}`} green />
+                    <TotalRow label="Settled" value={`- ${money(inv.amount_paid)}`} green />
+                    {inv.tds_amount > 0 && (
+                      <>
+                        <TotalRow label="   of which TDS withheld" value={money(inv.tds_amount)} />
+                        <TotalRow label="   Net received in bank" value={money(inv.amount_paid - inv.tds_amount)} />
+                      </>
+                    )}
                     <div className="flex items-center justify-between px-3">
                       <span className="font-extrabold">Balance due</span>
                       <span className="tf-num font-extrabold">{money(balance)}</span>
@@ -308,9 +314,16 @@ export default async function InvoiceDetailPage({
           <div className="rounded-2xl border border-[#e9edf3] bg-white p-[20px]">
             <div className="mb-3 flex items-center justify-between">
               <div className="text-[14px] font-extrabold">Payments</div>
-              <span className="tf-num rounded-full bg-[#e9f9ef] px-2.5 py-[3px] text-[11.5px] font-bold text-[#16a34a]">
-                {money(inv.amount_paid)} received
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="tf-num rounded-full bg-[#e9f9ef] px-2.5 py-[3px] text-[11.5px] font-bold text-[#16a34a]">
+                  {money(inv.amount_paid - inv.tds_amount)} in bank
+                </span>
+                {inv.tds_amount > 0 && (
+                  <span className="tf-num rounded-full bg-[#eef4fe] px-2.5 py-[3px] text-[11.5px] font-bold text-[#2a6fdb]">
+                    {money(inv.tds_amount)} TDS
+                  </span>
+                )}
+              </div>
             </div>
             {payments.map((p) => (
               <div
@@ -321,7 +334,12 @@ export default async function InvoiceDetailPage({
                   <IndianRupee size={13} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="tf-num text-[13px] font-extrabold">{money(p.amount)}</div>
+                  <div className="tf-num text-[13px] font-extrabold">
+                    {money(p.amount)}
+                    {p.tds_amount > 0 && (
+                      <span className="ml-1.5 text-[11px] font-bold text-[#2a6fdb]">+ {money(p.tds_amount)} TDS</span>
+                    )}
+                  </div>
                   <div className="truncate text-[11px] text-[#8a94a6]">
                     {fmtD(p.paid_on)} · {METHOD_LABEL[p.method]}
                     {p.reference ? ` · ${p.reference}` : ""}

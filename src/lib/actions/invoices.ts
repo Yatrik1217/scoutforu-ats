@@ -409,7 +409,8 @@ export async function sendInvoice(
 // ---- payments -----------------------------------------------------------------
 
 export type PaymentForm = {
-  amount: number;
+  amount: number; // net received in the bank
+  tds: number; // TDS the client withheld
   paidOn: string;
   method: PaymentMethod;
   reference: string;
@@ -422,12 +423,15 @@ async function recomputePaymentState(
 ) {
   const [{ data: inv }, { data: pays }] = await Promise.all([
     sb.from("invoices").select("total,status,paid_at").eq("id", invoiceId).single(),
-    sb.from("invoice_payments").select("amount").eq("invoice_id", invoiceId),
+    sb.from("invoice_payments").select("amount,tds_amount").eq("invoice_id", invoiceId),
   ]);
   if (!inv) return;
-  const paid = round2((pays ?? []).reduce((s, p) => s + p.amount, 0));
+  // Gross discharged = net received + TDS withheld; that's what settles the bill.
+  const paid = round2((pays ?? []).reduce((s, p) => s + p.amount + (p.tds_amount || 0), 0));
+  const tds = round2((pays ?? []).reduce((s, p) => s + (p.tds_amount || 0), 0));
   const patch: Partial<InvoiceRow> = {
     amount_paid: paid,
+    tds_amount: tds,
     updated_at: new Date().toISOString(),
   };
   if (!["void", "written_off", "draft"].includes(inv.status)) {
@@ -449,7 +453,9 @@ export async function recordPayment(invoiceId: string, form: PaymentForm): Promi
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can manage invoices." };
   const amount = round2(Number(form.amount));
-  if (!amount || amount <= 0) return { ok: false, error: "Enter a valid payment amount." };
+  const tds = round2(Math.max(0, Number(form.tds) || 0));
+  if ((!amount || amount <= 0) && tds <= 0)
+    return { ok: false, error: "Enter a valid payment amount." };
   if (!form.paidOn) return { ok: false, error: "Payment date is required." };
   const { data: inv } = await sb
     .from("invoices")
@@ -462,33 +468,39 @@ export async function recordPayment(invoiceId: string, form: PaymentForm): Promi
   if (inv.status === "draft")
     return { ok: false, error: "Send (or mark as sent) the invoice before recording payments." };
   const balance = round2(inv.total - inv.amount_paid);
-  if (amount > balance + 0.01)
-    return { ok: false, error: `Amount exceeds the balance due (${money(balance)}).` };
+  const gross = round2(amount + tds); // what this payment discharges
+  if (gross > balance + 0.01)
+    return { ok: false, error: `Received + TDS (${money(gross)}) exceeds the balance due (${money(balance)}).` };
 
   const { error } = await sb.from("invoice_payments").insert({
     invoice_id: invoiceId,
     amount,
+    tds_amount: tds,
     paid_on: form.paidOn,
     method: form.method,
     reference: form.reference.trim(),
     notes: form.notes.trim(),
     created_by: me.id,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    if (/tds_amount/i.test(error.message))
+      return { ok: false, error: "Run migration 0054 (invoice TDS) in Supabase → SQL Editor, then try again." };
+    return { ok: false, error: error.message };
+  }
   await recomputePaymentState(sb, invoiceId);
   await sb.from("invoice_events").insert({
     invoice_id: invoiceId,
     kind: "payment",
-    body: `Payment of ${money(amount)} recorded (${form.method.replace(/_/g, " ")})${form.reference ? ` — ref ${form.reference.trim()}` : ""}`,
+    body: `Payment of ${money(amount)} received${tds > 0 ? ` (+ ${money(tds)} TDS)` : ""} (${form.method.replace(/_/g, " ")})${form.reference ? ` — ref ${form.reference.trim()}` : ""}`,
     by_user_id: me.id,
   });
   refresh();
-  const nowPaid = amount >= balance - 0.01;
+  const nowPaid = gross >= balance - 0.01;
   return {
     ok: true,
     message: nowPaid
-      ? `${inv.invoice_no} fully paid 🎉`
-      : `Payment recorded — ${money(round2(balance - amount))} still due`,
+      ? `${inv.invoice_no} fully settled${tds > 0 ? ` (incl. ${money(tds)} TDS)` : ""} 🎉`
+      : `Payment recorded — ${money(round2(balance - gross))} still due`,
   };
 }
 
