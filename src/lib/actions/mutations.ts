@@ -1094,6 +1094,16 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
     return { ok: false, error: "Candidate, date and time are required" };
   const sb = await createClient();
   const scheduled_at = new Date(`${form.date}T${form.time}:00`).toISOString();
+  // Guard against an accidental duplicate — the same candidate already booked at
+  // the exact same date & time (a recruiter double-scheduling by mistake).
+  const { data: dup } = await sb
+    .from("interviews")
+    .select("id")
+    .eq("candidate_id", form.candidateId)
+    .eq("scheduled_at", scheduled_at)
+    .maybeSingle();
+  if (dup)
+    return { ok: false, error: "This candidate already has an interview at that date & time." };
   const {
     data: { user },
   } = await sb.auth.getUser();
@@ -1280,6 +1290,15 @@ export async function deleteCandidateNote(id: string): Promise<Result> {
   if (error) return { ok: false, error: error.message };
   refresh();
   return { ok: true };
+}
+
+// Remove a mistakenly-scheduled interview (e.g. an accidental duplicate).
+export async function deleteInterview(id: string): Promise<Result> {
+  const sb = await createClient();
+  const { error } = await sb.from("interviews").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Interview removed" };
 }
 
 export async function addInterviewFeedback(

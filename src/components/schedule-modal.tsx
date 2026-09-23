@@ -38,6 +38,7 @@ export function ScheduleModal({
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
   const [opts, setOpts] = useState<{ id: string; label: string }[]>([]);
+  const [existing, setExisting] = useState<Record<string, { at: string; type: string }[]>>({});
   const [f, setF] = useState<{
     candidateId: string;
     date: string;
@@ -64,12 +65,16 @@ export function ScheduleModal({
     setErr("");
     (async () => {
       const sb = createClient();
-      const [{ data: cands }, { data: jobs }] = await Promise.all([
+      const [{ data: cands }, { data: jobs }, { data: ivs }] = await Promise.all([
         sb
           .from("candidates")
           .select("id,name,stage,job_id")
           .not("stage", "in", "(joined,not_joined)"),
         sb.from("jobs").select("id,title"),
+        sb
+          .from("interviews")
+          .select("candidate_id,scheduled_at,type")
+          .gte("scheduled_at", new Date().toISOString()),
       ]);
       const jobTitle = new Map((jobs ?? []).map((j) => [j.id, j.title]));
       setOpts(
@@ -78,6 +83,9 @@ export function ScheduleModal({
           label: `${c.name} — ${c.job_id ? jobTitle.get(c.job_id) ?? "—" : "—"}`,
         })),
       );
+      const map: Record<string, { at: string; type: string }[]> = {};
+      for (const iv of ivs ?? []) (map[iv.candidate_id] ??= []).push({ at: iv.scheduled_at, type: iv.type });
+      setExisting(map);
     })();
   }, [open, candidateId]);
 
@@ -152,6 +160,21 @@ export function ScheduleModal({
           {err && (
             <div className="mt-1.5 text-[11.5px] font-semibold text-[#ef4444]">
               {err}
+            </div>
+          )}
+          {f.candidateId && (existing[f.candidateId]?.length ?? 0) > 0 && (
+            <div className="mt-2 rounded-[10px] border border-[#f5d9a8] bg-[#fff7ea] p-[10px_12px] text-[11.5px] font-semibold text-[#92400e]">
+              ⚠ Already has {existing[f.candidateId].length} upcoming interview
+              {existing[f.candidateId].length === 1 ? "" : "s"}:{" "}
+              {existing[f.candidateId]
+                .slice()
+                .sort((a, b) => +new Date(a.at) - +new Date(b.at))
+                .map(
+                  (x) =>
+                    `${new Date(x.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} ${new Date(x.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })} (${x.type})`,
+                )
+                .join(", ")}
+              . Add another only if it is a different round.
             </div>
           )}
 

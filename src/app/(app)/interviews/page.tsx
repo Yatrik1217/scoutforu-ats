@@ -1,7 +1,7 @@
 import { format, isToday, isTomorrow, isThisWeek } from "date-fns";
 import { loadWorkspace } from "@/lib/data";
 import { Avatar, RecBadge, TypePill, typeLabelFromEnum } from "@/components/bits";
-import { OpenOnClick, NewInterviewButton } from "@/components/view-actions";
+import { OpenOnClick, NewInterviewButton, DeleteInterviewButton } from "@/components/view-actions";
 import { AddToCalendarButton } from "@/components/add-to-calendar";
 
 function dayLabel(d: Date) {
@@ -126,6 +126,7 @@ export default async function InterviewsPage() {
                     location={`${typeLabelFromEnum(iv.type)} interview`}
                     startIso={iv.scheduled_at}
                   />
+                  <DeleteInterviewButton id={iv.id} />
                 </OpenOnClick>
               );
             })}

@@ -14,11 +14,39 @@ import {
 import {
   acceptOffer,
   advanceCandidate,
+  deleteInterview,
   deleteJob,
   setUserActive,
   updateSetting,
 } from "@/lib/actions/mutations";
 import type { JobRow } from "@/lib/database.types";
+
+// Remove a mistakenly-scheduled interview (e.g. an accidental duplicate). Stops
+// row-click propagation so it doesn't open the candidate.
+export function DeleteInterviewButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button
+      disabled={pending}
+      title="Remove this interview"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!confirm("Remove this scheduled interview?")) return;
+        start(async () => {
+          const r = await deleteInterview(id);
+          if (r.ok) {
+            toast.success(r.message ?? "Removed");
+            router.refresh();
+          } else toast.error(r.error ?? "Failed");
+        });
+      }}
+      className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] border border-[#eef1f6] text-[#c3ccdb] hover:border-[#f3c4c4] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:opacity-50"
+    >
+      <Trash2 size={15} />
+    </button>
+  );
+}
 
 export function OpenOnClick({
   id,
