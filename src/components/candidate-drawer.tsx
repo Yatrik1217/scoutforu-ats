@@ -812,7 +812,8 @@ export function CandidateDrawer({
             </div>
 
             {canWrite && (
-              <div className="flex shrink-0 gap-2.5 border-t border-[#eef1f6] p-[16px_22px]">
+              <div className="flex shrink-0 flex-col gap-2.5 border-t border-[#eef1f6] p-[16px_22px]">
+               <div className="flex gap-2.5">
                 <button
                   disabled={pending}
                   title="Delete candidate"
@@ -834,8 +835,8 @@ export function CandidateDrawer({
                   }
                   className={
                     detail.cand.on_hold
-                      ? "flex items-center justify-center gap-1.5 rounded-[11px] border border-[#bbe3c9] bg-[#eafaf0] px-3 py-3 text-[13px] font-bold text-[#16a34a] hover:bg-[#dcf5e6] disabled:opacity-60"
-                      : "flex items-center justify-center gap-1.5 rounded-[11px] border border-[#f5d9a8] bg-[#fff7ea] px-3 py-3 text-[13px] font-bold text-[#b45309] hover:bg-[#fdeecb] disabled:opacity-60"
+                      ? "flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#bbe3c9] bg-[#eafaf0] px-3 py-3 text-[13px] font-bold text-[#16a34a] hover:bg-[#dcf5e6] disabled:opacity-60"
+                      : "flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#f5d9a8] bg-[#fff7ea] px-3 py-3 text-[13px] font-bold text-[#b45309] hover:bg-[#fdeecb] disabled:opacity-60"
                   }
                 >
                   {detail.cand.on_hold ? <Play size={15} /> : <PauseCircle size={15} />}
@@ -844,10 +845,12 @@ export function CandidateDrawer({
                 <button
                   disabled={pending}
                   onClick={() => setRejectOpen(true)}
-                  className="rounded-[11px] border border-[#f3c4c4] bg-[#fef2f2] px-4 py-3 text-[13px] font-bold text-[#dc2626] hover:bg-[#fee2e2] disabled:opacity-60"
+                  className="flex-1 rounded-[11px] border border-[#f3c4c4] bg-[#fef2f2] px-4 py-3 text-[13px] font-bold text-[#dc2626] hover:bg-[#fee2e2] disabled:opacity-60"
                 >
                   Reject
                 </button>
+               </div>
+               <div className="flex gap-2.5">
                 {/* Jump straight to any stage — lets recruiters bypass steps
                     (e.g. a walk-in placed directly, or mark Joined / Not Joined). */}
                 <select
@@ -864,7 +867,7 @@ export function CandidateDrawer({
                       } else toast.error(res.error ?? "Action failed");
                     });
                   }}
-                  className="rounded-[11px] border border-[#e3e8f0] bg-[#f6f8fb] px-2.5 py-3 text-[13px] font-bold text-[#42506b] outline-none focus:border-[#2a6fdb] disabled:opacity-60"
+                  className="min-w-0 flex-1 rounded-[11px] border border-[#e3e8f0] bg-[#f6f8fb] px-2.5 py-3 text-[13px] font-bold text-[#42506b] outline-none focus:border-[#2a6fdb] disabled:opacity-60"
                 >
                   {detail.stages.map((s) => (
                     <option key={s.slug} value={s.slug}>
@@ -878,16 +881,16 @@ export function CandidateDrawer({
                     onClick={() =>
                       run((id) => moveCandidateStage(id, nextStageObj.slug))
                     }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-[#2a6fdb] py-3 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(42,111,219,.32)] hover:bg-[#1f5bc0] disabled:opacity-60"
+                    className="flex flex-[1.6] items-center justify-center gap-2 whitespace-nowrap rounded-[11px] bg-[#2a6fdb] px-4 py-3 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(42,111,219,.32)] hover:bg-[#1f5bc0] disabled:opacity-60"
                   >
                     Move to {nextStageObj.name}
-                    <ArrowRight size={16} strokeWidth={2.4} />
+                    <ArrowRight size={16} strokeWidth={2.4} className="shrink-0" />
                   </button>
                 ) : (
                   // Terminal stage (Joined / Not Joined) — no "next" to advance to.
                   // Show a clear status, not a dead button. Use the dropdown to change it.
                   <div
-                    className="flex flex-1 items-center justify-center gap-2 rounded-[11px] py-3 text-[13.5px] font-extrabold"
+                    className="flex flex-[1.6] items-center justify-center gap-2 whitespace-nowrap rounded-[11px] py-3 text-[13.5px] font-extrabold"
                     style={{
                       background: hexA(sc, 0.14),
                       color: sc,
@@ -896,6 +899,7 @@ export function CandidateDrawer({
                     <Check size={17} strokeWidth={2.8} /> {curStage?.name ?? detail.stageSlug}
                   </div>
                 )}
+               </div>
               </div>
             )}
           </>
