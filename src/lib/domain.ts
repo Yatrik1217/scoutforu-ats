@@ -58,8 +58,9 @@ export function nextStage(key: StageKey): StageKey | null {
 }
 
 // --- type pills (README §9) ---
-export type InterviewType = "Video" | "Phone" | "Onsite" | "Practical";
+export type InterviewType = "Client" | "Video" | "Phone" | "Onsite" | "Practical";
 export const TYPE_COLOR: Record<InterviewType, string> = {
+  Client: "#16a34a",
   Video: "#2a6fdb",
   Onsite: "#8b5cf6",
   Phone: "#06b6d4",

@@ -6,7 +6,7 @@
 export type UserRole = "master_admin" | "recruiter" | "client";
 export type JobStatus = "open" | "hot" | "closed";
 export type EmploymentType = "full_time" | "contract" | "intern";
-export type InterviewTypeEnum = "video" | "phone" | "onsite" | "practical";
+export type InterviewTypeEnum = "client" | "video" | "phone" | "onsite" | "practical";
 export type OfferStatus = "pending" | "accepted";
 export type CandidateStage =
   | "sourced"

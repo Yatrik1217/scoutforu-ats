@@ -1132,7 +1132,7 @@ export async function scheduleInterview(form: SchedForm): Promise<Result> {
           timeStyle: "short",
           timeZone: "Asia/Kolkata",
         });
-        const typeLabel = { video: "Video", phone: "Phone", onsite: "On-site", practical: "Practical" }[form.type];
+        const typeLabel = { client: "Client", video: "Video", phone: "Phone", onsite: "On-site", practical: "Practical" }[form.type];
         const role = job?.title ? ` for ${job.title}` : "";
         const loc = form.location ? `\nLocation / link: ${form.location}` : "";
         const notes = form.notes ? `\n\nNotes: ${form.notes}` : "";

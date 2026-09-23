@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format, isToday, isTomorrow, isThisWeek } from "date-fns";
 import {
   Briefcase,
   Users,
@@ -18,7 +18,7 @@ import {
 import { getProfile } from "@/lib/auth";
 import { ShieldCheck } from "lucide-react";
 import { DEPT_COLOR, hexA } from "@/lib/domain";
-import { Avatar } from "@/components/bits";
+import { Avatar, TypePill, typeLabelFromEnum } from "@/components/bits";
 
 function avgTimeToHire(events: { candidate_id: string; to_stage: string; created_at: string }[]) {
   const byCand = new Map<string, typeof events>();
@@ -89,6 +89,24 @@ export default async function OverviewPage() {
     .filter((c) => c.stageIsInterview && !c.on_hold)
     .sort((a, b) => b.stagePosition - a.stagePosition || a.name.localeCompare(b.name));
 
+  // Interviews the recruiters have MARKED (scheduled) — the day planner. Only
+  // future/today ones matter for planning, so drop already-past days.
+  const marked = ws.interviews
+    .map((iv) => {
+      const c = ws.byId.get(iv.candidate_id);
+      const d = new Date(iv.scheduled_at);
+      return { id: iv.id, type: iv.type, d, name: c?.name ?? "Candidate", role: c?.jobTitle ?? "" };
+    })
+    .sort((a, b) => +a.d - +b.d);
+  const todayDate = new Date();
+  const tomorrowDate = new Date(todayDate.getTime() + 86_400_000);
+  const startOfToday = new Date(todayDate.toDateString());
+  const todayIv = marked.filter((x) => isToday(x.d));
+  const tomorrowIv = marked.filter((x) => isTomorrow(x.d));
+  const weekIvCount = marked.filter(
+    (x) => isThisWeek(x.d, { weekStartsOn: 1 }) && +x.d >= +startOfToday,
+  ).length;
+
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       {canReview && pendingReviews > 0 && (
@@ -132,6 +150,30 @@ export default async function OverviewPage() {
             </Link>
           );
         })}
+      </div>
+
+      {/* interviews planned — day planner (client interviews marked by recruiters) */}
+      <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-[15.5px] font-extrabold">
+              <Calendar size={17} className="text-[#16a34a]" /> Interviews Planned
+            </div>
+            <div className="text-[12px] font-medium text-[#8a94a6]">
+              {weekIvCount} scheduled this week · marked by recruiters (no calendar needed)
+            </div>
+          </div>
+          <Link
+            href="/interviews"
+            className="rounded-lg bg-[#eef4fe] px-3 py-[7px] text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+          >
+            Full agenda →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InterviewDay label="Today" date={todayDate} items={todayIv} />
+          <InterviewDay label="Tomorrow" date={tomorrowDate} items={tomorrowIv} />
+        </div>
       </div>
 
       {/* funnel + upcoming */}
@@ -320,6 +362,46 @@ export default async function OverviewPage() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function InterviewDay({
+  label,
+  date,
+  items,
+}: {
+  label: string;
+  date: Date;
+  items: { id: string; type: string; d: Date; name: string; role: string }[];
+}) {
+  return (
+    <div className="rounded-[14px] border border-[#eef1f6] bg-[#fafbfe] p-[14px_16px]">
+      <div className="mb-2 flex items-baseline justify-between">
+        <div className="text-[13.5px] font-extrabold text-[#16203a]">
+          {label}{" "}
+          <span className="text-[11.5px] font-semibold text-[#8a94a6]">· {format(date, "EEE, dd MMM")}</span>
+        </div>
+        <span className="tf-num rounded-full bg-[#e9f9ef] px-2.5 py-[3px] text-[11.5px] font-bold text-[#16a34a]">
+          {items.length} interview{items.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <div className="py-6 text-center text-[12px] font-semibold text-[#a3acbd]">No interviews marked.</div>
+      ) : (
+        <div className="flex flex-col">
+          {items.map((x) => (
+            <div key={x.id} className="flex items-center gap-3 border-t border-[#f0f3f8] py-2.5 first:border-0">
+              <div className="tf-num w-[46px] shrink-0 text-[12px] font-bold text-[#2a6fdb]">{format(x.d, "HH:mm")}</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-bold text-[#16203a]">{x.name}</div>
+                <div className="truncate text-[11.5px] font-medium text-[#8a94a6]">{x.role || "—"}</div>
+              </div>
+              <TypePill type={typeLabelFromEnum(x.type)} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

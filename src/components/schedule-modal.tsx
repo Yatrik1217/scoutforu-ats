@@ -13,6 +13,7 @@ import { scheduleInterview } from "@/lib/actions/mutations";
 import type { InterviewTypeEnum, ProfileRow } from "@/lib/database.types";
 
 const TYPES: { label: string; value: InterviewTypeEnum }[] = [
+  { label: "Client Interview", value: "client" },
   { label: "Video", value: "video" },
   { label: "Phone", value: "phone" },
   { label: "Onsite", value: "onsite" },
@@ -50,7 +51,7 @@ export function ScheduleModal({
     candidateId: candidateId ?? "",
     date: "",
     time: "",
-    type: "video",
+    type: "client",
     interviewerId: team[0]?.id ?? null,
     location: "",
     notes: "",
