@@ -67,7 +67,16 @@ export async function getWorkspace(
   const [clients, jobs, team, candidates, interviews, offers, events, settings, jobRecs, pipeRows] =
     await Promise.all([
       sb.from("clients").select("*").order("name"),
-      sb.from("jobs").select("*").order("posted_at", { ascending: false }),
+      // Only the light job columns the app-wide snapshot needs — the heavy text
+      // (description / keywords / profile_criteria / benefits / qualification /
+      // custom) is fetched on demand by the edit form and the matcher, so it
+      // isn't streamed on every page load. Big egress saver.
+      sb
+        .from("jobs")
+        .select(
+          "id,title,dept,location,type,openings,status,client_id,recruiter_id,posted_at,applicants_count,min_ctc_lpa,max_ctc_lpa,designation,target_date,reference_code,interviewer_hr,interview_venue,remote_work,exp_min,exp_max,functional_area,industry,hide_salary,walk_in,telephonic,branch_id,approval_status,published,published_at,created_at",
+        )
+        .order("posted_at", { ascending: false }),
       sb.from("profiles").select("*"),
       sb.from("candidates").select("*"),
       sb.from("interviews").select("*").order("scheduled_at"),
@@ -85,9 +94,12 @@ export async function getWorkspace(
   const profileById = new Map<string, ProfileRow>(
     (team.data ?? []).map((p) => [p.id, p]),
   );
-  const jobById = new Map<string, JobRow>((jobs.data ?? []).map((j) => [j.id, j]));
+  // The trimmed select returns fewer columns; treat as JobRow (heavy fields are
+  // simply absent app-wide and loaded on demand where actually needed).
+  const jobsLight = (jobs.data ?? []) as unknown as JobRow[];
+  const jobById = new Map<string, JobRow>(jobsLight.map((j) => [j.id, j]));
 
-  let jobRows = jobs.data ?? [];
+  let jobRows = jobsLight;
   let candRows = candidates.data ?? [];
   let interviewRows = interviews.data ?? [];
   let offerRows = offers.data ?? [];

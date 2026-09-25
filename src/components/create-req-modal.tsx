@@ -142,21 +142,23 @@ export function JobFormModal({
         expMax: numStr(job.exp_max),
         functionalArea: job.functional_area,
         industry: job.industry,
-        qualification: job.qualification,
-        keywords: job.keywords,
+        // Heavy text isn't in the app-wide snapshot — filled by the fetch below.
+        qualification: job.qualification ?? "",
+        keywords: job.keywords ?? "",
         minCtc: numStr(job.min_ctc_lpa),
         maxCtc: numStr(job.max_ctc_lpa),
         hideSalary: job.hide_salary,
-        description: job.description,
-        profileCriteria: job.profile_criteria,
-        benefits: job.benefits,
+        description: job.description ?? "",
+        profileCriteria: job.profile_criteria ?? "",
+        benefits: job.benefits ?? "",
         walkIn: job.walk_in,
         telephonic: job.telephonic,
         status: job.status,
       });
       // Load the full assigned set (lead + co-recruiters) for this job.
       const jobId = job.id;
-      createClient()
+      const sb = createClient();
+      sb
         .from("job_recruiters")
         .select("recruiter_id")
         .eq("job_id", jobId)
@@ -169,6 +171,23 @@ export function JobFormModal({
             ...ids.filter((x) => x !== job.recruiter_id),
           ];
           setF((s) => ({ ...s, recruiterIds: ordered, recruiterId: ordered[0] ?? s.recruiterId }));
+        });
+      // Heavy JD text is loaded on demand (kept out of the app-wide snapshot).
+      sb
+        .from("jobs")
+        .select("qualification,keywords,description,profile_criteria,benefits")
+        .eq("id", jobId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          setF((s) => ({
+            ...s,
+            qualification: data.qualification ?? "",
+            keywords: data.keywords ?? "",
+            description: data.description ?? "",
+            profileCriteria: data.profile_criteria ?? "",
+            benefits: data.benefits ?? "",
+          }));
         });
     } else {
       setF(blank(clients, team));
