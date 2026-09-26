@@ -28,6 +28,7 @@ import {
   BadgeIndianRupee,
   Mail,
   Wallet,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor, ROLE_LABEL } from "@/lib/domain";
@@ -75,6 +76,7 @@ export function AppSidebar({
     { href: "/talent-bank", label: "Talent Bank", icon: FolderArchive },
     ...(role === "master_admin"
       ? [
+          { href: "/priorities", label: "Weekly Focus", icon: Target } as NavItem,
           { href: "/team", label: "Team", icon: UserCheck } as NavItem,
           { href: "/activity", label: "Daily Activity", icon: Activity } as NavItem,
           { href: "/placements", label: "Placements", icon: HandCoins } as NavItem,

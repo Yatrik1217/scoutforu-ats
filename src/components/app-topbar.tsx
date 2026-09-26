@@ -25,6 +25,7 @@ const TITLES: Record<string, [string, string]> = {
   "/interviews": ["Interviews", "Upcoming & scheduled rounds"],
   "/offers": ["Offers", "Offer journey & status"],
   "/analytics": ["Analytics", "Funnel & sourcing insights"],
+  "/priorities": ["Weekly Focus", "What to prioritise this week"],
   "/team": ["Recruiting Team", "Recruiter load & performance"],
   "/talent": ["Talent Pool", "Sourced & ready candidates"],
   "/admin": ["Admin", "Users, clients & configuration"],
