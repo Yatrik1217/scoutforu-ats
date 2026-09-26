@@ -16,6 +16,7 @@ import type {
   EmploymentType,
   FeedbackRecommendation,
   InterviewTypeEnum,
+  JobRow,
 } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; message?: string };
@@ -699,6 +700,54 @@ export async function setJobPublished(id: string, published: boolean): Promise<R
   }
   refresh();
   return { ok: true, message: published ? "Job is live on your careers page" : "Job removed from careers page" };
+}
+
+// Pin/unpin a role as Critical — forces it to the top of Weekly Focus.
+export async function setJobCritical(id: string, critical: boolean): Promise<Result> {
+  const sb = await createClient();
+  if (!(await canManageJob(sb, id)))
+    return { ok: false, error: "You can only change openings assigned to you." };
+  const { error } = await sb
+    .from("jobs")
+    .update({ is_critical: critical } as unknown as Partial<JobRow>)
+    .eq("id", id);
+  if (error) {
+    if (/is_critical/i.test(error.message))
+      return { ok: false, error: "Run migration 0056 (job critical flag) in Supabase, then try again." };
+    return { ok: false, error: error.message };
+  }
+  refresh();
+  return { ok: true, message: critical ? "Marked critical" : "Critical removed" };
+}
+
+// Assign (or reassign) the lead recruiter on a role straight from Weekly Focus.
+// Keeps job_recruiters in sync and emails a newly-added recruiter.
+export async function assignJobRecruiter(
+  id: string,
+  recruiterId: string | null,
+): Promise<Result> {
+  const sb = await createClient();
+  if (!(await canManageJob(sb, id)))
+    return { ok: false, error: "You can only change openings assigned to you." };
+  const { error } = await sb
+    .from("jobs")
+    .update({ recruiter_id: recruiterId })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  if (recruiterId) {
+    const { data: ex } = await sb
+      .from("job_recruiters")
+      .select("recruiter_id")
+      .eq("job_id", id)
+      .eq("recruiter_id", recruiterId)
+      .maybeSingle();
+    if (!ex) {
+      await sb.from("job_recruiters").insert({ job_id: id, recruiter_id: recruiterId });
+      await notifyJobAssignment(sb, id, [recruiterId]);
+    }
+  }
+  refresh();
+  return { ok: true, message: recruiterId ? "Recruiter assigned" : "Unassigned" };
 }
 
 export async function setUserApprover(id: string, isApprover: boolean): Promise<Result> {

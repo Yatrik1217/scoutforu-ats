@@ -74,7 +74,7 @@ export async function getWorkspace(
       sb
         .from("jobs")
         .select(
-          "id,title,dept,location,type,openings,status,client_id,recruiter_id,posted_at,applicants_count,min_ctc_lpa,max_ctc_lpa,designation,target_date,reference_code,interviewer_hr,interview_venue,remote_work,exp_min,exp_max,functional_area,industry,hide_salary,walk_in,telephonic,branch_id,approval_status,published,published_at,created_at",
+          "id,title,dept,location,type,openings,status,client_id,recruiter_id,posted_at,applicants_count,min_ctc_lpa,max_ctc_lpa,designation,target_date,reference_code,interviewer_hr,interview_venue,remote_work,exp_min,exp_max,functional_area,industry,hide_salary,walk_in,telephonic,branch_id,approval_status,published,published_at,is_critical,created_at",
         )
         .order("posted_at", { ascending: false }),
       sb.from("profiles").select("*"),

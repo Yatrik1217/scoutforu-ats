@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { Flame, Clock, AlertTriangle } from "lucide-react";
 import { loadWorkspace } from "@/lib/data";
 import { recruiterMetrics } from "@/lib/team-metrics";
-import { Avatar, RecBadge } from "@/components/bits";
+import { Avatar } from "@/components/bits";
+import { ArrowRight } from "lucide-react";
+import { CriticalToggle, AssignRecruiterSelect } from "@/components/priorities-actions";
 
 const LEVEL = {
   High: { bg: "#fdecec", fg: "#dc2626" },
@@ -22,7 +24,7 @@ export default async function PrioritiesPage() {
   const clientName = (id: string | null) =>
     id ? (ws.clients.find((c) => c.id === id)?.name ?? null) : null;
 
-  const now = Date.now();
+  const now = new Date().getTime();
   const day = 86_400_000;
 
   // Rank every open role by a transparent priority score.
@@ -30,11 +32,28 @@ export default async function PrioritiesPage() {
     .filter((j) => j.status !== "closed")
     .map((j) => {
       const cands = ws.candidates.filter((c) => c.job_id === j.id);
-      const active = cands.filter((c) => c.stageOutcome === "in_progress" && !c.on_hold).length;
+      const activeCands = cands.filter((c) => c.stageOutcome === "in_progress" && !c.on_hold);
+      const active = activeCands.length;
       // "submitted to client" = reached the Client Submit stage or beyond (not lost).
       const submitted = cands.filter(
         (c) => c.stageOutcome !== "lost" && c.stagePosition >= submitPos,
       ).length;
+      const readyToSubmit = activeCands.filter((c) => c.stagePosition < submitPos).length;
+      const stalledSubmitted = activeCands.filter((c) => c.stagePosition >= submitPos && c.days > 10).length;
+      const inInterview = activeCands.filter((c) => c.stageIsInterview).length;
+      const critical = !!j.is_critical;
+
+      // The concrete next step for this role.
+      const action =
+        active === 0
+          ? { label: "Source candidates", tone: "red" as const }
+          : readyToSubmit > 0
+            ? { label: `Submit ${readyToSubmit} to client`, tone: "amber" as const }
+            : stalledSubmitted > 0
+              ? { label: "Chase client", tone: "blue" as const }
+              : inInterview > 0
+                ? { label: "Push interviews", tone: "blue" as const }
+                : { label: "Review pipeline", tone: "muted" as const };
       const daysOpen = Math.max(0, Math.floor((now - +new Date(j.posted_at)) / day));
       const overdue = j.target_date
         ? Math.floor((now - +new Date(j.target_date)) / day)
@@ -71,8 +90,11 @@ export default async function PrioritiesPage() {
         reasons.push({ label: `${active} in pipeline`, tone: "amber" });
       }
 
-      const level = score >= 80 ? "High" : score >= 45 ? "Medium" : "Low";
-      const rec = j.recruiter_id ? ws.profileById.get(j.recruiter_id) : null;
+      if (critical) {
+        score += 1000; // pinned to the top by the admin
+        reasons.unshift({ label: "Critical", tone: "red" });
+      }
+      const level = critical || score >= 80 ? "High" : score >= 45 ? "Medium" : "Low";
       return {
         id: j.id,
         title: j.title,
@@ -83,12 +105,18 @@ export default async function PrioritiesPage() {
         submitted,
         active,
         level: level as keyof typeof LEVEL,
+        critical,
+        action,
         score,
         reasons,
-        rec,
+        recId: j.recruiter_id,
       };
     })
     .sort((a, b) => b.score - a.score);
+
+  const recruiterOpts = ws.team
+    .filter((p) => p.role === "recruiter")
+    .map((p) => ({ id: p.id, name: p.name }));
 
   const highCount = ranked.filter((r) => r.level === "High").length;
 
@@ -104,12 +132,14 @@ export default async function PrioritiesPage() {
     timeZone: "Asia/Kolkata",
   });
 
-  const toneCls = (t: "red" | "amber" | "muted") =>
+  const toneCls = (t: "red" | "amber" | "muted" | "blue") =>
     t === "red"
       ? "bg-[#fdecec] text-[#dc2626]"
       : t === "amber"
         ? "bg-[#fff5e6] text-[#b45309]"
-        : "bg-[#eef1f6] text-[#7a8696]";
+        : t === "blue"
+          ? "bg-[#eef4fe] text-[#2a6fdb]"
+          : "bg-[#eef1f6] text-[#7a8696]";
 
   return (
     <div className="animate-sc-fadein p-[22px_26px_40px]">
@@ -133,8 +163,9 @@ export default async function PrioritiesPage() {
                 key={r.id}
                 className="flex items-start gap-3 border-t border-[#f0f3f8] py-3 first:border-0"
               >
-                <div className="w-6 shrink-0 pt-0.5 text-center text-[13px] font-extrabold text-[#c3ccdb]">
-                  {i + 1}
+                <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                  <span className="w-4 text-center text-[13px] font-extrabold text-[#c3ccdb]">{i + 1}</span>
+                  <CriticalToggle jobId={r.id} critical={r.critical} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -146,16 +177,25 @@ export default async function PrioritiesPage() {
                     </Link>
                     <span
                       className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold"
-                      style={{ background: LEVEL[r.level].bg, color: LEVEL[r.level].fg }}
+                      style={
+                        r.critical
+                          ? { background: "#dc2626", color: "#fff" }
+                          : { background: LEVEL[r.level].bg, color: LEVEL[r.level].fg }
+                      }
                     >
-                      {r.level}
+                      {r.critical ? "Critical" : r.level}
                     </span>
                   </div>
                   <div className="mt-0.5 truncate text-[11.5px] font-semibold text-[#8a94a6]">
                     {[r.client, r.dept].filter(Boolean).join(" · ") || "—"} · {r.openings} opening
                     {r.openings === 1 ? "" : "s"}
                   </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${toneCls(r.action.tone)}`}
+                    >
+                      <ArrowRight size={11} strokeWidth={2.6} /> {r.action.label}
+                    </span>
                     {r.reasons.map((x, k) => (
                       <span
                         key={k}
@@ -166,17 +206,8 @@ export default async function PrioritiesPage() {
                     ))}
                   </div>
                 </div>
-                <div className="flex w-[150px] shrink-0 items-center justify-end gap-1.5">
-                  {r.rec ? (
-                    <>
-                      <RecBadge name={r.rec.name} color={r.rec.color} />
-                      <span className="truncate text-[12px] font-semibold text-[#42506b]">
-                        {r.rec.name}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[12px] font-semibold text-[#dc2626]">Unassigned</span>
-                  )}
+                <div className="shrink-0 pt-0.5">
+                  <AssignRecruiterSelect jobId={r.id} current={r.recId} recruiters={recruiterOpts} />
                 </div>
               </div>
             ))}

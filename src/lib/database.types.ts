@@ -99,6 +99,7 @@ export type JobRow = {
   approval_status: ApprovalStatus;
   published: boolean;
   published_at: string | null;
+  is_critical: boolean;
   created_at: string;
 };
 
