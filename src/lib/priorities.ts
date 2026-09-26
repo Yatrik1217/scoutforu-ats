@@ -30,6 +30,7 @@ export type RecruiterLoad = {
   stalled: number;
   hirePct: number;
   offerPct: number;
+  expYears: number; // recruiter's own experience — drives seniority alignment
   pct: number; // capacity vs a nominal load of 8 active
   overloaded: boolean;
 };
@@ -151,6 +152,7 @@ export function recruiterLoad(ws: Workspace): RecruiterLoad[] {
         stalled: m.stalled,
         hirePct: m.conv.hirePct,
         offerPct: m.conv.offerPct,
+        expYears: ws.profileById.get(m.id)?.experience_years ?? 0,
         pct,
         overloaded: pct >= 90,
       };
@@ -158,8 +160,11 @@ export function recruiterLoad(ws: Workspace): RecruiterLoad[] {
     .sort((a, b) => b.active - a.active);
 }
 
-// Recommend who should take a role: senior/critical → best track record among
-// those with room; junior/mid → whoever has the most capacity.
+// Recommend who should take a role — aligned by EXPERIENCE first:
+//   senior / critical JD → the most experienced recruiter with room
+//   junior JD           → a junior recruiter with room (right-sized, not wasted)
+//   mid / no exp data   → whoever has the most capacity
+// Ties and "everyone busy" fall back to spare capacity, and to track record.
 export function recommendRecruiter(
   role: Pick<PriorityRole, "seniority" | "critical">,
   load: RecruiterLoad[],
@@ -167,6 +172,19 @@ export function recommendRecruiter(
   if (!load.length) return null;
   const withRoom = load.filter((r) => !r.overloaded);
   const pool = withRoom.length ? withRoom : load;
+  const hasExp = load.some((r) => r.expYears > 0);
+  const yrs = (r: RecruiterLoad) => (r.expYears ? ` (${r.expYears}y)` : "");
+
+  if ((role.seniority === "senior" || role.critical) && hasExp) {
+    const rec = [...pool].sort(
+      (a, b) => b.expYears - a.expYears || b.hirePct - a.hirePct || a.active - b.active,
+    )[0];
+    return { rec, reason: `senior recruiter${yrs(rec)}${withRoom.length ? " + room" : ""}` };
+  }
+  if (role.seniority === "junior" && hasExp) {
+    const rec = [...pool].sort((a, b) => a.expYears - b.expYears || a.active - b.active)[0];
+    return { rec, reason: `right-sized${yrs(rec)} + capacity` };
+  }
   if (role.seniority === "senior" || role.critical) {
     const rec = [...pool].sort((a, b) => b.hirePct - a.hirePct || a.active - b.active)[0];
     return { rec, reason: withRoom.length ? "strong track record + room" : "strongest track record" };

@@ -4,7 +4,12 @@ import { Flame, Clock, AlertTriangle, ArrowRight, Sparkles, UserPlus } from "luc
 import { loadWorkspace } from "@/lib/data";
 import { rankRoles, recruiterLoad, weeklyAdvice, type Reason } from "@/lib/priorities";
 import { Avatar } from "@/components/bits";
-import { CriticalToggle, AssignRecruiterSelect } from "@/components/priorities-actions";
+import {
+  CriticalToggle,
+  AssignRecruiterSelect,
+  RecruiterExpInput,
+  ApplySuggestion,
+} from "@/components/priorities-actions";
 
 const LEVEL = {
   High: { bg: "#fdecec", fg: "#dc2626" },
@@ -70,6 +75,7 @@ export default async function PrioritiesPage() {
                 <span className="text-[11.5px] font-semibold text-[#8a94a6]">
                   ({reason}{rec.overloaded ? " · note: also busy" : ""})
                 </span>
+                {role.recId !== rec.id && <ApplySuggestion jobId={role.id} recruiterId={rec.id} />}
               </div>
             ))}
           </div>
@@ -157,6 +163,7 @@ export default async function PrioritiesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 text-[13.5px] font-bold text-[#16203a]">
                         {m.name}
+                        <RecruiterExpInput id={m.id} years={m.expYears} />
                         {m.overloaded && (
                           <span className="rounded-full bg-[#fdecec] px-2 py-0.5 text-[9.5px] font-bold text-[#dc2626]">
                             Overloaded

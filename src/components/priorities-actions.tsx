@@ -1,10 +1,79 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Flag } from "lucide-react";
-import { setJobCritical, assignJobRecruiter } from "@/lib/actions/mutations";
+import { Flag, Check } from "lucide-react";
+import {
+  setJobCritical,
+  assignJobRecruiter,
+  setRecruiterExperience,
+} from "@/lib/actions/mutations";
+
+// Inline editor for a recruiter's years of experience (drives role alignment).
+export function RecruiterExpInput({ id, years }: { id: string; years: number }) {
+  const router = useRouter();
+  const [val, setVal] = useState(String(years || ""));
+  const [pending, start] = useTransition();
+  const save = () => {
+    const n = Number(val) || 0;
+    if (n === years) return;
+    start(async () => {
+      const r = await setRecruiterExperience(id, n);
+      if (r.ok) {
+        toast.success(r.message ?? "Saved");
+        router.refresh();
+      } else toast.error(r.error ?? "Failed");
+    });
+  };
+  return (
+    <span
+      className="flex items-center gap-1 text-[11px] font-semibold text-[#8a94a6]"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    >
+      <input
+        type="number"
+        min={0}
+        step={0.5}
+        value={val}
+        disabled={pending}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        className="w-[42px] rounded-[7px] border border-[#e3e8f0] bg-white px-1.5 py-0.5 text-[11px] font-bold text-[#42506b] outline-none focus:border-[#2a6fdb]"
+        title="Recruiter's years of experience"
+      />
+      y exp
+    </span>
+  );
+}
+
+// One-click "apply this suggested assignment".
+export function ApplySuggestion({ jobId, recruiterId }: { jobId: string; recruiterId: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const r = await assignJobRecruiter(jobId, recruiterId);
+          if (r.ok) {
+            toast.success(r.message ?? "Assigned");
+            router.refresh();
+          } else toast.error(r.error ?? "Failed");
+        })
+      }
+      className="flex items-center gap-1 rounded-[7px] bg-[#2a6fdb] px-2 py-0.5 text-[10.5px] font-bold text-white hover:bg-[#1f5bc0] disabled:opacity-50"
+      title="Assign this role to the suggested recruiter"
+    >
+      <Check size={11} strokeWidth={3} /> Assign
+    </button>
+  );
+}
 
 // Pin/unpin a role as Critical (forces it to the top of Weekly Focus).
 export function CriticalToggle({ jobId, critical }: { jobId: string; critical: boolean }) {

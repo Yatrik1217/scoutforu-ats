@@ -17,6 +17,7 @@ import type {
   FeedbackRecommendation,
   InterviewTypeEnum,
   JobRow,
+  ProfileRow,
 } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; message?: string };
@@ -748,6 +749,29 @@ export async function assignJobRecruiter(
   }
   refresh();
   return { ok: true, message: recruiterId ? "Recruiter assigned" : "Unassigned" };
+}
+
+// A recruiter's own years of experience — drives seniority-based role alignment.
+export async function setRecruiterExperience(id: string, years: number): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data: me } = await sb.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (me?.role !== "master_admin") return { ok: false, error: "Only the Master Admin can do this" };
+  const val = Math.max(0, Math.min(50, Number(years) || 0));
+  const { error } = await sb
+    .from("profiles")
+    .update({ experience_years: val } as unknown as Partial<ProfileRow>)
+    .eq("id", id);
+  if (error) {
+    if (/experience_years/i.test(error.message))
+      return { ok: false, error: "Run migration 0057 (recruiter experience) in Supabase, then try again." };
+    return { ok: false, error: error.message };
+  }
+  refresh();
+  return { ok: true, message: `Experience set to ${val} yrs` };
 }
 
 export async function setUserApprover(id: string, isApprover: boolean): Promise<Result> {
