@@ -206,15 +206,21 @@ export async function loadWorkspace(): Promise<{
 export async function getNavCounts(): Promise<{
   jobs: number;
   interviews: number;
+  critical: number;
 }> {
   const sb = await createClient();
   // "Open Jobs" badge = active openings only (open/hot), matching the Jobs page
   // which treats status != 'closed' as active. Closed jobs must not inflate it.
-  const [jobs, interviews] = await Promise.all([
+  const [jobs, interviews, critical] = await Promise.all([
     sb.from("jobs").select("id", { count: "exact", head: true }).neq("status", "closed"),
     sb.from("interviews").select("id", { count: "exact", head: true }),
+    sb
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "closed")
+      .eq("is_critical", true),
   ]);
-  return { jobs: jobs.count ?? 0, interviews: interviews.count ?? 0 };
+  return { jobs: jobs.count ?? 0, interviews: interviews.count ?? 0, critical: critical.count ?? 0 };
 }
 
 // ---------- derived analytics (computed from candidates + events) ----------

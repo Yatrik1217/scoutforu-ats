@@ -46,11 +46,13 @@ export function AppSidebar({
   role,
   jobsCount,
   interviewsCount,
+  criticalCount = 0,
 }: {
   name: string;
   role: UserRole;
   jobsCount: number;
   interviewsCount: number;
+  criticalCount?: number;
 }) {
   const pathname = usePathname();
 
@@ -76,7 +78,7 @@ export function AppSidebar({
     { href: "/talent-bank", label: "Talent Bank", icon: FolderArchive },
     ...(role === "master_admin"
       ? [
-          { href: "/priorities", label: "Weekly Focus", icon: Target } as NavItem,
+          { href: "/priorities", label: "Weekly Focus", icon: Target, badge: criticalCount || undefined } as NavItem,
           { href: "/team", label: "Team", icon: UserCheck } as NavItem,
           { href: "/activity", label: "Daily Activity", icon: Activity } as NavItem,
           { href: "/placements", label: "Placements", icon: HandCoins } as NavItem,

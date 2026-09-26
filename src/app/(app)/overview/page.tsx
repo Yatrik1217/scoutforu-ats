@@ -15,8 +15,9 @@ import {
   inInterviewCount,
   hiresCount,
 } from "@/lib/data";
+import { rankRoles, recruiterLoad, weeklyAdvice } from "@/lib/priorities";
 import { getProfile } from "@/lib/auth";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Target, Sparkles, ArrowRight, UserPlus } from "lucide-react";
 import { DEPT_COLOR, hexA } from "@/lib/domain";
 import { Avatar, TypePill, typeLabelFromEnum } from "@/components/bits";
 
@@ -107,6 +108,19 @@ export default async function OverviewPage() {
     (x) => isThisWeek(x.d, { weekStartsOn: 1 }) && +x.d >= +startOfToday,
   ).length;
 
+  // Weekly Focus summary (admin) — priority roles, recruiter load & auto-advice.
+  const isAdmin = me?.role === "master_admin";
+  const ranked = isAdmin ? rankRoles(ws) : [];
+  const load = isAdmin ? recruiterLoad(ws) : [];
+  const advice = isAdmin ? weeklyAdvice(ranked, load) : { picks: [], overloaded: [], needHire: false };
+  const topRoles = ranked.filter((r) => r.level === "High" || r.critical).slice(0, 4);
+  const criticalN = ranked.filter((r) => r.critical).length;
+  const LVL = {
+    High: { bg: "#fdecec", fg: "#dc2626" },
+    Medium: { bg: "#fff5e6", fg: "#b45309" },
+    Low: { bg: "#eef4fe", fg: "#2a6fdb" },
+  } as const;
+
   return (
     <div className="animate-sc-fadein p-[24px_26px_40px]">
       {canReview && pendingReviews > 0 && (
@@ -175,6 +189,98 @@ export default async function OverviewPage() {
           <InterviewDay label="Tomorrow" date={tomorrowDate} items={tomorrowIv} />
         </div>
       </div>
+
+      {/* weekly focus — priorities + recruiter load + auto-advice (admin) */}
+      {isAdmin && ranked.length > 0 && (
+        <div className="mt-[18px] rounded-2xl border border-[#e9edf3] bg-white p-[22px]">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-[15.5px] font-extrabold">
+                <Target size={17} className="text-[#2a6fdb]" /> Weekly Focus
+              </div>
+              <div className="text-[12px] font-medium text-[#8a94a6]">
+                {ranked.length} open roles ·{" "}
+                <span className="font-bold text-[#dc2626]">
+                  {topRoles.length} to push{criticalN ? ` · ${criticalN} critical` : ""}
+                </span>
+              </div>
+            </div>
+            <Link
+              href="/priorities"
+              className="rounded-lg bg-[#eef4fe] px-3 py-[7px] text-[12.5px] font-bold text-[#2a6fdb] hover:bg-[#e0ebfd]"
+            >
+              Open board →
+            </Link>
+          </div>
+
+          {(advice.picks.length > 0 || advice.needHire) && (
+            <div className="mb-4 rounded-[12px] border border-[#dce7fb] bg-[#f5f9ff] p-[12px_14px]">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-extrabold text-[#16203a]">
+                <Sparkles size={13} className="text-[#2a6fdb]" /> Suggested assignments
+              </div>
+              {advice.needHire && (
+                <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[#b45309]">
+                  <UserPlus size={13} /> Team at capacity with High roles waiting — consider adding a recruiter.
+                </div>
+              )}
+              {advice.picks.slice(0, 3).map(({ role, rec, reason }) => (
+                <div key={role.id} className="flex flex-wrap items-center gap-1.5 text-[12px] leading-6">
+                  <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold capitalize text-[#42506b] ring-1 ring-[#e3e8f0]">
+                    {role.seniority}
+                  </span>
+                  <span className="font-bold text-[#16203a]">{role.title}</span>
+                  <ArrowRight size={12} className="text-[#8a94a6]" />
+                  <span className="font-extrabold text-[#2a6fdb]">{rec.name}</span>
+                  <span className="text-[11px] font-semibold text-[#8a94a6]">({reason})</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* top roles */}
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#9aa4b6]">Push these first</div>
+              {topRoles.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/pipeline?job=${r.id}`}
+                  className="-mx-2 flex items-center gap-2 rounded-[9px] px-2 py-1.5 hover:bg-[#f6f8fb]"
+                >
+                  <span
+                    className="shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+                    style={r.critical ? { background: "#dc2626", color: "#fff" } : { background: LVL[r.level].bg, color: LVL[r.level].fg }}
+                  >
+                    {r.critical ? "Critical" : r.level}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-[#16203a]">{r.title}</span>
+                  <span className="shrink-0 text-[11px] font-bold text-[#2a6fdb]">{r.action.label}</span>
+                </Link>
+              ))}
+              {topRoles.length === 0 && (
+                <div className="py-3 text-[12px] font-semibold text-[#a3acbd]">Nothing urgent — nice.</div>
+              )}
+            </div>
+            {/* recruiter load */}
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#9aa4b6]">Recruiter load</div>
+              {load.map((m) => {
+                const bar = m.pct > 90 ? "#ef4444" : m.pct > 55 ? "#f59e0b" : "#16a34a";
+                return (
+                  <div key={m.id} className="mb-2 flex items-center gap-2">
+                    <span className="w-[92px] shrink-0 truncate text-[12px] font-bold text-[#42506b]">{m.name}</span>
+                    <div className="h-[7px] flex-1 overflow-hidden rounded bg-[#f1f4f9]">
+                      <div className="h-full rounded" style={{ width: `${Math.min(100, m.pct)}%`, background: bar }} />
+                    </div>
+                    <span className="tf-num w-9 text-right text-[11px] font-bold" style={{ color: bar }}>{m.pct}%</span>
+                    {m.overloaded && <span className="text-[9.5px] font-bold text-[#dc2626]">busy</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* funnel + upcoming */}
       <div className="mt-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-[1.55fr_1fr]">

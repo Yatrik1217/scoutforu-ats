@@ -38,6 +38,7 @@ export default async function AppLayout({
         role={scope.role}
         jobsCount={counts.jobs}
         interviewsCount={counts.interviews}
+        criticalCount={counts.critical}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <ShellProvider role={scope.role} team={team ?? []} clients={clients ?? []} stages={stageOptions}>
