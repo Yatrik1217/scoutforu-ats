@@ -74,27 +74,45 @@ export default async function FinanceDashboard({
 
   // ---- Company vs Personal split + the monthly HDFC → Kotak transfer ----
   const r2 = (n: number) => Math.round(n * 100) / 100;
+  const catById = new Map(categories.map((c) => [c.id, c]));
   const companyExpTotal = r2(companyExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
   const personalExpTotal = r2(personalExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
 
-  // Personal cash needed this month = personal commitments due in the next 30
-  // days (EMIs / SIPs / insurance / bills — already de-duplicated by buildDueItems)
-  // + this month's personal living spend that isn't a commitment payment.
-  const personalDues = dueItems.filter((d) => d.scope === "personal");
-  const dueByTag = new Map<string, { amount: number; color: string }>();
-  for (const d of personalDues) {
-    const cur = dueByTag.get(d.tag) ?? { amount: 0, color: d.color };
-    cur.amount = r2(cur.amount + d.amount);
-    dueByTag.set(d.tag, cur);
+  // Personal cash this month, grouped by the category YOU tagged each entry with
+  // — nothing invented. Every rupee here traces to an expense you recorded.
+  const byCat = new Map<string, { amount: number; color: string }>();
+  for (const e of personalExp) {
+    if (e.is_income) continue;
+    const cat = e.category_id ? catById.get(e.category_id) : null;
+    const name = cat?.name ?? "Uncategorised";
+    const cur = byCat.get(name) ?? { amount: 0, color: cat?.color ?? "#8b5cf6" };
+    cur.amount = r2(cur.amount + e.amount);
+    byCat.set(name, cur);
   }
-  const personalLiving = r2(
-    personalExp.filter((e) => !e.is_income && !e.emi_id).reduce((s, e) => s + e.amount, 0),
-  );
-  const transferToKotak = r2([...dueByTag.values()].reduce((s, v) => s + v.amount, 0) + personalLiving);
+  // Add auto-debit SIPs/loans you set up but didn't log as an expense this month,
+  // so investments aren't missed (skips any already logged to avoid double-count).
+  const loggedEmiIds = new Set(personalExp.filter((e) => e.emi_id).map((e) => e.emi_id));
+  for (const c of emis) {
+    if (c.scope !== "personal" || c.status !== "active") continue;
+    if (c.type !== "sip" && c.type !== "loan") continue;
+    if (loggedEmiIds.has(c.id)) continue;
+    const name = c.type === "sip" ? "SIP (auto-debit)" : "EMI (auto-debit)";
+    const cur = byCat.get(name) ?? { amount: 0, color: c.type === "sip" ? "#16a34a" : "#4b6bfb" };
+    cur.amount = r2(cur.amount + (c.emi_amount || 0));
+    byCat.set(name, cur);
+  }
+  const transferBreakdown = [...byCat.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.amount - a.amount);
+  const transferToKotak = r2(transferBreakdown.reduce((s, v) => s + v.amount, 0));
 
-  // Credit-card spend this period, split by who pays it.
-  const ccCompany = r2(companyExp.filter((e) => !e.is_income && e.payment_method === "card").reduce((s, e) => s + e.amount, 0));
-  const ccPersonal = r2(personalExp.filter((e) => !e.is_income && e.payment_method === "card").reduce((s, e) => s + e.amount, 0));
+  // Credit-card spend split by who pays — by the "Credit Card" category you tag.
+  const isCC = (e: (typeof expenses)[number]) => {
+    const c = e.category_id ? catById.get(e.category_id) : null;
+    return (c?.name ?? "").toLowerCase().includes("credit card");
+  };
+  const ccCompany = r2(companyExp.filter((e) => !e.is_income && isCC(e)).reduce((s, e) => s + e.amount, 0));
+  const ccPersonal = r2(personalExp.filter((e) => !e.is_income && isCC(e)).reduce((s, e) => s + e.amount, 0));
   const ccTotal = r2(ccCompany + ccPersonal);
 
   const recent = expenses.slice(0, 8);
@@ -197,23 +215,22 @@ export default async function FinanceDashboard({
             {money(transferToKotak)}
           </div>
           <div className="mt-1 text-[11.5px] font-medium text-[#5a6573]">
-            Everything personal — EMIs, investments, insurance &amp; living spend
+            Your personal entries this month, by the category you tagged
           </div>
           <div className="mt-3 border-t border-[#d6ead0] pt-2.5">
-            {[...dueByTag.entries()].map(([tag, v]) => (
-              <div key={tag} className="flex items-center justify-between py-[3px] text-[12.5px]">
+            {transferBreakdown.map((v) => (
+              <div key={v.name} className="flex items-center justify-between py-[3px] text-[12.5px]">
                 <span className="flex items-center gap-1.5 font-semibold text-[#42506b]">
-                  <span className="h-2 w-2 rounded-full" style={{ background: v.color }} /> {tag}
+                  <span className="h-2 w-2 rounded-full" style={{ background: v.color }} /> {v.name}
                 </span>
                 <span className="tf-num font-bold text-[#16203a]">{money(v.amount)}</span>
               </div>
             ))}
-            <div className="flex items-center justify-between py-[3px] text-[12.5px]">
-              <span className="flex items-center gap-1.5 font-semibold text-[#42506b]">
-                <span className="h-2 w-2 rounded-full bg-[#8b5cf6]" /> Living expenses
-              </span>
-              <span className="tf-num font-bold text-[#16203a]">{money(personalLiving)}</span>
-            </div>
+            {transferBreakdown.length === 0 && (
+              <div className="py-2 text-[12px] font-semibold text-[#a3acbd]">
+                No personal entries this month yet.
+              </div>
+            )}
           </div>
         </div>
 
