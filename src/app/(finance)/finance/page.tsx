@@ -44,10 +44,13 @@ export default async function FinanceDashboard({
   horizon.setDate(horizon.getDate() + 30);
   const horizonISO = horizon.toISOString().slice(0, 10);
 
-  const [{ categories, expenses, emis }, rev, upcomingBundle] = await Promise.all([
+  const [{ categories, expenses, emis }, rev, upcomingBundle, monthData] = await Promise.all([
     loadFinance(undefined, period),
     loadPlacementRevenue(period),
     loadFinance(undefined, { from: todayISO, to: horizonISO, label: "" }),
+    // Always the CURRENT calendar month — the "move to personal this month"
+    // transfer must be monthly even when the page toggle shows the full year.
+    loadFinance(undefined, monthPeriod()),
   ]);
   const revenue = rev.grossFee; // fees earned, ex-GST; TDS/GST handled on the company page
 
@@ -78,10 +81,12 @@ export default async function FinanceDashboard({
   const companyExpTotal = r2(companyExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
   const personalExpTotal = r2(personalExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
 
-  // Personal cash this month, grouped by the category YOU tagged each entry with
-  // — nothing invented. Every rupee here traces to an expense you recorded.
+  // Personal cash for the CURRENT MONTH (not the page toggle), grouped by the
+  // category YOU tagged — nothing invented. Every rupee traces to an entry you
+  // recorded this month.
+  const personalMonthExp = monthData.expenses.filter((e) => e.scope === "personal");
   const byCat = new Map<string, { amount: number; color: string }>();
-  for (const e of personalExp) {
+  for (const e of personalMonthExp) {
     if (e.is_income) continue;
     const cat = e.category_id ? catById.get(e.category_id) : null;
     const name = cat?.name ?? "Uncategorised";
@@ -91,7 +96,7 @@ export default async function FinanceDashboard({
   }
   // Add auto-debit SIPs/loans you set up but didn't log as an expense this month,
   // so investments aren't missed (skips any already logged to avoid double-count).
-  const loggedEmiIds = new Set(personalExp.filter((e) => e.emi_id).map((e) => e.emi_id));
+  const loggedEmiIds = new Set(personalMonthExp.filter((e) => e.emi_id).map((e) => e.emi_id));
   for (const c of emis) {
     if (c.scope !== "personal" || c.status !== "active") continue;
     if (c.type !== "sip" && c.type !== "loan") continue;
