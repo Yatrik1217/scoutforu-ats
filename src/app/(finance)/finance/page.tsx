@@ -72,6 +72,31 @@ export default async function FinanceDashboard({
   const duesTotal = dueItems.reduce((s, i) => s + i.amount, 0);
   const sipMonthly = monthlySipOutflow(emis);
 
+  // ---- Company vs Personal split + the monthly HDFC → Kotak transfer ----
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const companyExpTotal = r2(companyExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
+  const personalExpTotal = r2(personalExp.filter((e) => !e.is_income).reduce((s, e) => s + e.amount, 0));
+
+  // Personal cash needed this month = personal commitments due in the next 30
+  // days (EMIs / SIPs / insurance / bills — already de-duplicated by buildDueItems)
+  // + this month's personal living spend that isn't a commitment payment.
+  const personalDues = dueItems.filter((d) => d.scope === "personal");
+  const dueByTag = new Map<string, { amount: number; color: string }>();
+  for (const d of personalDues) {
+    const cur = dueByTag.get(d.tag) ?? { amount: 0, color: d.color };
+    cur.amount = r2(cur.amount + d.amount);
+    dueByTag.set(d.tag, cur);
+  }
+  const personalLiving = r2(
+    personalExp.filter((e) => !e.is_income && !e.emi_id).reduce((s, e) => s + e.amount, 0),
+  );
+  const transferToKotak = r2([...dueByTag.values()].reduce((s, v) => s + v.amount, 0) + personalLiving);
+
+  // Credit-card spend this period, split by who pays it.
+  const ccCompany = r2(companyExp.filter((e) => !e.is_income && e.payment_method === "card").reduce((s, e) => s + e.amount, 0));
+  const ccPersonal = r2(personalExp.filter((e) => !e.is_income && e.payment_method === "card").reduce((s, e) => s + e.amount, 0));
+  const ccTotal = r2(ccCompany + ccPersonal);
+
   const recent = expenses.slice(0, 8);
 
   return (
@@ -158,6 +183,84 @@ export default async function FinanceDashboard({
           <span className="ml-auto text-[12px] font-bold text-[#2a6fdb]">View all →</span>
         </Link>
       )}
+
+      {/* Company vs Personal split + the monthly owner transfer */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1fr]">
+        {/* HDFC -> Kotak transfer */}
+        <div className="rounded-[16px] border border-[#dbe7d5] bg-[#f2faf0] p-[18px_20px]">
+          <div className="flex items-baseline justify-between">
+            <div className="text-[12.5px] font-bold uppercase tracking-wide text-[#16a34a]">
+              Move to personal this month · HDFC → Kotak
+            </div>
+          </div>
+          <div className="font-display tf-num mt-1 text-[30px] font-extrabold text-[#16a34a]">
+            {money(transferToKotak)}
+          </div>
+          <div className="mt-1 text-[11.5px] font-medium text-[#5a6573]">
+            Everything personal — EMIs, investments, insurance &amp; living spend
+          </div>
+          <div className="mt-3 border-t border-[#d6ead0] pt-2.5">
+            {[...dueByTag.entries()].map(([tag, v]) => (
+              <div key={tag} className="flex items-center justify-between py-[3px] text-[12.5px]">
+                <span className="flex items-center gap-1.5 font-semibold text-[#42506b]">
+                  <span className="h-2 w-2 rounded-full" style={{ background: v.color }} /> {tag}
+                </span>
+                <span className="tf-num font-bold text-[#16203a]">{money(v.amount)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between py-[3px] text-[12.5px]">
+              <span className="flex items-center gap-1.5 font-semibold text-[#42506b]">
+                <span className="h-2 w-2 rounded-full bg-[#8b5cf6]" /> Living expenses
+              </span>
+              <span className="tf-num font-bold text-[#16203a]">{money(personalLiving)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Company vs Personal + credit-card split */}
+        <div className="rounded-[16px] border border-[#e9edf3] bg-white p-[18px_20px]">
+          <div className="mb-3 text-[13.5px] font-extrabold text-[#16203a]">
+            Company vs Personal ({period.label})
+          </div>
+          {(() => {
+            const tot = Math.max(1, companyExpTotal + personalExpTotal);
+            return (
+              <>
+                <div className="mb-1 flex justify-between text-[12px] font-bold">
+                  <span className="text-[#2a6fdb]">Company {money(companyExpTotal)}</span>
+                  <span className="text-[#8b5cf6]">Personal {money(personalExpTotal)}</span>
+                </div>
+                <div className="flex h-[10px] overflow-hidden rounded-full bg-[#eef1f6]">
+                  <div style={{ width: `${(companyExpTotal / tot) * 100}%`, background: "#2a6fdb" }} />
+                  <div style={{ width: `${(personalExpTotal / tot) * 100}%`, background: "#8b5cf6" }} />
+                </div>
+              </>
+            );
+          })()}
+          <div className="mt-4 rounded-[11px] bg-[#f7f9fc] p-[12px_14px]">
+            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#9aa4b6]">
+              Credit card this period
+            </div>
+            {ccTotal > 0 ? (
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="tf-num font-extrabold text-[#16203a]">{money(ccTotal)} total</span>
+                <span className="text-[12px] font-semibold">
+                  <span className="text-[#2a6fdb]">{money(ccCompany)} company</span>
+                  {" · "}
+                  <span className="text-[#8b5cf6]">{money(ccPersonal)} personal</span>
+                </span>
+              </div>
+            ) : (
+              <div className="text-[12px] font-semibold text-[#a3acbd]">
+                No card spends tagged yet — set an expense’s payment mode to “Card”.
+              </div>
+            )}
+          </div>
+          <div className="mt-2 text-[11px] font-medium text-[#a3acbd]">
+            The company pays the company-tagged card spend; the personal portion is part of your Kotak transfer.
+          </div>
+        </div>
+      </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Company P&L */}
