@@ -465,6 +465,21 @@ export type PlacementEventRow = {
   created_at: string;
 };
 
+// Money actually paid out to a recruiter against their earned incentive.
+// placement_id ties a payout to one candidate/closure (null = general/advance).
+export type IncentivePayoutRow = {
+  id: string;
+  recruiter_id: string;
+  placement_id: string | null;
+  amount: number;
+  paid_on: string;
+  method: PaymentMethod;
+  reference: string;
+  notes: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 // ---- Finance (expense & P&L tracker, /finance) -------------------------------
 export type FinanceScope = "personal" | "company";
 export type FinanceCategoryKind = "expense" | "income";
@@ -796,6 +811,7 @@ export type Database = {
       placement_payments: Table<PlacementPaymentRow>;
       placement_events: Table<PlacementEventRow>;
       incentive_settings: Table<IncentiveSettingsRow>;
+      incentive_payouts: Table<IncentivePayoutRow>;
       employees: Table<EmployeeRow>;
       leave_types: Table<LeaveTypeRow>;
       leave_requests: Table<LeaveRequestRow>;

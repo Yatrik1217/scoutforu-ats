@@ -19,9 +19,11 @@ import {
 import { hexA } from "@/lib/domain";
 import { Avatar } from "@/components/bits";
 import { PlacementStatusBadge } from "@/components/placement-bits";
+import { IncentivePayouts, type PayoutItem } from "@/components/incentive-payouts";
 import type {
   PlacementRow,
   PlacementPaymentRow,
+  IncentivePayoutRow,
   IncentiveSettingsRow,
   ProfileRow,
 } from "@/lib/database.types";
@@ -50,6 +52,7 @@ export default async function RecruiterPerformancePage({
     { data: settingsData },
     { data: clientRows },
     { data: candCount },
+    { data: payoutData },
   ] = await Promise.all([
     sb
       .from("profiles")
@@ -61,6 +64,12 @@ export default async function RecruiterPerformancePage({
     sb.from("incentive_settings").select("*").maybeSingle(),
     sb.from("clients").select("id,name"),
     sb.from("candidates").select("id,created_at").eq("recruiter_id", id),
+    // New table (migration 0058); degrades to [] until the migration is run.
+    sb
+      .from("incentive_payouts")
+      .select("*")
+      .eq("recruiter_id", id)
+      .order("paid_on", { ascending: false }),
   ]);
   if (!profile) notFound();
 
@@ -105,6 +114,33 @@ export default async function RecruiterPerformancePage({
         startYear: fyStartYear(new Date()),
       })
     : null;
+
+  // Incentive payout ledger (money actually handed to this recruiter).
+  const placementName = new Map(placements.map((x) => [x.id, x.candidate_name]));
+  const payouts = ((payoutData ?? []) as IncentivePayoutRow[]).map(
+    (x): PayoutItem => ({
+      id: x.id,
+      amount: x.amount,
+      paid_on: x.paid_on,
+      method: x.method,
+      reference: x.reference,
+      notes: x.notes,
+      placement_id: x.placement_id,
+      candidateName: x.placement_id ? (placementName.get(x.placement_id) ?? null) : null,
+    }),
+  );
+  const paidByPlacement = new Map<string, number>();
+  for (const x of payouts)
+    if (x.placement_id)
+      paidByPlacement.set(x.placement_id, (paidByPlacement.get(x.placement_id) ?? 0) + x.amount);
+  // "Earned" anchor for the payout card: the FY closure total, else the period incentive.
+  const incentiveEarned = closureMode ? statement!.total : stats.incentive;
+  const earnedLabel = closureMode ? statement!.fyLabel : range.label;
+  // Candidates this recruiter has placed — the tag list for a payout.
+  const payablePlacements = placements
+    .filter((x) => x.status !== "cancelled")
+    .sort((a, b) => b.joining_date.localeCompare(a.joining_date))
+    .map((x) => ({ id: x.id, candidate_name: x.candidate_name }));
 
   const cards: { label: string; value: string; sub: string; icon: LucideIcon; color: string }[] = [
     { label: "Fee Booked", value: moneyShort(stats.bookedFee), sub: `${stats.placements} hire${stats.placements === 1 ? "" : "s"}`, icon: TrendingUp, color: "#2a6fdb" },
@@ -320,6 +356,16 @@ export default async function RecruiterPerformancePage({
       </div>
       )}
 
+      {/* incentive payout ledger — what's actually been paid vs earned */}
+      <IncentivePayouts
+        recruiterId={profile.id}
+        recruiterName={profile.name}
+        fyLabel={earnedLabel}
+        earned={incentiveEarned}
+        payouts={payouts}
+        placements={payablePlacements}
+      />
+
       <div className="mt-[18px] grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] items-start gap-[18px]">
         {/* placements */}
         <div className="overflow-hidden rounded-2xl border border-[#e9edf3] bg-white">
@@ -348,6 +394,14 @@ export default async function RecruiterPerformancePage({
                 <div className="tf-num text-[13px] font-extrabold">{money(pl.fee_amount)}</div>
                 <div className="text-[10.5px] font-medium text-[#a3acbd]">base fee</div>
               </div>
+              {paidByPlacement.has(pl.id) && (
+                <span
+                  className="tf-num shrink-0 rounded-full bg-[#f3eefe] px-2 py-0.5 text-[10.5px] font-bold text-[#8b5cf6]"
+                  title="Incentive paid against this candidate"
+                >
+                  {money(paidByPlacement.get(pl.id)!)} paid
+                </span>
+              )}
               <PlacementStatusBadge placement={pl} />
             </Link>
           ))}

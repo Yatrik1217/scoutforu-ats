@@ -8,6 +8,7 @@ import type {
   IncentiveSlab,
   QuarterTier,
   BonusTier,
+  PaymentMethod,
 } from "@/lib/database.types";
 
 type Result = { ok: boolean; error?: string; message?: string };
@@ -122,4 +123,64 @@ export async function setRecruiterIncentive(
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true, message: value == null ? "Using the firm default" : `Set to ${value}%` };
+}
+
+// ---- incentive payout ledger -------------------------------------------------
+// Record money actually handed to a recruiter against their earned incentive.
+// Optionally tagged to one placement (candidate) so a per-candidate tally works.
+const PAYOUT_METHODS: PaymentMethod[] = [
+  "bank_transfer",
+  "upi",
+  "cheque",
+  "cash",
+  "card",
+  "other",
+];
+
+export async function recordIncentivePayout(input: {
+  recruiterId: string;
+  amount: number;
+  paidOn: string; // ISO date
+  placementId?: string | null;
+  method?: PaymentMethod;
+  reference?: string;
+  notes?: string;
+}): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can record incentive payouts." };
+
+  const amount = Number(input.amount);
+  if (!input.recruiterId) return { ok: false, error: "Missing recruiter." };
+  if (!Number.isFinite(amount) || amount <= 0)
+    return { ok: false, error: "Enter a payout amount greater than zero." };
+  const paidOn = (input.paidOn || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn))
+    return { ok: false, error: "Pick a valid payout date." };
+  const method: PaymentMethod = PAYOUT_METHODS.includes(input.method as PaymentMethod)
+    ? (input.method as PaymentMethod)
+    : "bank_transfer";
+
+  const { error } = await sb.from("incentive_payouts").insert({
+    recruiter_id: input.recruiterId,
+    placement_id: input.placementId || null,
+    amount: Math.round(amount * 100) / 100,
+    paid_on: paidOn,
+    method,
+    reference: (input.reference ?? "").trim(),
+    notes: (input.notes ?? "").trim(),
+    created_by: me.id,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/performance", "layout");
+  return { ok: true, message: "Payout recorded" };
+}
+
+export async function deleteIncentivePayout(id: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can delete incentive payouts." };
+  if (!id) return { ok: false, error: "Missing payout." };
+  const { error } = await sb.from("incentive_payouts").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/performance", "layout");
+  return { ok: true, message: "Payout removed" };
 }
