@@ -92,11 +92,13 @@ export default async function OverviewPage() {
 
   // Interviews the recruiters have MARKED (scheduled) — the day planner. Only
   // future/today ones matter for planning, so drop already-past days.
+  const clientNameById = new Map(ws.clients.map((cl) => [cl.id, cl.name]));
   const marked = ws.interviews
     .map((iv) => {
       const c = ws.byId.get(iv.candidate_id);
       const d = new Date(iv.scheduled_at);
-      return { id: iv.id, type: iv.type, d, name: c?.name ?? "Candidate", role: c?.jobTitle ?? "" };
+      const client = c?.clientId ? (clientNameById.get(c.clientId) ?? "") : "";
+      return { id: iv.id, type: iv.type, d, name: c?.name ?? "Candidate", role: c?.jobTitle ?? "", client };
     })
     .sort((a, b) => +a.d - +b.d);
   const todayDate = new Date();
@@ -479,8 +481,16 @@ function InterviewDay({
 }: {
   label: string;
   date: Date;
-  items: { id: string; type: string; d: Date; name: string; role: string }[];
+  items: { id: string; type: string; d: Date; name: string; role: string; client: string }[];
 }) {
+  // Per-client tally for the day — "which clients have how many interviews".
+  const byClient = new Map<string, number>();
+  for (const x of items) {
+    const key = x.client || "Unassigned";
+    byClient.set(key, (byClient.get(key) ?? 0) + 1);
+  }
+  const clientTally = [...byClient.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
   return (
     <div className="rounded-[14px] border border-[#eef1f6] bg-[#fafbfe] p-[14px_16px]">
       <div className="mb-2 flex items-baseline justify-between">
@@ -492,6 +502,18 @@ function InterviewDay({
           {items.length} interview{items.length === 1 ? "" : "s"}
         </span>
       </div>
+      {items.length > 0 && (
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
+          {clientTally.map(([name, n]) => (
+            <span
+              key={name}
+              className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#42506b] ring-1 ring-[#e6e9f0]"
+            >
+              {name} <span className="tf-num text-[#2a6fdb]">{n}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {items.length === 0 ? (
         <div className="py-6 text-center text-[12px] font-semibold text-[#a3acbd]">No interviews marked.</div>
       ) : (
@@ -501,7 +523,11 @@ function InterviewDay({
               <div className="tf-num w-[46px] shrink-0 text-[12px] font-bold text-[#2a6fdb]">{format(x.d, "HH:mm")}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-bold text-[#16203a]">{x.name}</div>
-                <div className="truncate text-[11.5px] font-medium text-[#8a94a6]">{x.role || "—"}</div>
+                <div className="truncate text-[11.5px] font-medium text-[#8a94a6]">
+                  {x.client && <span className="font-bold text-[#42506b]">{x.client}</span>}
+                  {x.client && x.role ? " · " : ""}
+                  {x.role || (x.client ? "" : "—")}
+                </div>
               </div>
               <TypePill type={typeLabelFromEnum(x.type)} />
             </div>
