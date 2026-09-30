@@ -12,6 +12,11 @@ function dayLabel(d: Date) {
 
 export default async function InterviewsPage() {
   const { ws } = await loadWorkspace();
+  const clientNameById = new Map(ws.clients.map((cl) => [cl.id, cl.name]));
+  const clientOf = (candidateId: string) => {
+    const c = ws.byId.get(candidateId);
+    return c?.clientId ? (clientNameById.get(c.clientId) ?? "") : "";
+  };
 
   const stats = [
     {
@@ -84,6 +89,29 @@ export default async function InterviewsPage() {
                 {g.items.length} interviews
               </span>
             </div>
+            {/* per-client tally for the day — which clients have how many interviews */}
+            {(() => {
+              const byClient = new Map<string, number>();
+              for (const iv of g.items) {
+                const key = clientOf(iv.candidate_id) || "Unassigned";
+                byClient.set(key, (byClient.get(key) ?? 0) + 1);
+              }
+              const tally = [...byClient.entries()].sort(
+                (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+              );
+              return (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {tally.map(([name, n]) => (
+                    <span
+                      key={name}
+                      className="rounded-full bg-[#f6f8fb] px-2.5 py-0.5 text-[11px] font-bold text-[#42506b] ring-1 ring-[#e6e9f0]"
+                    >
+                      {name} <span className="tf-num text-[#2a6fdb]">{n}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {g.items.map((iv) => {
               const c = ws.byId.get(iv.candidate_id);
               const interviewer = iv.interviewer_id
@@ -103,8 +131,18 @@ export default async function InterviewsPage() {
                   <Avatar name={c?.name ?? "—"} size={38} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-bold">{c?.name ?? "—"}</div>
-                    <div className="text-[12px] font-medium text-[#8a94a6]">
-                      {c?.jobTitle ?? ""}
+                    <div className="truncate text-[12px] font-medium text-[#8a94a6]">
+                      {(() => {
+                        const client = clientOf(iv.candidate_id);
+                        const role = c?.jobTitle ?? "";
+                        return (
+                          <>
+                            {client && <span className="font-bold text-[#42506b]">{client}</span>}
+                            {client && role ? " · " : ""}
+                            {role}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                   <TypePill type={typeLabelFromEnum(iv.type)} />
