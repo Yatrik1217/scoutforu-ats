@@ -29,6 +29,7 @@ import {
   Mail,
   Wallet,
   Target,
+  PartyPopper,
   type LucideIcon,
 } from "lucide-react";
 import { initials, avatarColor, ROLE_LABEL } from "@/lib/domain";
@@ -98,6 +99,7 @@ export function AppSidebar({
   const mine: NavItem[] = [
     { href: "/my/attendance", label: "My Attendance", icon: CalendarCheck },
     { href: "/my/leave", label: "My Leave", icon: CalendarDays },
+    { href: "/my/holidays", label: "Holidays", icon: PartyPopper },
     { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
     // Staff can send candidate emails from their own mailbox.
     ...(role !== "client"
