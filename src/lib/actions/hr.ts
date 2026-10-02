@@ -502,6 +502,7 @@ async function computeLopForEmployee(input: {
     let crmLop: number | null = null;
     const crm = await getCrmPersonAttendance(e.crm_user_id, monthDays, todayISO);
     if (crm) {
+      const lwpLeave = new Set(crm.lwpLeaveDates);
       let l = 0;
       for (const d of monthDays) {
         if (e.joined_on && d < e.joined_on) continue;
@@ -509,8 +510,11 @@ async function computeLopForEmployee(input: {
         if (d > todayISO) continue;
         if (offDates.has(d)) continue; // company holidays + weekly-offs are paid
         const st = crm.statuses[d];
-        if (st === "absent" || st === "leave") l += 1;
+        if (st === "absent") l += 1;
         else if (st === "half_day") l += 0.5;
+        // Leave docks pay ONLY when it's unpaid (LWP). The monthly paid leave a
+        // salesperson is entitled to shows as "leave" but is never docked.
+        else if (st === "leave" && lwpLeave.has(d)) l += 1;
       }
       crmLop = round2(l);
     }

@@ -45,10 +45,21 @@ type CrmConfig = {
   saturdayOffWeeks?: number[];
   holidays?: CrmHoliday[];
 };
+// An approved leave in the CRM carries its own paid/unpaid verdict (`lwp`),
+// decided when it was granted (probation + accrual balance). Payroll must honour
+// that — paid leave never docks, only LWP leave does.
+type CrmLeaveRequest = {
+  userId: string | number;
+  fromDate: string;
+  toDate: string;
+  status?: string;
+  lwp?: boolean;
+};
 type CrmDB = {
   users?: CrmUser[];
   attendance?: CrmAttendance[];
   attendanceConfig?: CrmConfig;
+  leaveRequests?: CrmLeaveRequest[];
 };
 
 // ---- IST wall-clock helpers (mirror the CRM's app.js) -------------------------
@@ -133,6 +144,9 @@ export type CrmAttnRow = {
   name: string;
   statuses: Record<string, AttendanceStatus>; // date → status (real days only)
   times: Record<string, { in: string | null; out: string | null }>; // date → login/logout ISO
+  // Dates in this window the person was on UNPAID (LWP) leave — these dock pay;
+  // paid-leave dates still show as "leave" in `statuses` but are not listed here.
+  lwpLeaveDates: string[];
   summary: {
     present: number;
     halfDay: number;
@@ -175,15 +189,18 @@ function computeUserRow(
   cfg: CrmConfig,
   days: string[],
   todayISO: string,
+  leaveByDate?: Map<string, { lwp: boolean }>, // `${userId}|${date}` → paid/unpaid
 ): CrmAttnRow {
   const statuses: Record<string, AttendanceStatus> = {};
   const times: Record<string, { in: string | null; out: string | null }> = {};
+  const lwpLeaveDates: string[] = [];
   const summary = { present: 0, halfDay: 0, leave: 0, absent: 0, late: 0, grossMin: 0, netMin: 0 };
   for (const ds of days) {
     if (ds > todayISO) continue; // not yet due
     // Don't back-date absences before the person joined the CRM.
     if (u.createdAt && ds < u.createdAt) continue;
     const rec = byUserDate.get(`${u.id}|${ds}`);
+    const leave = leaveByDate?.get(`${u.id}|${ds}`);
     let st: string;
     if (rec) {
       const sp = spans(rec, cfg, todayISO);
@@ -196,15 +213,40 @@ function computeUserRow(
     } else {
       st = statusForDay(ds, cfg);
     }
+    // An APPROVED leave is authoritative over an un-worked day: a leave day with
+    // no check-in would otherwise fall through to "absent". If they actually
+    // checked in (present/half), that stands — they worked.
+    if (leave && st !== "present" && st !== "half_day") st = "leave";
     if (st === "none") continue;
     if (!CRM_STATUSES.includes(st as AttendanceStatus)) continue;
     statuses[ds] = st as AttendanceStatus;
     if (st === "present") summary.present++;
     else if (st === "half_day") summary.halfDay++;
-    else if (st === "leave") summary.leave++;
-    else if (st === "absent") summary.absent++;
+    else if (st === "leave") {
+      summary.leave++;
+      // Only UNPAID leave docks pay; paid leave shows as "leave" but is not LWP.
+      if (leave?.lwp) lwpLeaveDates.push(ds);
+    } else if (st === "absent") summary.absent++;
   }
-  return { id: String(u.id), name: u.name, statuses, times, summary };
+  return { id: String(u.id), name: u.name, statuses, times, lwpLeaveDates, summary };
+}
+
+// Index approved CRM leave by `${userId}|${date}` with its paid/unpaid verdict.
+function indexLeave(db: CrmDB): Map<string, { lwp: boolean }> {
+  const out = new Map<string, { lwp: boolean }>();
+  for (const r of Array.isArray(db.leaveRequests) ? db.leaveRequests : []) {
+    if (r.status !== "approved" || !r.fromDate || !r.toDate) continue;
+    const d = new Date(r.fromDate + "T00:00:00Z");
+    const end = new Date(r.toDate + "T00:00:00Z");
+    while (d <= end) {
+      const ds = d.toISOString().slice(0, 10);
+      // If any request marks the day paid, keep it paid (don't dock).
+      const prev = out.get(`${r.userId}|${ds}`);
+      out.set(`${r.userId}|${ds}`, { lwp: (prev ? prev.lwp : true) && !!r.lwp });
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+  }
+  return out;
 }
 
 function indexAttendance(db: CrmDB): Map<string, CrmAttendance> {
@@ -227,9 +269,10 @@ export async function getCrmSalespeopleAttendance(
   if (!db) return [];
   const cfg: CrmConfig = db.attendanceConfig || {};
   const byUserDate = indexAttendance(db);
+  const leaveByDate = indexLeave(db);
   return (db.users || [])
     .filter((u) => u.active !== false && u.role === "salesperson")
-    .map((u) => computeUserRow(u, byUserDate, cfg, days, todayISO));
+    .map((u) => computeUserRow(u, byUserDate, cfg, days, todayISO, leaveByDate));
 }
 
 /**
@@ -248,7 +291,7 @@ export async function getCrmPersonAttendance(
   const u = (db.users || []).find((x) => String(x.id) === String(crmUserId));
   if (!u) return null;
   const cfg: CrmConfig = db.attendanceConfig || {};
-  return computeUserRow(u, indexAttendance(db), cfg, days, todayISO);
+  return computeUserRow(u, indexAttendance(db), cfg, days, todayISO, indexLeave(db));
 }
 
 /**
