@@ -480,6 +480,80 @@ export async function setAttendance(
 
 // ---- payroll ------------------------------------------------------------------
 
+// Loss-of-pay days for one employee in a month, from attendance (ATS check-ins
+// or the CRM bridge) + approved leave + mid-month proration. Shared by the
+// initial run build and the on-demand "recalculate attendance" so both agree.
+async function computeLopForEmployee(input: {
+  e: EmployeeRow;
+  monthDays: string[];
+  offDates: Set<string>;
+  todayISO: string;
+  leaves: LeaveRequestRow[];
+  attendance: AttendanceRow[];
+  leaveTypes: LeaveTypeRow[];
+  period: string;
+}): Promise<number> {
+  const { e, monthDays, offDates, todayISO, leaves, attendance, leaveTypes, period } = input;
+  let lop: number;
+  if (e.attendance_source === "crm" && e.crm_user_id) {
+    // CRM salesperson: read their month from the CRM bridge; dock only real
+    // Absent / Half-day / leave days. If the blob can't be read, do NOT dock
+    // the whole month — leave in-month LOP at 0 (admin can adjust the line).
+    let crmLop: number | null = null;
+    const crm = await getCrmPersonAttendance(e.crm_user_id, monthDays, todayISO);
+    if (crm) {
+      let l = 0;
+      for (const d of monthDays) {
+        if (e.joined_on && d < e.joined_on) continue;
+        if (e.exit_on && d > e.exit_on) continue;
+        if (d > todayISO) continue;
+        if (offDates.has(d)) continue; // company holidays + weekly-offs are paid
+        const st = crm.statuses[d];
+        if (st === "absent" || st === "leave") l += 1;
+        else if (st === "half_day") l += 0.5;
+      }
+      crmLop = round2(l);
+    }
+    lop = crmLop ?? 0;
+  } else {
+    const mine = leaves.filter((l) => l.employee_id === e.id);
+    const myAtt = attendance.filter((a) => a.employee_id === e.id);
+    const unmarked = unmarkedAbsentCount({
+      monthDays,
+      markedDates: new Set(myAtt.map((a) => a.on_date)),
+      leaveDates: approvedLeaveDates(mine, period),
+      offDates,
+      joinedOn: e.joined_on,
+      exitOn: e.exit_on,
+      todayISO,
+    });
+    lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
+  }
+  // Prorate a mid-month joiner/leaver by CALENDAR days: every day before they
+  // joined (or after they left) is unpaid, including weekly-offs.
+  let notEmployed = 0;
+  for (const d of monthDays) {
+    if ((e.joined_on && d < e.joined_on) || (e.exit_on && d > e.exit_on)) notEmployed++;
+  }
+  return round2(lop + notEmployed);
+}
+
+// Off days for a month = weekly-off policy + company holidays. None dock pay.
+function offDatesForMonth(
+  monthDays: string[],
+  settingsRow: { weekly_offs?: number[] | null; saturday_off_weeks?: number[] | null } | null,
+  holidayDates: string[],
+): Set<string> {
+  return new Set<string>([
+    ...weeklyOffDates(
+      monthDays,
+      (settingsRow?.weekly_offs as number[] | undefined) ?? [0],
+      (settingsRow?.saturday_off_weeks as number[] | undefined) ?? [],
+    ),
+    ...holidayDates,
+  ]);
+}
+
 // How much incentive each employee has earned so far this financial year,
 // according to whichever incentive scheme is configured.
 async function incentiveEarnedByEmployee(
@@ -586,14 +660,11 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
     (_, i) => toISODate(new Date(year, monthNo - 1, i + 1)),
   );
   const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
-  const offDates = new Set<string>([
-    ...weeklyOffDates(
-      monthDays,
-      (settingsRow?.weekly_offs as number[] | undefined) ?? [0],
-      (settingsRow?.saturday_off_weeks as number[] | undefined) ?? [],
-    ),
-    ...((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
-  ]);
+  const offDates = offDatesForMonth(
+    monthDays,
+    settingsRow,
+    ((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
+  );
 
   // Incentive already carried on finalised/paid runs, per employee.
   const { data: doneRuns } = await sb
@@ -613,65 +684,19 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
 
   // Only build lines for active employees that don't already have one.
   const toBuild = ((emps ?? []) as EmployeeRow[]).filter((e) => !alreadyLined.has(e.id));
+  const allLeaves = (leaves ?? []) as LeaveRequestRow[];
   const rows = [];
   for (const e of toBuild) {
-    let lop: number;
-    // A CRM-sourced employee (e.g. a salesperson who checks in from the CRM)
-    // has no ATS attendance rows, so read their month from the CRM bridge and
-    // dock only real Absent / Half-day days. Falls back to the ATS calculation
-    // if the CRM blob can't be read.
-    let crmLop: number | null = null;
-    if (e.attendance_source === "crm" && e.crm_user_id) {
-      const crm = await getCrmPersonAttendance(e.crm_user_id, monthDays, todayISO);
-      if (crm) {
-        let l = 0;
-        for (const d of monthDays) {
-          if (e.joined_on && d < e.joined_on) continue;
-          if (e.exit_on && d > e.exit_on) continue;
-          if (d > todayISO) continue;
-          // Company holidays + weekly-offs (from the ATS holiday list) are paid,
-          // even if the CRM's own config hasn't got them — the ATS list is the
-          // single source of truth for payroll.
-          if (offDates.has(d)) continue;
-          const st = crm.statuses[d];
-          // Absent = full loss of pay; leave for a CRM salesperson defaults to
-          // LWP (unpaid) — a paid-leave case can be adjusted on the line.
-          if (st === "absent" || st === "leave") l += 1;
-          else if (st === "half_day") l += 0.5;
-        }
-        crmLop = round2(l);
-      }
-    }
-    if (e.attendance_source === "crm" && e.crm_user_id) {
-      // CRM employee: use the CRM loss-of-pay. If the CRM blob couldn't be read
-      // (crmLop null) do NOT fall back to the ATS calc — they have no ATS
-      // attendance, so it would wrongly dock the whole month. Default to no
-      // in-month LOP (mid-month proration below still applies); the admin can
-      // adjust the line if a real absence is missed.
-      lop = crmLop ?? 0;
-    } else {
-      const mine = ((leaves ?? []) as LeaveRequestRow[]).filter((l) => l.employee_id === e.id);
-      const myAtt = attendance.filter((a) => a.employee_id === e.id);
-      const unmarked = unmarkedAbsentCount({
-        monthDays,
-        markedDates: new Set(myAtt.map((a) => a.on_date)),
-        leaveDates: approvedLeaveDates(mine, period),
-        offDates,
-        joinedOn: e.joined_on,
-        exitOn: e.exit_on,
-        todayISO,
-      });
-      lop = lopDaysForMonth(mine, leaveTypes, period, myAtt) + unmarked;
-    }
-    // Prorate a mid-month joiner/leaver by CALENDAR days: every day in the month
-    // before they joined (or after they left) is unpaid — including weekly-offs,
-    // since salary is gross ÷ days-in-month and they weren't employed those days.
-    // (Only new lines run this — existing lines are never recomputed.)
-    let notEmployed = 0;
-    for (const d of monthDays) {
-      if ((e.joined_on && d < e.joined_on) || (e.exit_on && d > e.exit_on)) notEmployed++;
-    }
-    lop = round2(lop + notEmployed);
+    const lop = await computeLopForEmployee({
+      e,
+      monthDays,
+      offDates,
+      todayISO,
+      leaves: allLeaves,
+      attendance,
+      leaveTypes,
+      period,
+    });
     const incentive = e.profile_id
       ? incentiveDue({
           earnedThisFY: earned.get(e.profile_id) ?? 0,
@@ -711,6 +736,99 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
       : "All employees already in this run"
     : `${monthLabel(period)} payroll created`;
   return { ok: true, id: runId, message: msg };
+}
+
+// Re-pull attendance for every line in a DRAFT run and refresh LOP / earned /
+// net. This is what makes "run payroll" reflect the month once it has actually
+// been worked — the initial build freezes LOP (often 0 if created early in the
+// month), and this recomputes it from the latest attendance. Manual additions,
+// deductions and incentive on each line are preserved untouched.
+export async function recalcPayrollAttendance(runId: string): Promise<Result> {
+  const { sb, me } = await requireAdmin();
+  if (!me) return { ok: false, error: "Only the Master Admin can recalculate payroll." };
+
+  const { data: run } = await sb
+    .from("payroll_runs")
+    .select("id,period_month,status")
+    .eq("id", runId)
+    .maybeSingle();
+  if (!run) return { ok: false, error: "Payroll run not found." };
+  if (run.status !== "draft")
+    return { ok: false, error: "This run is locked — reopen it to recalculate attendance." };
+
+  const period = run.period_month.slice(0, 8) + "01";
+  const monthEnd = toISODate(
+    new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0),
+  );
+  const [{ data: lines }, { data: emps }, { data: types }, { data: leaves }, { data: att }, { data: settingsRow }, { data: holData }] =
+    await Promise.all([
+      sb.from("payroll_lines").select("*").eq("run_id", runId),
+      sb.from("employees").select("*"),
+      sb.from("leave_types").select("*"),
+      sb.from("leave_requests").select("*").eq("status", "approved"),
+      sb.from("attendance").select("*").gte("on_date", period).lte("on_date", monthEnd),
+      sb.from("attendance_settings").select("weekly_offs,saturday_off_weeks").maybeSingle(),
+      sb.from("holidays").select("on_date").gte("on_date", period).lte("on_date", monthEnd),
+    ]);
+
+  const year = Number(period.slice(0, 4));
+  const monthNo = Number(period.slice(5, 7));
+  const monthDays = Array.from(
+    { length: new Date(year, monthNo, 0).getDate() },
+    (_, i) => toISODate(new Date(year, monthNo - 1, i + 1)),
+  );
+  const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+  const offDates = offDatesForMonth(
+    monthDays,
+    settingsRow,
+    ((holData ?? []) as { on_date: string }[]).map((h) => h.on_date),
+  );
+  const empById = new Map(((emps ?? []) as EmployeeRow[]).map((e) => [e.id, e]));
+  const allLeaves = (leaves ?? []) as LeaveRequestRow[];
+  const attendance = (att ?? []) as AttendanceRow[];
+  const leaveTypes = (types ?? []) as LeaveTypeRow[];
+  const total = daysInMonth(period);
+
+  let changed = 0;
+  for (const l of (lines ?? []) as PayrollLineRow[]) {
+    const e = empById.get(l.employee_id);
+    if (!e) continue;
+    const lop = await computeLopForEmployee({
+      e,
+      monthDays,
+      offDates,
+      todayISO,
+      leaves: allLeaves,
+      attendance,
+      leaveTypes,
+      period,
+    });
+    const calc = computeNet({
+      monthlyGross: l.monthly_gross,
+      totalDays: total,
+      lopDays: lop,
+      incentive: l.incentive, // keep the line's incentive + manual adjustments
+      additions: l.additions ?? [],
+      deductions: l.deductions ?? [],
+    });
+    if (lop !== l.lop_days || calc.earnedGross !== l.earned_gross || calc.net !== l.net_pay) {
+      const { error } = await sb
+        .from("payroll_lines")
+        .update({ lop_days: lop, earned_gross: calc.earnedGross, net_pay: calc.net })
+        .eq("id", l.id);
+      if (error) return { ok: false, error: error.message };
+      changed++;
+    }
+  }
+
+  refresh();
+  return {
+    ok: true,
+    id: runId,
+    message: changed
+      ? `Attendance recalculated — ${changed} payslip${changed === 1 ? "" : "s"} updated`
+      : "Already up to date with attendance",
+  };
 }
 
 export async function updatePayrollLine(

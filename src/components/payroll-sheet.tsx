@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { X, Save, Plus, Trash2, Lock, Unlock, BadgeIndianRupee, Download, RefreshCw } from "lucide-react";
+import { X, Save, Plus, Trash2, Lock, Unlock, BadgeIndianRupee, Download, RefreshCw, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
-import { updatePayrollLine, setPayrollStatus, createPayrollRun } from "@/lib/actions/hr";
+import { updatePayrollLine, setPayrollStatus, createPayrollRun, recalcPayrollAttendance } from "@/lib/actions/hr";
 import { NumberInput } from "@/components/number-input";
 import { Avatar } from "@/components/bits";
 import { money } from "@/lib/invoice";
@@ -72,8 +72,25 @@ export function PayrollActions({ run }: { run: PayrollRunRow }) {
       } else toast.error(res.error || "Failed");
     });
 
+  // Re-pull attendance into every line's LOP / earned / net. The initial build
+  // freezes LOP (0 if the run was created early in the month), so this is what
+  // makes the payslips reflect the month once it has actually been worked.
+  const recalc = () =>
+    start(async () => {
+      const res = await recalcPayrollAttendance(run.id);
+      if (res.ok) {
+        toast.success(res.message || "Recalculated");
+        router.refresh();
+      } else toast.error(res.error || "Failed");
+    });
+
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {run.status === "draft" && (
+        <button onClick={recalc} disabled={pending} className={ghost} title="Re-pull attendance and update loss-of-pay, earned salary and net for every payslip">
+          <CalendarClock size={14} /> Recalculate attendance
+        </button>
+      )}
       {run.status === "draft" && (
         <button onClick={sync} disabled={pending} className={ghost} title="Add any employees missing from this run">
           <RefreshCw size={14} /> Sync employees
