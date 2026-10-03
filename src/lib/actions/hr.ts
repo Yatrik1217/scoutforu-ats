@@ -908,11 +908,15 @@ async function syncPayrollExpense(
       await sb.from("finance_expenses").delete().eq("payroll_run_id", run.id);
       return;
     }
+    // Post SALARY only (earned gross, already net of loss-of-pay). Incentive and
+    // one-off additions/deductions are deliberately excluded — incentive lives in
+    // its own payout ledger, so the "Salaries & Wages" line stays a pure salary
+    // figure (e.g. ₹65,000/mo), not inflated by incentive.
     const { data: lines } = await sb
       .from("payroll_lines")
-      .select("net_pay")
+      .select("earned_gross")
       .eq("run_id", run.id);
-    const net = round2((lines ?? []).reduce((s, l) => s + Number(l.net_pay || 0), 0));
+    const net = round2((lines ?? []).reduce((s, l) => s + Number(l.earned_gross || 0), 0));
     if (net <= 0) {
       await sb.from("finance_expenses").delete().eq("payroll_run_id", run.id);
       return;
@@ -934,11 +938,11 @@ async function syncPayrollExpense(
       scope: "company" as const,
       category_id: salaryCat?.id ?? null,
       is_income: false,
-      title: `Payroll — ${monthTitle} (${count} employee${count === 1 ? "" : "s"})`,
+      title: `Salaries — ${monthTitle} (${count} employee${count === 1 ? "" : "s"})`,
       amount: net,
       txn_date: period, // cost belongs to the period month
       paid_on: paidOn, // actual cash-out date (often the next month)
-      notes: "Auto-posted from payroll. Edit the payroll run to change this.",
+      notes: "Auto-posted from payroll (salary only, excl. incentive). Edit the payroll run to change this.",
       payroll_run_id: run.id,
     };
     const { data: existing } = await sb
