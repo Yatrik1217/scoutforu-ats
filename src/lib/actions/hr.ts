@@ -890,6 +890,69 @@ export async function updatePayrollLine(
   return { ok: true, message: "Saved" };
 }
 
+// Keep the company P&L's "Salaries & Wages" line in step with payroll: when a
+// run is marked PAID, post (or update) one finance expense for the ACTUAL net
+// paid, dated to the run's PERIOD month (so September salary shows in September)
+// with the real pay-out date on `paid_on`. When a run is reopened/finalised
+// (i.e. not paid), the auto-posted expense is removed. Idempotent via
+// finance_expenses.payroll_run_id — never duplicates. Best-effort: any failure
+// here (e.g. migration 0059 not yet run) never blocks the status change.
+async function syncPayrollExpense(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  run: { id: string; period_month: string; paid_at?: string | null },
+  status: "draft" | "finalised" | "paid",
+): Promise<void> {
+  try {
+    if (status !== "paid") {
+      // Not actually paid any more — pull the auto-posted expense back out.
+      await sb.from("finance_expenses").delete().eq("payroll_run_id", run.id);
+      return;
+    }
+    const { data: lines } = await sb
+      .from("payroll_lines")
+      .select("net_pay")
+      .eq("run_id", run.id);
+    const net = round2((lines ?? []).reduce((s, l) => s + Number(l.net_pay || 0), 0));
+    if (net <= 0) {
+      await sb.from("finance_expenses").delete().eq("payroll_run_id", run.id);
+      return;
+    }
+    // Resolve the company "Salaries & Wages" category (match by name, fall back
+    // to any company expense category mentioning salary/wage).
+    const { data: cats } = await sb
+      .from("finance_categories")
+      .select("id,name,scope,kind")
+      .eq("scope", "company");
+    const salaryCat =
+      (cats ?? []).find((c) => /^salaries?\b|salaries?\s*&?\s*wages/i.test(c.name)) ??
+      (cats ?? []).find((c) => /salar|wage/i.test(c.name));
+    const period = run.period_month.slice(0, 8) + "01"; // first of the period month
+    const paidOn = (run.paid_at ?? new Date().toISOString()).slice(0, 10);
+    const count = (lines ?? []).length;
+    const monthTitle = monthLabel(period);
+    const row = {
+      scope: "company" as const,
+      category_id: salaryCat?.id ?? null,
+      is_income: false,
+      title: `Payroll — ${monthTitle} (${count} employee${count === 1 ? "" : "s"})`,
+      amount: net,
+      txn_date: period, // cost belongs to the period month
+      paid_on: paidOn, // actual cash-out date (often the next month)
+      notes: "Auto-posted from payroll. Edit the payroll run to change this.",
+      payroll_run_id: run.id,
+    };
+    const { data: existing } = await sb
+      .from("finance_expenses")
+      .select("id")
+      .eq("payroll_run_id", run.id)
+      .maybeSingle();
+    if (existing) await sb.from("finance_expenses").update(row).eq("id", existing.id);
+    else await sb.from("finance_expenses").insert(row);
+  } catch {
+    /* best-effort: never block the payroll status change */
+  }
+}
+
 export async function setPayrollStatus(
   runId: string,
   status: "draft" | "finalised" | "paid",
@@ -897,14 +960,22 @@ export async function setPayrollStatus(
   const { sb, me } = await requireAdmin();
   if (!me) return { ok: false, error: "Only the Master Admin can run payroll." };
   const patch: Partial<PayrollRunRow> = { status };
-  if (status === "finalised") patch.finalised_at = new Date().toISOString();
-  if (status === "paid") patch.paid_at = new Date().toISOString();
+  const paidAt = new Date().toISOString();
+  if (status === "finalised") patch.finalised_at = paidAt;
+  if (status === "paid") patch.paid_at = paidAt;
   if (status === "draft") {
     patch.finalised_at = null;
     patch.paid_at = null;
   }
-  const { error } = await sb.from("payroll_runs").update(patch).eq("id", runId);
+  const { data: run, error } = await sb
+    .from("payroll_runs")
+    .update(patch)
+    .eq("id", runId)
+    .select("id,period_month,paid_at")
+    .maybeSingle();
   if (error) return { ok: false, error: error.message };
+  // Mirror the actual salary into the finance P&L.
+  if (run) await syncPayrollExpense(sb, run, status);
   refresh();
   const msg =
     status === "paid"

@@ -519,6 +519,7 @@ export type FinanceExpenseRow = {
   notes: string;
   emi_id: string | null;
   paid_on: string | null;
+  payroll_run_id: string | null; // set when auto-posted from a paid payroll run
   created_by: string | null;
   created_at: string;
   updated_at: string;
