@@ -51,8 +51,9 @@ if (existing) {
   console.log(`✓ Employee record ${existing.employee_code} already linked (type: contract)`);
 } else {
   const codes = await api("employees?select=employee_code");
-  const next = Math.max(0, ...codes.map((c) => Number(/^SFU-(\d+)$/.exec(c.employee_code)?.[1] ?? 0))) + 1;
-  const code = `SFU-${String(next).padStart(3, "0")}`;
+  // Consultants get their own series — they are not SFU-numbered staff.
+  const next = Math.max(0, ...codes.map((c) => Number(/^Consultant-(\d+)$/.exec(c.employee_code)?.[1] ?? 0))) + 1;
+  const code = `Consultant-${String(next).padStart(3, "0")}`;
   await api("employees", {
     method: "POST",
     body: JSON.stringify({
@@ -60,7 +61,7 @@ if (existing) {
       employee_code: code,
       name: profile.name,
       email: profile.email,
-      designation: "Freelance Recruiter",
+      designation: "Consultant Recruiter",
       department: "Recruitment",
       employment_type: "contract",
       joined_on: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
