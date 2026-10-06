@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
+import { FREELANCER_EMPLOYMENT_TYPE, isFreelancerPath } from "@/lib/freelancer";
 
 // "/invoice/" (trailing slash) keeps the tokenized public invoice view open
 // without exposing the staff "/invoices" area.
@@ -64,6 +65,22 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("deactivated", "1");
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Freelance recruiters are confined to the Workspace + My Attendance. Only
+  // looked up when the path is outside that set, so normal browsing costs nothing.
+  if (user && !isPublic && !isFreelancerPath(path)) {
+    const { data: emp } = await supabase
+      .from("employees")
+      .select("employment_type")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    if (emp?.employment_type === FREELANCER_EMPLOYMENT_TYPE) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/overview";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

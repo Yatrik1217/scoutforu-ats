@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
 import { ShellProvider } from "@/components/shell-provider";
+import { FREELANCER_EMPLOYMENT_TYPE } from "@/lib/freelancer";
 
 export default async function AppLayout({
   children,
@@ -17,7 +18,7 @@ export default async function AppLayout({
   // New logins must set their own password before using the app.
   if (profile.must_change_password) redirect("/change-password");
   const sb = await createClient();
-  const [{ data: clients }, { data: team }, counts, pipelines] = await Promise.all([
+  const [{ data: clients }, { data: team }, counts, pipelines, { data: myEmp }] = await Promise.all([
     sb.from("clients").select("*").order("name"),
     sb
       .from("profiles")
@@ -26,7 +27,9 @@ export default async function AppLayout({
       .eq("active", true),
     getNavCounts(),
     loadPipelines(),
+    sb.from("employees").select("employment_type").eq("profile_id", profile.id).maybeSingle(),
   ]);
+  const freelancer = myEmp?.employment_type === FREELANCER_EMPLOYMENT_TYPE;
   const scope = await getEffectiveScope(profile, clients ?? []);
   // Real pipeline stages for the "add/edit candidate" form's Stage dropdown.
   const stageOptions = pipelines.default.map((s) => ({ slug: s.slug, name: s.name }));
@@ -39,6 +42,7 @@ export default async function AppLayout({
         jobsCount={counts.jobs}
         interviewsCount={counts.interviews}
         criticalCount={counts.critical}
+        freelancer={freelancer}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <ShellProvider role={scope.role} team={team ?? []} clients={clients ?? []} stages={stageOptions}>

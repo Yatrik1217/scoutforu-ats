@@ -687,7 +687,10 @@ export async function createPayrollRun(periodMonth: string): Promise<Result> {
   const leaveTypes = (types ?? []) as LeaveTypeRow[];
 
   // Only build lines for active employees that don't already have one.
-  const toBuild = ((emps ?? []) as EmployeeRow[]).filter((e) => !alreadyLined.has(e.id));
+  // Freelancers (contract, no salary on file) are paid outside payroll.
+  const toBuild = ((emps ?? []) as EmployeeRow[]).filter(
+    (e) => !alreadyLined.has(e.id) && !(e.employment_type === "contract" && e.monthly_gross <= 0),
+  );
   const allLeaves = (leaves ?? []) as LeaveRequestRow[];
   const rows = [];
   for (const e of toBuild) {

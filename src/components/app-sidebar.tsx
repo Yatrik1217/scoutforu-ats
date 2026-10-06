@@ -48,12 +48,14 @@ export function AppSidebar({
   jobsCount,
   interviewsCount,
   criticalCount = 0,
+  freelancer = false,
 }: {
   name: string;
   role: UserRole;
   jobsCount: number;
   interviewsCount: number;
   criticalCount?: number;
+  freelancer?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -95,17 +97,20 @@ export function AppSidebar({
       : []),
   ];
 
-  // Everyone with a login gets their own leave and payslips.
-  const mine: NavItem[] = [
-    { href: "/my/attendance", label: "My Attendance", icon: CalendarCheck },
-    { href: "/my/leave", label: "My Leave", icon: CalendarDays },
-    { href: "/my/holidays", label: "Holidays", icon: PartyPopper },
-    { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
-    // Staff can send candidate emails from their own mailbox.
-    ...(role !== "client"
-      ? [{ href: "/my/email", label: "My Email", icon: Mail } as NavItem]
-      : []),
-  ];
+  // Everyone with a login gets their own leave and payslips — except freelance
+  // recruiters, who only mark attendance.
+  const mine: NavItem[] = freelancer
+    ? [{ href: "/my/attendance", label: "My Attendance", icon: CalendarCheck }]
+    : [
+        { href: "/my/attendance", label: "My Attendance", icon: CalendarCheck },
+        { href: "/my/leave", label: "My Leave", icon: CalendarDays },
+        { href: "/my/holidays", label: "Holidays", icon: PartyPopper },
+        { href: "/my/payslips", label: "My Payslips", icon: BadgeIndianRupee },
+        // Staff can send candidate emails from their own mailbox.
+        ...(role !== "client"
+          ? [{ href: "/my/email", label: "My Email", icon: Mail } as NavItem]
+          : []),
+      ];
 
   const showAdmin = role !== "client";
   const [open, setOpen] = useState(false);
@@ -174,10 +179,14 @@ export function AppSidebar({
             {mine.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
-            <SectionLabel className="pt-3.5">Administration</SectionLabel>
-            {admin.map((item) => (
-              <NavLink key={item.href} item={item} pathname={pathname} />
-            ))}
+            {!freelancer && (
+              <>
+                <SectionLabel className="pt-3.5">Administration</SectionLabel>
+                {admin.map((item) => (
+                  <NavLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </>
+            )}
           </>
         )}
       </nav>
