@@ -21,7 +21,7 @@ import { hexA } from "@/lib/domain";
 import type { PipelineStage } from "@/lib/pipeline";
 import { Avatar, RecBadge, RatingChip } from "@/components/bits";
 import { useShell } from "@/components/shell-provider";
-import { UserPlus } from "lucide-react";
+import { UserPlus, FileSpreadsheet } from "lucide-react";
 import { moveCandidateStage } from "@/lib/actions/mutations";
 import type { EnrichedCandidate } from "@/lib/data";
 
@@ -274,6 +274,29 @@ export function PipelineClient({
             <UserPlus size={15} strokeWidth={2.2} /> New Candidate
           </button>
         )}
+        {/* Download the selected role's CLIENT submissions tracker (Excel to
+            send to the client — the full client list across all recruiters).
+            Staff only; a client login never sees or can pull this. */}
+        {role !== "client" && (() => {
+          const job = filterJob !== "all" ? jobs.find((j) => j.id === filterJob) : null;
+          const cid = job?.clientId ?? null;
+          return cid ? (
+            <a
+              href={`/api/submissions-tracker/${cid}`}
+              title="Download this client's submissions tracker (Excel) to send to the client"
+              className="flex items-center gap-1.5 rounded-[9px] border border-[#d7e6cf] bg-[#f3faef] px-3 py-2 text-[12.5px] font-bold text-[#16a34a] hover:bg-[#eaf6e3]"
+            >
+              <FileSpreadsheet size={15} /> Client tracker
+            </a>
+          ) : (
+            <span
+              title="Pick a specific role above — the tracker exports that role's client"
+              className="flex cursor-not-allowed items-center gap-1.5 rounded-[9px] border border-[#eef1f6] bg-white px-3 py-2 text-[12.5px] font-bold text-[#c3ccdb]"
+            >
+              <FileSpreadsheet size={15} /> Client tracker
+            </span>
+          );
+        })()}
         <div className="flex-1" />
         <div className="flex gap-0.5 rounded-[10px] bg-[#eef1f6] p-[3px]">
           {(
