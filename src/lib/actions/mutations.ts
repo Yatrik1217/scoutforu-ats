@@ -11,6 +11,7 @@ import { loadPipelines } from "@/lib/pipeline";
 import { AUTO_EMAIL_MASTER } from "@/lib/domain";
 import type {
   AppSettingsRow,
+  CandidateRow,
   CandidateStage,
   CustomValues,
   EmploymentType,
@@ -30,6 +31,24 @@ function refresh() {
 // verbatim instead of being collapsed to a default StageKey.
 async function setStageBySlug(id: string, toSlug: string): Promise<Result> {
   const sb = await createClient();
+
+  // Mandate: a candidate cannot move to Client Submit without the recruiter's
+  // comment — it's what the client reads in the tracker. Blocks every path
+  // (drawer move, advance, bulk) from submitting a profile with no note.
+  if (toSlug === "client_submit") {
+    const { data: c } = await sb
+      .from("candidates")
+      .select("recruiter_comment")
+      .eq("id", id)
+      .maybeSingle();
+    if (!((c?.recruiter_comment ?? "").trim()))
+      return {
+        ok: false,
+        error:
+          "Add your recruiter comment first — it's required before submitting the candidate to the client.",
+      };
+  }
+
   const patch: { stage: CandidateStage; review_status?: "pending" } = {
     stage: toSlug as CandidateStage,
   };
@@ -204,6 +223,26 @@ export async function moveCandidateStage(
     await sendStageAutoEmail(sb, id, toSlug);
   }
   return res;
+}
+
+// Save the recruiter's comment (their assessment shown to the client). Required
+// before the candidate can be submitted to the client (see setStageBySlug).
+export async function setRecruiterComment(
+  id: string,
+  comment: string,
+): Promise<Result> {
+  const sb = await createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { error } = await sb
+    .from("candidates")
+    .update({ recruiter_comment: (comment ?? "").trim() } as unknown as Partial<CandidateRow>)
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: "Comment saved" };
 }
 
 export async function advanceCandidate(id: string): Promise<Result> {

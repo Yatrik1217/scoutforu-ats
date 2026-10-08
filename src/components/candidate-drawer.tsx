@@ -27,6 +27,7 @@ import {
   deleteInterviewFeedback,
   reviewCandidate,
   setCandidateHold,
+  setRecruiterComment,
 } from "@/lib/actions/mutations";
 import { scoreCandidateJd } from "@/lib/actions/jd-score";
 import type {
@@ -75,6 +76,8 @@ export function CandidateDrawer({
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [recComment, setRecComment] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
 
   const loadNotes = async (id: string) => {
     const sb = createClient();
@@ -221,6 +224,7 @@ export function CandidateDrawer({
       if (!active) return;
       // Resolve this candidate's pipeline: its client's override, else Default.
       const stages = buildResolver(ps.data ?? []).forClient(job.data?.client_id ?? null);
+      setRecComment(cand.recruiter_comment ?? "");
       setDetail({
         cand,
         stageSlug: cand.stage,
@@ -813,6 +817,50 @@ export function CandidateDrawer({
 
             {canWrite && (
               <div className="flex shrink-0 flex-col gap-2.5 border-t border-[#eef1f6] p-[16px_22px]">
+               {/* Recruiter comment — required before client submission; shown to
+                   the client in the submissions tracker. */}
+               <div className="rounded-[11px] border border-[#e3e8f0] bg-[#f9fbfe] p-[10px_12px]">
+                 <div className="mb-1 flex items-center justify-between">
+                   <span className="text-[11.5px] font-extrabold text-[#42506b]">
+                     Recruiter comment{" "}
+                     <span className="font-semibold text-[#dc2626]">· required to submit to client</span>
+                   </span>
+                   {!recComment.trim() && (
+                     <span className="rounded-full bg-[#fdecec] px-2 py-px text-[10px] font-bold text-[#dc2626]">
+                       Missing
+                     </span>
+                   )}
+                 </div>
+                 <textarea
+                   value={recComment}
+                   onChange={(e) => setRecComment(e.target.value)}
+                   placeholder="Why this candidate fits — key strengths, relevant experience, notice, any flags. The client reads this."
+                   rows={3}
+                   className="w-full resize-y rounded-[9px] border border-[#e3e8f0] bg-white px-3 py-2 text-[13px] text-[#16203a] outline-none focus:border-[#2a6fdb]"
+                 />
+                 <div className="mt-1.5 flex justify-end">
+                   <button
+                     disabled={savingComment || recComment === (detail.cand.recruiter_comment ?? "")}
+                     onClick={() => {
+                       if (!candidateId) return;
+                       setSavingComment(true);
+                       setRecruiterComment(candidateId, recComment).then((res) => {
+                         setSavingComment(false);
+                         if (res.ok) {
+                           toast.success(res.message ?? "Comment saved");
+                           setDetail((d) =>
+                             d ? { ...d, cand: { ...d.cand, recruiter_comment: recComment.trim() } } : d,
+                           );
+                           router.refresh();
+                         } else toast.error(res.error ?? "Could not save");
+                       });
+                     }}
+                     className="rounded-[9px] bg-[#2a6fdb] px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-[#1f5bc0] disabled:opacity-50"
+                   >
+                     {savingComment ? "Saving…" : "Save comment"}
+                   </button>
+                 </div>
+               </div>
                <div className="flex gap-2.5">
                 <button
                   disabled={pending}

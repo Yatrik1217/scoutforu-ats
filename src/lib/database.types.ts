@@ -143,6 +143,7 @@ export type CandidateRow = {
   industry: string;
   resume_url: string;
   reject_reason: string;
+  recruiter_comment: string; // recruiter's assessment shown to the client
   custom: CustomValues;
   jd_match: JdMatch | null;
   review_status: ReviewStatus;

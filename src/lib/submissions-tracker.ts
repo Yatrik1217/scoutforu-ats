@@ -18,7 +18,7 @@ export type SubmissionRow = {
   status: string;
   submittedOn: string | null; // ISO
   updatedOn: string | null; // ISO
-  recruiter: string;
+  recruiterComment: string; // recruiter's assessment for the client
 };
 
 // Candidates submitted to a client = anyone who reached the Client-Submit stage
@@ -52,7 +52,7 @@ export function submissionsForClient(ws: Workspace, clientId: string): Submissio
       status: c.on_hold ? `${c.stageName} (On hold)` : c.stageName,
       submittedOn: c.created_at ?? null,
       updatedOn: c.entered_stage_at ?? null,
-      recruiter: c.recruiterName ?? "",
+      recruiterComment: c.recruiter_comment ?? "",
     }));
   return rows;
 }
@@ -99,9 +99,9 @@ export async function buildSubmissionsWorkbook(input: {
     { header: "Email", key: "email", width: 26 },
     { header: "Phone", key: "phone", width: 15 },
     { header: "Current Status", key: "status", width: 20 },
+    { header: "Recruiter Comments", key: "recruiterComment", width: 44 },
     { header: "Submitted On", key: "submittedOn", width: 14 },
     { header: "Updated On", key: "updatedOn", width: 14 },
-    { header: "Recruiter", key: "recruiter", width: 16 },
   ];
   const lastCol = columns.length;
   const colLetter = (n: number) => wb.worksheets[0].getColumn(n).letter;
@@ -152,10 +152,11 @@ export async function buildSubmissionsWorkbook(input: {
       r.email,
       r.phone,
       r.status,
+      r.recruiterComment,
       fmtDate(r.submittedOn),
       fmtDate(r.updatedOn),
-      r.recruiter,
     ];
+    const commentCol = 13; // 0-based index of "Recruiter Comments"
     vals.forEach((v, i) => {
       const cell = row.getCell(i + 1);
       cell.value = v;
@@ -163,7 +164,7 @@ export async function buildSubmissionsWorkbook(input: {
       cell.alignment = {
         vertical: "middle",
         horizontal: i === 0 || i === 3 || i === 8 ? "center" : "left",
-        wrapText: false,
+        wrapText: i === commentCol, // wrap the (long) recruiter comment
       };
     });
     // Zebra striping for readability.
@@ -171,7 +172,7 @@ export async function buildSubmissionsWorkbook(input: {
       for (let i = 1; i <= lastCol; i++)
         row.getCell(i).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F8FB" } };
     }
-    row.height = 18;
+    // No fixed height — Excel auto-fits so wrapped recruiter comments show fully.
   });
 
   // Thin outer border around the table.
