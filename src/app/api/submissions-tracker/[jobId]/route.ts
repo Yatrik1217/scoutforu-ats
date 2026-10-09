@@ -2,24 +2,25 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getWorkspace } from "@/lib/data";
 import {
-  submissionsForClient,
+  submissionsForJob,
   buildSubmissionsWorkbook,
 } from "@/lib/submissions-tracker";
 import type { EffectiveScope } from "@/lib/preview";
-import type { OrganizationRow } from "@/lib/database.types";
+import type { ClientRow, OrganizationRow } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
-// Client submissions tracker (.xlsx). Available to any signed-in staff member
-// (admins and recruiters) — NOT to a client login. It always returns the FULL
-// client tracker (every recruiter's candidates for that client), so it is built
-// from a service-role workspace rather than the caller's own scoped view.
-//   GET /api/submissions-tracker/<clientId>
+// Submissions tracker (.xlsx) for ONE opening — the candidates submitted to the
+// client for that specific role, to share with the client. Available to any
+// signed-in staff member (admins + recruiters), never to a client login. Built
+// from a service-role workspace so it's the complete list for the role,
+// regardless of who downloads it.
+//   GET /api/submissions-tracker/<jobId>
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ clientId: string }> },
+  { params }: { params: Promise<{ jobId: string }> },
 ) {
-  const { clientId } = await params;
+  const { jobId } = await params;
   const sb = await createClient();
   const {
     data: { user },
@@ -31,12 +32,9 @@ export async function GET(
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  // Clients must never pull the internal submissions tracker.
   if (!me || me.role === "client")
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
 
-  // Full, unscoped workspace (all recruiters' candidates) so the tracker is the
-  // complete client list regardless of who is downloading it.
   const scope: EffectiveScope = {
     role: "master_admin",
     realRole: "master_admin",
@@ -47,20 +45,25 @@ export async function GET(
   };
   const ws = await getWorkspace(scope, createServiceClient());
 
-  const client = ws.clients.find((c) => c.id === clientId);
-  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  const job = ws.jobById.get(jobId) ?? ws.jobs.find((j) => j.id === jobId);
+  if (!job) return NextResponse.json({ error: "Opening not found" }, { status: 404 });
+  const client = ws.clients.find((c) => c.id === job.client_id) ?? null;
 
-  const rows = submissionsForClient(ws, clientId);
+  const rows = submissionsForJob(ws, jobId);
   const { data: org } = await sb.from("organization").select("*").maybeSingle();
 
   const bytes = await buildSubmissionsWorkbook({
-    client,
+    client: (client ?? ({ name: "—" } as ClientRow)),
     org: (org as OrganizationRow | null) ?? null,
     rows,
+    jobTitle: job.title,
   });
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const name = `Submissions - ${client.name} - ${stamp}`.replace(/[^\w .-]+/g, " ");
+  const name = `Submissions - ${client?.name ?? "—"} - ${job.title} - ${stamp}`.replace(
+    /[^\w .-]+/g,
+    " ",
+  );
 
   return new NextResponse(new Uint8Array(bytes), {
     headers: {

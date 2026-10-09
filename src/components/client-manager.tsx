@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Plus, Pencil, Trash2, X, FileSpreadsheet } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, X } from "lucide-react";
 import {
   saveClient,
   deleteClientRecord,
@@ -132,13 +132,6 @@ export function ClientManager({
           <span className="rounded-full bg-[#e9f9ef] px-2.5 py-1 text-[11px] font-bold text-[#16a34a]">{c.status}</span>
           {isAdmin && (
             <div className="flex gap-1">
-              <a
-                href={`/api/submissions-tracker/${c.id}`}
-                title={`Download ${c.name}'s submissions as an Excel tracker`}
-                className="flex h-7 items-center gap-1 rounded-lg border border-[#d7e6cf] bg-[#f3faef] px-2 text-[11px] font-bold text-[#16a34a] hover:bg-[#eaf6e3]"
-              >
-                <FileSpreadsheet size={14} /> Tracker
-              </a>
               <button onClick={() => openEdit(c)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#e6eaf1] text-[#9aa4b6] hover:bg-[#f6f8fb]"><Pencil size={14} /></button>
               <button onClick={() => remove(c)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#e6eaf1] text-[#9aa4b6] hover:bg-[#fef2f2] hover:text-[#dc2626]"><Trash2 size={14} /></button>
             </div>

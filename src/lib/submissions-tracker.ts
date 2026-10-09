@@ -21,17 +21,37 @@ export type SubmissionRow = {
   recruiterComment: string; // recruiter's assessment for the client
 };
 
-// Candidates submitted to a client = anyone who reached the Client-Submit stage
-// (or beyond) on a job belonging to that client. Collapsed-stage safety: we use
-// the pipeline-resolved stagePosition, not the raw slug.
-export function submissionsForClient(ws: Workspace, clientId: string): SubmissionRow[] {
+// The Client-Submit position for the Default pipeline (candidates at/after it
+// count as submitted to the client). Collapsed-stage safety: resolved position,
+// never the raw slug.
+function submitPosOf(ws: Workspace): number {
   const stages = ws.pipeline.default;
-  const submitPos =
+  return (
     stages.find((s) => s.slug === "client_submit")?.position ??
-    (stages.find((s) => s.slug === "screening")?.position ?? 1) + 1;
+    (stages.find((s) => s.slug === "screening")?.position ?? 1) + 1
+  );
+}
 
-  const rows = ws.candidates
-    .filter((c) => c.clientId === clientId && c.stagePosition >= submitPos)
+// Candidates submitted for ONE opening (job) — what the client is shown for
+// that specific role.
+export function submissionsForJob(ws: Workspace, jobId: string): SubmissionRow[] {
+  const submitPos = submitPosOf(ws);
+  return toRows(
+    ws.candidates.filter((c) => c.job_id === jobId && c.stagePosition >= submitPos),
+  );
+}
+
+// Candidates submitted to a client across ALL its openings. Kept for the
+// admin's whole-client export.
+export function submissionsForClient(ws: Workspace, clientId: string): SubmissionRow[] {
+  const submitPos = submitPosOf(ws);
+  return toRows(
+    ws.candidates.filter((c) => c.clientId === clientId && c.stagePosition >= submitPos),
+  );
+}
+
+function toRows(list: EnrichedCandidate[]): SubmissionRow[] {
+  const rows = list
     .sort(
       (a, b) =>
         b.stagePosition - a.stagePosition ||
@@ -75,8 +95,9 @@ export async function buildSubmissionsWorkbook(input: {
   client: ClientRow;
   org: OrganizationRow | null;
   rows: SubmissionRow[];
+  jobTitle?: string; // when exporting a single opening, named in the header
 }): Promise<Buffer> {
-  const { client, org, rows } = input;
+  const { client, org, rows, jobTitle } = input;
   const wb = new ExcelJS.Workbook();
   wb.creator = org?.name || "ScoutforU";
   wb.created = new Date();
@@ -116,9 +137,9 @@ export async function buildSubmissionsWorkbook(input: {
 
   ws.mergeCells(2, 1, 2, lastCol);
   const subCell = ws.getCell(2, 1);
-  subCell.value = `Client: ${client.name}    •    ${rows.length} candidate${
-    rows.length === 1 ? "" : "s"
-  }    •    Generated ${fmtDate(new Date().toISOString())}`;
+  subCell.value = `Client: ${client.name}${jobTitle ? `    •    Role: ${jobTitle}` : ""}    •    ${
+    rows.length
+  } candidate${rows.length === 1 ? "" : "s"}    •    Generated ${fmtDate(new Date().toISOString())}`;
   subCell.font = { size: 10.5, color: { argb: "FF6B7280" } };
   ws.getRow(3).height = 4;
 
